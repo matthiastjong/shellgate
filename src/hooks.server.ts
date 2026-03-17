@@ -22,6 +22,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (
 		pathname.startsWith("/api/") ||
 		pathname.startsWith("/gateway/") ||
+		pathname.startsWith("/discovery") ||
 		pathname.startsWith("/_app/") ||
 		pathname === "/favicon.ico"
 	) {
