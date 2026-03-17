@@ -1,5 +1,6 @@
 <script lang="ts">
 import { enhance } from "$app/forms";
+import { page } from "$app/state";
 import { toast } from "svelte-sonner";
 import { Button } from "$lib/components/ui/button/index.js";
 import { Badge } from "$lib/components/ui/badge/index.js";
@@ -11,6 +12,7 @@ import * as Tooltip from "$lib/components/ui/tooltip/index.js";
 import * as Breadcrumb from "$lib/components/ui/breadcrumb/index.js";
 import { Input } from "$lib/components/ui/input/index.js";
 import { Label } from "$lib/components/ui/label/index.js";
+import { Switch } from "$lib/components/ui/switch/index.js";
 import PlusIcon from "@lucide/svelte/icons/plus";
 import KeyRoundIcon from "@lucide/svelte/icons/key-round";
 import CopyIcon from "@lucide/svelte/icons/copy";
@@ -28,15 +30,26 @@ type Token = {
 	revokedAt: string | Date | null;
 	lastUsedAt: string | Date | null;
 	updatedAt: string | Date;
+	targetCount: number;
+};
+
+type Target = {
+	id: string;
+	name: string;
+	slug: string;
+	type: string;
+	baseUrl: string | null;
+	enabled: boolean;
 };
 
 let { data }: { data: PageData } = $props();
 
 let localTokens = $state<Token[] | null>(null);
-let tokenList = $derived<Token[]>(localTokens ?? data.tokens);
+let tokenList = $derived<Token[]>(localTokens ?? data.tokens as Token[]);
 let sheetOpen = $state(false);
 let revealOpen = $state(false);
 let revealedToken = $state("");
+let revealedTargetSlug = $state<string | null>(null);
 let copied = $state(false);
 let submitting = $state(false);
 let confirmRevokeId = $state<string | null>(null);
@@ -46,6 +59,14 @@ let confirmRegenerateId = $state<string | null>(null);
 let renameId = $state<string | null>(null);
 let renameName = $state("");
 let renameSubmitting = $state(false);
+
+// Create wizard state
+let createStep = $state<0 | 1 | 2>(0);
+let createName = $state("");
+let selectedTargetIds = $state<Set<string>>(new Set());
+
+let gatewayUrl = $derived(page.url.origin);
+let selectedCount = $derived(selectedTargetIds.size);
 
 function updateTokenList(updater: (tokens: Token[]) => Token[]) {
 	localTokens = updater(tokenList);
@@ -86,6 +107,9 @@ async function copyToClipboard(text: string) {
 function openCreateSheet() {
 	renameId = null;
 	renameName = "";
+	createStep = 0;
+	createName = "";
+	selectedTargetIds = new Set();
 	sheetOpen = true;
 }
 
@@ -94,20 +118,26 @@ function openRenameSheet(token: Token) {
 	renameName = token.name;
 	sheetOpen = true;
 }
+
+function toggleTarget(targetId: string) {
+	const next = new Set(selectedTargetIds);
+	if (next.has(targetId)) {
+		next.delete(targetId);
+	} else {
+		next.add(targetId);
+	}
+	selectedTargetIds = next;
+}
 </script>
 
 <!-- Create / Rename Sheet -->
 <Sheet.Root bind:open={sheetOpen}>
 	<Sheet.Content side="right">
-		<Sheet.Header>
-			<Sheet.Title>{renameId ? 'Rename API Key' : 'Create API Key'}</Sheet.Title>
-			<Sheet.Description>
-				{renameId
-					? 'Update the name for this API key.'
-					: 'Give your key a name to identify which agent or purpose it belongs to.'}
-			</Sheet.Description>
-		</Sheet.Header>
 		{#if renameId}
+			<Sheet.Header>
+				<Sheet.Title>Rename API Key</Sheet.Title>
+				<Sheet.Description>Update the name for this API key.</Sheet.Description>
+			</Sheet.Header>
 			<form
 				method="POST"
 				action="?/rename"
@@ -141,48 +171,109 @@ function openRenameSheet(token: Token) {
 					</Button>
 				</div>
 			</form>
-		{:else}
-			<form
-				method="POST"
-				action="?/create"
-				use:enhance={() => {
-					submitting = true;
-					return async ({ result, update }) => {
-						submitting = false;
-						if (result.type === 'success' && result.data?.created) {
-							const created = result.data.created as Token & { token: string };
-							updateTokenList((tokens) => [...tokens, {
-								id: created.id,
-								name: created.name,
-								createdAt: created.createdAt,
-								revokedAt: null,
-								lastUsedAt: null,
-								updatedAt: created.createdAt,
-							}]);
-							sheetOpen = false;
-							revealedToken = created.token;
-							revealOpen = true;
-							toast.success('API key created');
-						} else if (result.type === 'failure') {
-							toast.error((result.data?.error as string) ?? 'Failed to create key');
-						}
-						await update({ reset: true, invalidateAll: false });
-					};
-				}}
-			>
-				<div class="grid gap-4 px-4">
-					<div class="grid gap-2">
-						<Label for="create-name">Name</Label>
-						<Input id="create-name" name="name" placeholder="e.g. Production Agent" required />
-					</div>
-					<Button type="submit" disabled={submitting}>
-						{#if submitting}
-							<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
-						{/if}
-						Create Key
-					</Button>
+		{:else if createStep === 0}
+			<!-- Step 1: Name -->
+			<Sheet.Header>
+				<Sheet.Title>Create API Key</Sheet.Title>
+				<Sheet.Description>Give your key a name to identify which agent or purpose it belongs to.</Sheet.Description>
+			</Sheet.Header>
+			<div class="grid gap-4 px-4">
+				<div class="grid gap-2">
+					<Label for="create-name">Name</Label>
+					<Input id="create-name" bind:value={createName} placeholder="e.g. Production Agent" />
 				</div>
-			</form>
+				<Button disabled={!createName.trim()} onclick={() => (createStep = 1)}>
+					Next
+				</Button>
+			</div>
+		{:else if createStep === 1}
+			<!-- Step 2: Permissions -->
+			<Sheet.Header>
+				<Sheet.Title>Select Targets ({selectedCount} selected)</Sheet.Title>
+				<Sheet.Description>Choose which targets this API key can access.</Sheet.Description>
+			</Sheet.Header>
+			<div class="flex flex-col gap-4 px-4">
+				{#if (data.targets as Target[]).length === 0}
+					<p class="text-muted-foreground text-sm">No targets yet — you can add permissions later.</p>
+				{:else}
+					<div class="flex flex-col gap-2">
+						{#each data.targets as target (target.id)}
+							<div class="flex items-center justify-between rounded-lg border p-3">
+								<div class="flex flex-col gap-0.5">
+									<div class="flex items-center gap-2">
+										<span class="text-sm font-medium">{target.name}</span>
+										<Badge variant="outline" class="text-xs">{target.type}</Badge>
+									</div>
+									{#if target.baseUrl}
+										<span class="text-muted-foreground text-xs font-mono">{target.baseUrl}</span>
+									{/if}
+								</div>
+								<Switch
+									checked={selectedTargetIds.has(target.id)}
+									onCheckedChange={() => toggleTarget(target.id)}
+								/>
+							</div>
+						{/each}
+					</div>
+				{/if}
+				<div class="flex gap-2">
+					<Button variant="outline" class="flex-1" onclick={() => (createStep = 0)}>Back</Button>
+					<form
+						method="POST"
+						action="?/create"
+						class="flex-1"
+						use:enhance={() => {
+							submitting = true;
+							return async ({ result, update }) => {
+								submitting = false;
+								if (result.type === 'success' && result.data?.created) {
+									const created = result.data.created as Token & { token: string };
+									updateTokenList((tokens) => [...tokens, {
+										id: created.id,
+										name: created.name,
+										createdAt: created.createdAt,
+										revokedAt: null,
+										lastUsedAt: null,
+										updatedAt: created.createdAt,
+										targetCount: created.targetCount ?? 0,
+									}]);
+									sheetOpen = false;
+									revealedToken = created.token;
+									// Pick the first selected target slug for the curl example
+									const selectedTarget = (data.targets as Target[]).find((t) => selectedTargetIds.has(t.id));
+									revealedTargetSlug = selectedTarget?.slug ?? null;
+									revealOpen = true;
+									toast.success('API key created');
+								} else if (result.type === 'failure') {
+									toast.error((result.data?.error as string) ?? 'Failed to create key');
+								}
+								await update({ reset: true, invalidateAll: false });
+							};
+						}}
+					>
+						<input type="hidden" name="name" value={createName} />
+						<input type="hidden" name="targetIds" value={[...selectedTargetIds].join(",")} />
+						<Button type="submit" class="w-full" disabled={submitting}>
+							{#if submitting}
+								<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
+							{/if}
+							{selectedCount > 0 ? `Create Key with ${selectedCount} target${selectedCount > 1 ? 's' : ''}` : 'Create Key'}
+						</Button>
+					</form>
+				</div>
+				{#if (data.targets as Target[]).length > 0}
+					<button
+						type="button"
+						class="text-muted-foreground text-xs underline"
+						onclick={() => {
+							selectedTargetIds = new Set();
+							document.querySelector<HTMLFormElement>('[action="?/create"]')?.requestSubmit();
+						}}
+					>
+						Skip — create without permissions
+					</button>
+				{/if}
+			</div>
 		{/if}
 	</Sheet.Content>
 </Sheet.Root>
@@ -214,6 +305,15 @@ function openRenameSheet(token: Token) {
 				</Button>
 			</div>
 		</div>
+		{#if revealedTargetSlug}
+			<div class="mt-2">
+				<p class="text-muted-foreground mb-1 text-xs font-medium">Example usage:</p>
+				<div class="rounded-lg border bg-muted/50 p-3">
+					<pre class="break-all font-mono text-xs whitespace-pre-wrap">{`curl ${gatewayUrl}/gateway/${revealedTargetSlug}/v1/chat/completions \
+  -H "Authorization: Bearer ${revealedToken}"`}</pre>
+				</div>
+			</div>
+		{/if}
 		<p class="text-muted-foreground text-sm">
 			&#x26A0;&#xFE0F; This key will not be shown again. Copy it now and store it securely.
 		</p>
@@ -274,6 +374,7 @@ function openRenameSheet(token: Token) {
 						<Table.Head>Name</Table.Head>
 						<Table.Head>Key</Table.Head>
 						<Table.Head>Status</Table.Head>
+						<Table.Head>Targets</Table.Head>
 						<Table.Head>Last used</Table.Head>
 						<Table.Head>Created</Table.Head>
 						<Table.Head>Updated</Table.Head>
@@ -284,7 +385,7 @@ function openRenameSheet(token: Token) {
 					{#each tokenList as token (token.id)}
 						{#if confirmRevokeId === token.id}
 							<Table.Row class="bg-red-50 dark:bg-red-950/30">
-								<Table.Cell colspan={7}>
+								<Table.Cell colspan={8}>
 									<div class="flex items-center justify-between gap-4 py-1">
 										<p class="text-sm">
 											Revoke this key? Agents using it will lose access immediately.
@@ -319,7 +420,7 @@ function openRenameSheet(token: Token) {
 							</Table.Row>
 						{:else if confirmRegenerateId === token.id}
 							<Table.Row class="bg-amber-50 dark:bg-amber-950/30">
-								<Table.Cell colspan={7}>
+								<Table.Cell colspan={8}>
 									<div class="flex items-center justify-between gap-4 py-1">
 										<p class="text-sm">
 											Regenerate this key? The current key will stop working immediately.
@@ -338,6 +439,7 @@ function openRenameSheet(token: Token) {
 															));
 															confirmRegenerateId = null;
 															revealedToken = regenerated.token;
+															revealedTargetSlug = null;
 															revealOpen = true;
 															toast.success('Key regenerated');
 														} else if (result.type === 'failure') {
@@ -356,7 +458,9 @@ function openRenameSheet(token: Token) {
 							</Table.Row>
 						{:else}
 							<Table.Row>
-								<Table.Cell class="font-medium">{token.name}</Table.Cell>
+								<Table.Cell class="font-medium">
+									<a href="/api-keys/{token.id}" class="hover:underline">{token.name}</a>
+								</Table.Cell>
 								<Table.Cell>
 									<div class="flex items-center gap-1.5">
 										<span class="text-muted-foreground font-mono text-sm">sg_&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;</span>
@@ -375,6 +479,13 @@ function openRenameSheet(token: Token) {
 										<Badge variant="secondary">Revoked</Badge>
 									{:else}
 										<Badge class="border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300">Active</Badge>
+									{/if}
+								</Table.Cell>
+								<Table.Cell class="text-muted-foreground text-sm">
+									{#if token.targetCount > 0}
+										{token.targetCount} target{token.targetCount > 1 ? 's' : ''}
+									{:else}
+										<span class="text-muted-foreground/60">No targets</span>
 									{/if}
 								</Table.Cell>
 								<Table.Cell class="text-muted-foreground text-sm">{formatRelativeTime(token.lastUsedAt)}</Table.Cell>
