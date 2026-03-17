@@ -1,6 +1,6 @@
 import { fail, redirect } from "@sveltejs/kit";
 import { dev } from "$app/environment";
-import { env } from "$env/dynamic/private";
+import { verifyUser } from "$lib/server/services/users";
 import { createSession } from "$lib/server/auth";
 import type { Actions } from "./$types";
 
@@ -10,11 +10,10 @@ export const actions = {
 		const email = data.get("email")?.toString() ?? "";
 		const password = data.get("password")?.toString() ?? "";
 
-		if (email !== env.ADMIN_EMAIL || password !== env.ADMIN_PASSWORD) {
-			return fail(401, { error: "Invalid credentials" });
-		}
+		const user = await verifyUser(email, password);
+		if (!user) return fail(401, { error: "Invalid credentials" });
 
-		const session = createSession(email, env.ADMIN_PASSWORD ?? "");
+		const session = createSession(user.email);
 		cookies.set("session", session, {
 			path: "/",
 			httpOnly: true,

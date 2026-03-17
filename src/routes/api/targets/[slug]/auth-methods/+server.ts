@@ -5,7 +5,7 @@ import { getTargetBySlug } from "$lib/server/services/targets";
 import { listAuthMethods, createAuthMethod } from "$lib/server/services/auth-methods";
 
 export const GET: RequestHandler = async ({ request, params }) => {
-	requireAdmin(request);
+	await requireAdmin(request);
 
 	const target = await getTargetBySlug(params.slug);
 	if (!target) throw error(404, "target not found");
@@ -15,7 +15,7 @@ export const GET: RequestHandler = async ({ request, params }) => {
 };
 
 export const POST: RequestHandler = async ({ request, params }) => {
-	requireAdmin(request);
+	await requireAdmin(request);
 
 	const target = await getTargetBySlug(params.slug);
 	if (!target) throw error(404, "target not found");

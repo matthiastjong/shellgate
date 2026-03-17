@@ -4,13 +4,13 @@ import { requireAdmin } from "$lib/server/api-auth";
 import { listTokens, createToken } from "$lib/server/services/tokens";
 
 export const GET: RequestHandler = async ({ request }) => {
-	requireAdmin(request);
+	await requireAdmin(request);
 	const tokens = await listTokens();
 	return json(tokens);
 };
 
 export const POST: RequestHandler = async ({ request }) => {
-	requireAdmin(request);
+	await requireAdmin(request);
 	const body = await request.json().catch(() => ({}));
 	const name = typeof body.name === "string" ? body.name.trim() : "";
 	if (!name) throw error(400, "name is required");

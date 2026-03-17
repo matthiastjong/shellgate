@@ -6,7 +6,7 @@ import { updateAuthMethod, deleteAuthMethod } from "$lib/server/services/auth-me
 import { UUID_RE } from "$lib/server/utils/validate";
 
 export const PATCH: RequestHandler = async ({ request, params }) => {
-	requireAdmin(request);
+	await requireAdmin(request);
 
 	const target = await getTargetBySlug(params.slug);
 	if (!target) throw error(404, "target not found");
@@ -30,7 +30,7 @@ export const PATCH: RequestHandler = async ({ request, params }) => {
 };
 
 export const DELETE: RequestHandler = async ({ request, params }) => {
-	requireAdmin(request);
+	await requireAdmin(request);
 
 	const target = await getTargetBySlug(params.slug);
 	if (!target) throw error(404, "target not found");

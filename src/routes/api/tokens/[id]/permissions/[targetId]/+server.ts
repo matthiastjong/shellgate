@@ -5,7 +5,7 @@ import { removePermission } from "$lib/server/services/permissions";
 import { UUID_RE } from "$lib/server/utils/validate";
 
 export const DELETE: RequestHandler = async ({ request, params }) => {
-	requireAdmin(request);
+	await requireAdmin(request);
 	if (!UUID_RE.test(params.id)) throw error(400, "invalid id");
 	if (!UUID_RE.test(params.targetId)) throw error(400, "invalid targetId");
 

@@ -20,13 +20,18 @@ const data = {
 <script lang="ts">
 	import { page } from "$app/state";
 	import * as Sidebar from "$lib/components/ui/sidebar/index.js";
+	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
 	import ShieldCheckIcon from "@lucide/svelte/icons/shield-check";
+	import ChevronsUpDownIcon from "@lucide/svelte/icons/chevrons-up-down";
 	import type { ComponentProps } from "svelte";
 
 	let {
+		user,
 		ref = $bindable(null),
 		...restProps
-	}: ComponentProps<typeof Sidebar.Root> = $props();
+	}: ComponentProps<typeof Sidebar.Root> & {
+		user: { id: string; email: string } | null;
+	} = $props();
 </script>
 
 <Sidebar.Root {...restProps} bind:ref>
@@ -70,13 +75,30 @@ const data = {
 	<Sidebar.Footer>
 		<Sidebar.Menu>
 			<Sidebar.MenuItem>
-				<form method="POST" action="/logout" class="w-full">
-					<Sidebar.MenuButton class="w-full">
+				<DropdownMenu.Root>
+					<DropdownMenu.Trigger>
 						{#snippet child({ props })}
-							<button type="submit" {...props}>Logout</button>
+							<Sidebar.MenuButton size="lg" {...props}>
+								<div class="bg-sidebar-primary text-sidebar-primary-foreground flex size-8 items-center justify-center rounded-full text-sm font-medium">
+									{user?.email?.[0]?.toUpperCase() ?? "?"}
+								</div>
+								<div class="flex flex-col gap-0.5 leading-none text-left">
+									<span class="truncate text-sm font-medium">{user?.email ?? "Unknown"}</span>
+								</div>
+								<ChevronsUpDownIcon class="ml-auto size-4" />
+							</Sidebar.MenuButton>
 						{/snippet}
-					</Sidebar.MenuButton>
-				</form>
+					</DropdownMenu.Trigger>
+					<DropdownMenu.Content side="top" align="start" class="w-[--bits-sidebar-width]">
+						<DropdownMenu.Label class="truncate text-xs">{user?.email}</DropdownMenu.Label>
+						<DropdownMenu.Separator />
+						<DropdownMenu.Item>
+							<form method="POST" action="/logout" class="w-full">
+								<button type="submit" class="w-full text-left">Log out</button>
+							</form>
+						</DropdownMenu.Item>
+					</DropdownMenu.Content>
+				</DropdownMenu.Root>
 			</Sidebar.MenuItem>
 		</Sidebar.Menu>
 	</Sidebar.Footer>
