@@ -41,6 +41,11 @@ export async function getUserByEmail(email: string): Promise<User | null> {
 	return user ?? null;
 }
 
+export async function deleteUser(id: string): Promise<User | null> {
+	const [deleted] = await db.delete(users).where(eq(users.id, id)).returning();
+	return deleted ?? null;
+}
+
 export async function verifyUser(email: string, password: string): Promise<User | null> {
 	const [user] = await db
 		.select()

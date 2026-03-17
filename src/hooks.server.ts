@@ -4,11 +4,15 @@ import { countUsers, getUserByEmail } from "$lib/server/services/users";
 import { validateSession } from "$lib/server/auth";
 
 let hasUsers: boolean | null = null;
+let lastCheck = 0;
+const CHECK_TTL_MS = 60_000;
 
 async function checkHasUsers(): Promise<boolean> {
-	if (hasUsers === true) return true;
+	const now = Date.now();
+	if (hasUsers === true && now - lastCheck < CHECK_TTL_MS) return true;
 	const count = await countUsers();
 	hasUsers = count > 0;
+	lastCheck = now;
 	return hasUsers;
 }
 
