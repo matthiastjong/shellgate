@@ -33,8 +33,8 @@ type Target = {
 	baseUrl: string | null;
 	enabled: boolean;
 	authMethodCount: number;
-	createdAt: string;
-	updatedAt: string;
+	createdAt: string | Date;
+	updatedAt: string | Date;
 };
 
 let { data }: { data: PageData } = $props();
@@ -412,7 +412,7 @@ async function copyToClipboard(text: string) {
 											<DropdownMenu.Item onclick={() => goto(`/targets/${target.slug}`)}>Edit</DropdownMenu.Item>
 											<DropdownMenu.Item
 												onclick={() => {
-													document.getElementById(`toggle-form-${target.id}`)?.requestSubmit();
+													(document.getElementById(`toggle-form-${target.id}`) as HTMLFormElement)?.requestSubmit();
 												}}
 											>
 												{target.enabled !== false ? 'Disable' : 'Enable'}

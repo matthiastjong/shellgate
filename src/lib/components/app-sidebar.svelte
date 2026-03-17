@@ -71,8 +71,10 @@ const data = {
 		<Sidebar.Menu>
 			<Sidebar.MenuItem>
 				<form method="POST" action="/logout" class="w-full">
-					<Sidebar.MenuButton type="submit" class="w-full">
-						Logout
+					<Sidebar.MenuButton class="w-full">
+						{#snippet child({ props })}
+							<button type="submit" {...props}>Logout</button>
+						{/snippet}
 					</Sidebar.MenuButton>
 				</form>
 			</Sidebar.MenuItem>

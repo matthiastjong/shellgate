@@ -24,10 +24,10 @@ import type { PageData } from "./$types";
 type Token = {
 	id: string;
 	name: string;
-	createdAt: string;
-	revokedAt: string | null;
-	lastUsedAt: string | null;
-	updatedAt: string;
+	createdAt: string | Date;
+	revokedAt: string | Date | null;
+	lastUsedAt: string | Date | null;
+	updatedAt: string | Date;
 };
 
 let { data }: { data: PageData } = $props();
@@ -51,7 +51,7 @@ function updateTokenList(updater: (tokens: Token[]) => Token[]) {
 	localTokens = updater(tokenList);
 }
 
-function formatRelativeTime(dateStr: string | null): string {
+function formatRelativeTime(dateStr: string | Date | null): string {
 	if (!dateStr) return "Never";
 	if (!browser) return formatDate(dateStr);
 	const date = new Date(dateStr);
@@ -69,7 +69,7 @@ function formatRelativeTime(dateStr: string | null): string {
 	return rtf.format(-diffSec, "second");
 }
 
-function formatDate(dateStr: string): string {
+function formatDate(dateStr: string | Date): string {
 	return new Date(dateStr).toLocaleDateString("en-US", {
 		month: "short",
 		day: "numeric",
