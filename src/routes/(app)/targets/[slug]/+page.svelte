@@ -30,8 +30,8 @@ type Target = {
 	type: string;
 	baseUrl: string | null;
 	enabled: boolean;
-	createdAt: string;
-	updatedAt: string;
+	createdAt: string | Date;
+	updatedAt: string | Date;
 };
 
 type AuthMethod = {
@@ -40,7 +40,7 @@ type AuthMethod = {
 	type: string;
 	credentialHint: string | null;
 	isDefault: boolean;
-	createdAt: string;
+	createdAt: string | Date;
 };
 
 let { data }: { data: PageData } = $props();
@@ -130,7 +130,7 @@ function updateAuthMethods(updater: (methods: AuthMethod[]) => AuthMethod[]) {
 	localAuthMethods = updater(authMethods);
 }
 
-function formatDate(dateStr: string): string {
+function formatDate(dateStr: string | Date): string {
 	return new Date(dateStr).toLocaleDateString("en-US", {
 		month: "short",
 		day: "numeric",
@@ -615,7 +615,7 @@ async function copyToClipboard(text: string) {
 														<DropdownMenu.Item onclick={() => openRenameAuthSheet(method)}>Rename</DropdownMenu.Item>
 														<DropdownMenu.Item onclick={() => openUpdateCredentialSheet(method)}>Update Credential</DropdownMenu.Item>
 														{#if !method.isDefault}
-															<DropdownMenu.Item onclick={() => document.getElementById(`set-default-form-${method.id}`)?.requestSubmit()}>Set as Default</DropdownMenu.Item>
+															<DropdownMenu.Item onclick={() => (document.getElementById(`set-default-form-${method.id}`) as HTMLFormElement)?.requestSubmit()}>Set as Default</DropdownMenu.Item>
 														{/if}
 														<DropdownMenu.Separator />
 														<DropdownMenu.Item

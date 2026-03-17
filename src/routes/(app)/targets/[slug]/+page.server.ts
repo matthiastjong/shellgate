@@ -7,11 +7,11 @@ export const load: PageServerLoad = async ({ params }) => {
 	const target = await getTargetBySlug(params.slug);
 	if (!target) throw error(404, "Target not found");
 
-	let authMethods;
+	let authMethods: Awaited<ReturnType<typeof listAuthMethods>> = [];
 	try {
 		authMethods = await listAuthMethods(target.id);
 	} catch {
-		authMethods = [];
+		// fallback to empty array
 	}
 
 	return {
