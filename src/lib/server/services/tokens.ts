@@ -116,6 +116,23 @@ export async function findTokenByHash(hash: string) {
 	return row ?? null;
 }
 
+export async function getTokenById(id: string) {
+	const [row] = await db
+		.select({
+			id: tokens.id,
+			name: tokens.name,
+			allowedIps: tokens.allowedIps,
+			createdAt: tokens.createdAt,
+			revokedAt: tokens.revokedAt,
+			lastUsedAt: tokens.lastUsedAt,
+			updatedAt: tokens.updatedAt,
+		})
+		.from(tokens)
+		.where(eq(tokens.id, id))
+		.limit(1);
+	return row ?? null;
+}
+
 export async function updateLastUsed(id: string) {
 	await db
 		.update(tokens)

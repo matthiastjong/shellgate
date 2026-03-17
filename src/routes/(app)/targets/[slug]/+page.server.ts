@@ -1,4 +1,7 @@
 import { error, fail } from "@sveltejs/kit";
+import { eq } from "drizzle-orm";
+import { db } from "$lib/server/db";
+import { tokenPermissions, tokens } from "$lib/server/db/schema";
 import { getTargetBySlug, updateTarget } from "$lib/server/services/targets";
 import { listAuthMethods, createAuthMethod, updateAuthMethod, deleteAuthMethod } from "$lib/server/services/auth-methods";
 import type { Actions, PageServerLoad } from "./$types";
@@ -14,9 +17,26 @@ export const load: PageServerLoad = async ({ params }) => {
 		// fallback to empty array
 	}
 
+	let tokenAccess: { id: string; name: string; revokedAt: Date | null; lastUsedAt: Date | null }[] = [];
+	try {
+		tokenAccess = await db
+			.select({
+				id: tokens.id,
+				name: tokens.name,
+				revokedAt: tokens.revokedAt,
+				lastUsedAt: tokens.lastUsedAt,
+			})
+			.from(tokenPermissions)
+			.innerJoin(tokens, eq(tokenPermissions.tokenId, tokens.id))
+			.where(eq(tokenPermissions.targetId, target.id));
+	} catch {
+		// fallback to empty array
+	}
+
 	return {
 		target: { ...target, enabled: target.enabled !== false },
 		authMethods,
+		tokenAccess,
 	};
 };
 

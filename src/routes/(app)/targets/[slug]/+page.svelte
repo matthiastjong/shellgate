@@ -43,6 +43,13 @@ type AuthMethod = {
 	createdAt: string | Date;
 };
 
+type TokenAccess = {
+	id: string;
+	name: string;
+	revokedAt: string | Date | null;
+	lastUsedAt: string | Date | null;
+};
+
 let { data }: { data: PageData } = $props();
 
 let gatewayUrl = $derived(page.url.origin);
@@ -629,6 +636,51 @@ async function copyToClipboard(text: string) {
 											</Table.Cell>
 										</Table.Row>
 									{/if}
+								{/each}
+							</Table.Body>
+						</Table.Root>
+					</div>
+				{/if}
+			</div>
+
+			<!-- API Key Access -->
+			<div>
+				<div class="mb-4">
+					<h2 class="text-lg font-semibold">API Key Access</h2>
+				</div>
+
+				{#if (data.tokenAccess as TokenAccess[]).length === 0}
+					<div class="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed py-12">
+						<p class="text-muted-foreground text-sm">No API keys have access to this target yet.</p>
+					</div>
+				{:else}
+					<div class="rounded-lg border">
+						<Table.Root>
+							<Table.Header>
+								<Table.Row>
+									<Table.Head>Key Name</Table.Head>
+									<Table.Head>Status</Table.Head>
+									<Table.Head>Last used</Table.Head>
+								</Table.Row>
+							</Table.Header>
+							<Table.Body>
+								{#each data.tokenAccess as tokenRow (tokenRow.id)}
+									{@const ta = tokenRow as TokenAccess}
+									<Table.Row>
+										<Table.Cell class="font-medium">
+											<a href="/api-keys/{ta.id}" class="hover:underline">{ta.name}</a>
+										</Table.Cell>
+										<Table.Cell>
+											{#if ta.revokedAt}
+												<Badge variant="secondary">Revoked</Badge>
+											{:else}
+												<Badge class="border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300">Active</Badge>
+											{/if}
+										</Table.Cell>
+										<Table.Cell class="text-muted-foreground text-sm">
+											{ta.lastUsedAt ? formatDate(new Date(ta.lastUsedAt)) : 'Never'}
+										</Table.Cell>
+									</Table.Row>
 								{/each}
 							</Table.Body>
 						</Table.Root>
