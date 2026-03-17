@@ -8,6 +8,10 @@ export default defineConfig(({ mode }) => {
 		test: {
 			include: ["tests/**/*.test.ts"],
 			env,
+			globalSetup: ["tests/setup.ts"],
+			testTimeout: 30000,
+			hookTimeout: 60000,
+			fileParallelism: false,
 		},
 		resolve: {
 			alias: {
