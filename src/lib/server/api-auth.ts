@@ -1,16 +1,18 @@
 import { error } from "@sveltejs/kit";
-import { env } from "$env/dynamic/private";
 import { findTokenByHash, updateLastUsed } from "./services/tokens";
 import { hashToken } from "./services/tokens";
+import { verifyUser } from "./services/users";
 
-export function requireAdmin(request: Request) {
+export async function requireAdmin(request: Request) {
 	const header = request.headers.get("Authorization");
 	if (!header?.startsWith("Basic ")) throw error(401, "Unauthorized");
 	const decoded = atob(header.slice(6));
-	const [email, password] = decoded.split(":");
-	if (email !== env.ADMIN_EMAIL || password !== env.ADMIN_PASSWORD) {
-		throw error(401, "Unauthorized");
-	}
+	const colonIndex = decoded.indexOf(":");
+	if (colonIndex === -1) throw error(401, "Unauthorized");
+	const email = decoded.slice(0, colonIndex);
+	const password = decoded.slice(colonIndex + 1);
+	const user = await verifyUser(email, password);
+	if (!user) throw error(401, "Unauthorized");
 }
 
 export async function requireBearer(request: Request) {

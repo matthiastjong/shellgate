@@ -5,7 +5,7 @@ import { getTargetById, updateTarget, deleteTarget } from "$lib/server/services/
 import { UUID_RE } from "$lib/server/utils/validate";
 
 export const GET: RequestHandler = async ({ request, params }) => {
-	requireAdmin(request);
+	await requireAdmin(request);
 	if (!UUID_RE.test(params.id)) throw error(400, "invalid id");
 
 	const target = await getTargetById(params.id);
@@ -14,7 +14,7 @@ export const GET: RequestHandler = async ({ request, params }) => {
 };
 
 export const PATCH: RequestHandler = async ({ request, params }) => {
-	requireAdmin(request);
+	await requireAdmin(request);
 	if (!UUID_RE.test(params.id)) throw error(400, "invalid id");
 
 	const body = await request.json().catch(() => ({}));
@@ -36,7 +36,7 @@ export const PATCH: RequestHandler = async ({ request, params }) => {
 };
 
 export const DELETE: RequestHandler = async ({ request, params }) => {
-	requireAdmin(request);
+	await requireAdmin(request);
 	if (!UUID_RE.test(params.id)) throw error(400, "invalid id");
 
 	const result = await deleteTarget(params.id);

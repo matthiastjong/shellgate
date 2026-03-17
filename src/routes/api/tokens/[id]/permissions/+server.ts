@@ -5,7 +5,7 @@ import { listPermissions, addPermission } from "$lib/server/services/permissions
 import { UUID_RE } from "$lib/server/utils/validate";
 
 export const GET: RequestHandler = async ({ request, params }) => {
-	requireAdmin(request);
+	await requireAdmin(request);
 	if (!UUID_RE.test(params.id)) throw error(400, "invalid id");
 
 	const permissions = await listPermissions(params.id);
@@ -13,7 +13,7 @@ export const GET: RequestHandler = async ({ request, params }) => {
 };
 
 export const POST: RequestHandler = async ({ request, params }) => {
-	requireAdmin(request);
+	await requireAdmin(request);
 	if (!UUID_RE.test(params.id)) throw error(400, "invalid id");
 
 	const body = await request.json().catch(() => ({}));

@@ -4,13 +4,13 @@ import { requireAdmin } from "$lib/server/api-auth";
 import { listTargets, createTarget } from "$lib/server/services/targets";
 
 export const GET: RequestHandler = async ({ request }) => {
-	requireAdmin(request);
+	await requireAdmin(request);
 	const targets = await listTargets();
 	return json(targets);
 };
 
 export const POST: RequestHandler = async ({ request }) => {
-	requireAdmin(request);
+	await requireAdmin(request);
 	const body = await request.json().catch(() => ({}));
 
 	const name = typeof body.name === "string" ? body.name.trim() : "";
