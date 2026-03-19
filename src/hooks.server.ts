@@ -3,6 +3,9 @@ import { redirect } from "@sveltejs/kit";
 import { countUsers, getUserByEmail } from "$lib/server/services/users";
 import { validateSession } from "$lib/server/auth";
 import { checkHasTokens } from "$lib/server/cache";
+import { runMigrations } from "$lib/server/migrate";
+
+const migrationPromise = runMigrations();
 
 let hasUsers: boolean | null = null;
 let lastCheck = 0;
@@ -18,6 +21,8 @@ async function checkHasUsers(): Promise<boolean> {
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
+	await migrationPromise;
+
 	const { pathname } = event.url;
 
 	if (
@@ -25,6 +30,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		pathname.startsWith("/gateway/") ||
 		pathname.startsWith("/discovery") ||
 		pathname.startsWith("/verify-connection") ||
+		pathname.startsWith("/health") ||
 		pathname.startsWith("/_app/") ||
 		pathname === "/favicon.ico"
 	) {
