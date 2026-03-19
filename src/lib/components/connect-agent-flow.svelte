@@ -48,6 +48,7 @@ let showAddAuth = $state(false);
 let authSubmitting = $state(false);
 let showCredential = $state(false);
 let isDefaultChecked = $state(true);
+let showInlineTargetCreate = $state(false);
 
 let agentDisplayName = $derived(
 	selectedAgent === "openclaw" ? "OpenClaw"
@@ -212,8 +213,9 @@ async function copyToClipboard(text: string | null) {
 								</Button>
 							</div>
 						</div>
+						<input type="hidden" name="isDefault" value={isDefaultChecked ? "on" : ""} />
 						<div class="flex items-center gap-2">
-							<Checkbox id="auth-default" name="isDefault" checked={isDefaultChecked} onCheckedChange={(v) => (isDefaultChecked = v === true)} />
+							<Checkbox id="auth-default" checked={isDefaultChecked} onCheckedChange={(v) => (isDefaultChecked = v === true)} />
 							<Label for="auth-default" class="text-sm font-normal">Set as default auth method</Label>
 						</div>
 						<div class="flex gap-2">
@@ -332,15 +334,64 @@ async function copyToClipboard(text: string | null) {
 						{/each}
 					</div>
 				{:else}
-					<div class="flex flex-col items-center gap-3 rounded-lg border border-dashed p-8">
-						<p class="text-muted-foreground text-sm">No targets yet.</p>
-						<Button variant="outline" size="sm" href="/targets">
-							<PlusIcon class="mr-1.5 size-3.5" />
-							Create a target
-						</Button>
+					{#if !showInlineTargetCreate}
+						<div class="flex flex-col items-center gap-3 rounded-lg border border-dashed p-8">
+							<p class="text-muted-foreground text-sm">No targets yet. Create one so your agent has something to connect to.</p>
+							<Button onclick={() => (showInlineTargetCreate = true)}>
+								<PlusIcon class="mr-1.5 size-3.5" />
+								Create a target
+							</Button>
+						</div>
+					{:else}
+						<form
+							method="POST"
+							action="{actionUrl}?/createTarget"
+							use:enhance={() => {
+								targetSubmitting = true;
+								return async ({ result, update }) => {
+									targetSubmitting = false;
+									if (result.type === "success" && result.data?.created) {
+										const created = result.data.created as Target;
+										localTargets = [...localTargets, created];
+										selectedTargetIds = new Set([...selectedTargetIds, created.id]);
+										showInlineTargetCreate = false;
+										toast.success("Target created");
+									} else if (result.type === "failure") {
+										toast.error((result.data?.error as string) ?? "Failed to create target");
+									}
+									await update({ reset: true, invalidateAll: false });
+								};
+							}}
+						>
+							<div class="space-y-3 rounded-lg border p-4">
+								<p class="text-sm font-medium">New target</p>
+								<div class="space-y-2">
+									<Label for="inline-target-name">Name</Label>
+									<Input id="inline-target-name" name="name" placeholder="e.g. OpenAI API" required />
+								</div>
+								<div class="space-y-2">
+									<Label for="inline-target-url">Base URL</Label>
+									<Input id="inline-target-url" name="base_url" placeholder="e.g. https://api.openai.com" required />
+								</div>
+								<div class="flex gap-2">
+									<Button variant="outline" type="button" onclick={() => (showInlineTargetCreate = false)}>Cancel</Button>
+									<Button type="submit" class="flex-1" disabled={targetSubmitting}>
+										{#if targetSubmitting}
+											<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
+										{/if}
+										Create
+									</Button>
+								</div>
+							</div>
+						</form>
+					{/if}
+
+					<div class="flex justify-start pt-2">
+						<Button variant="outline" onclick={() => (step = 2)}>Back</Button>
 					</div>
 				{/if}
 
+				{#if localTargets.length > 0}
 				<div class="flex justify-between pt-2">
 					<Button variant="outline" onclick={() => (step = 2)}>Back</Button>
 					<form
@@ -353,6 +404,9 @@ async function copyToClipboard(text: string | null) {
 								if (result.type === "success" && result.data?.created) {
 									const created = result.data.created as { plainToken: string };
 									createdToken = created.plainToken;
+									if (result.data.warning) {
+										toast.warning(result.data.warning as string);
+									}
 									step = 4;
 									toast.success("API key created");
 								} else if (result.type === "failure") {
@@ -373,6 +427,7 @@ async function copyToClipboard(text: string | null) {
 						</Button>
 					</form>
 				</div>
+				{/if}
 			</div>
 		</div>
 
@@ -383,7 +438,7 @@ async function copyToClipboard(text: string | null) {
 
 			{#if createdToken}
 				{#if selectedAgent === "claude-code"}
-					{@const installCmd = `curl -s ${gatewayUrl}/api/install/claude-code/${createdToken} | bash`}
+					{@const installCmd = `curl -sX POST ${gatewayUrl}/api/install/claude-code -H "Content-Type: application/json" -d '{"token":"${createdToken}"}' | bash`}
 					<div class="space-y-2">
 						<p class="text-sm font-medium">Run this in your terminal:</p>
 						<div class="rounded-lg bg-muted p-4 font-mono text-sm">
@@ -405,7 +460,7 @@ async function copyToClipboard(text: string | null) {
 						</ul>
 					</div>
 				{:else if selectedAgent === "openclaw"}
-					{@const installCmd = `curl -s ${gatewayUrl}/api/install/openclaw/${createdToken} | bash`}
+					{@const installCmd = `curl -sX POST ${gatewayUrl}/api/install/openclaw -H "Content-Type: application/json" -d '{"token":"${createdToken}"}' | bash`}
 					<div class="space-y-2">
 						<p class="text-sm font-medium">Run this in your terminal:</p>
 						<div class="rounded-lg bg-muted p-4 font-mono text-sm">

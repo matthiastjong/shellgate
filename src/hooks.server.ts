@@ -69,7 +69,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.user = { id: user.id, email: user.email };
 
 	// Onboarding redirect: if no API keys exist, force onboarding
-	if (!pathname.startsWith("/onboarding") && !pathname.startsWith("/logout")) {
+	if (
+		!pathname.startsWith("/onboarding") &&
+		!pathname.startsWith("/logout") &&
+		!pathname.startsWith("/targets") &&
+		!pathname.startsWith("/api-keys") &&
+		!pathname.startsWith("/connect")
+	) {
 		const tokensExist = await checkHasTokens();
 		if (!tokensExist) {
 			redirect(303, "/onboarding");
