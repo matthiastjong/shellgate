@@ -1,3 +1,3 @@
 export const load = () => {
-	return { title: "ShellGate" };
+	return { title: "Shellgate" };
 };

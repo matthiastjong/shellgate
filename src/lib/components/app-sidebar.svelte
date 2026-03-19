@@ -13,6 +13,10 @@ const data = {
 			title: "Security",
 			items: [{ title: "API Keys", url: "/api-keys" }],
 		},
+		{
+			title: "Integrations",
+			items: [{ title: "Connect Agent", url: "/connect" }],
+		},
 	],
 };
 </script>
@@ -45,7 +49,7 @@ const data = {
 						<ShieldCheckIcon class="size-4" />
 					</div>
 					<div class="flex flex-col gap-0.5 leading-none">
-						<span class="font-semibold">ShellGate</span>
+						<span class="font-semibold">Shellgate</span>
 						<span class="text-xs">Dashboard</span>
 					</div>
 				</Sidebar.MenuButton>

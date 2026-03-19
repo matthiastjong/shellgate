@@ -40,6 +40,6 @@ export const actions = {
 			maxAge: 60 * 60 * 24 * 7,
 		});
 
-		redirect(303, "/");
+		redirect(303, "/onboarding");
 	},
 } satisfies Actions;

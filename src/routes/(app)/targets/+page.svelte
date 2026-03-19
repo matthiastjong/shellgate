@@ -272,7 +272,7 @@ async function copyToClipboard(text: string) {
 			<Breadcrumb.Root>
 				<Breadcrumb.List>
 					<Breadcrumb.Item>
-						<Breadcrumb.Link href="/">ShellGate</Breadcrumb.Link>
+						<Breadcrumb.Link href="/">Shellgate</Breadcrumb.Link>
 					</Breadcrumb.Item>
 					<Breadcrumb.Separator />
 					<Breadcrumb.Item>
