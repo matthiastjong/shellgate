@@ -1,9 +1,10 @@
 import type { Handle } from "@sveltejs/kit";
-import { redirect } from "@sveltejs/kit";
+import { error, redirect } from "@sveltejs/kit";
 import { countUsers, getUserByEmail } from "$lib/server/services/users";
 import { validateSession } from "$lib/server/auth";
 import { checkHasTokens } from "$lib/server/cache";
 import { runMigrations } from "$lib/server/migrate";
+import { env } from "$env/dynamic/private";
 
 const migrationPromise = runMigrations();
 
@@ -47,6 +48,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (pathname.startsWith("/login")) {
 		event.locals.user = null;
 		return resolve(event);
+	}
+
+	if (!env.SESSION_SECRET) {
+		error(500, "SESSION_SECRET environment variable is not configured. Set it in your deployment environment.");
 	}
 
 	const session = event.cookies.get("session");
