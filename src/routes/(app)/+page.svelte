@@ -18,7 +18,7 @@ let stats = $derived(data.stats);
 		<Breadcrumb.Root>
 			<Breadcrumb.List>
 				<Breadcrumb.Item>
-					<Breadcrumb.Link href="/">ShellGate</Breadcrumb.Link>
+					<Breadcrumb.Link href="/">Shellgate</Breadcrumb.Link>
 				</Breadcrumb.Item>
 				<Breadcrumb.Separator />
 				<Breadcrumb.Item>
@@ -28,6 +28,19 @@ let stats = $derived(data.stats);
 		</Breadcrumb.Root>
 		<h1 class="mt-1 text-2xl font-bold tracking-tight">Dashboard</h1>
 	</div>
+
+	<Card.Root class="border-primary/20 bg-primary/5">
+		<Card.Header class="flex flex-row items-center justify-between space-y-0">
+			<div>
+				<Card.Title>Connect an Agent</Card.Title>
+				<Card.Description>Set up a secure connection to Shellgate in under 2 minutes</Card.Description>
+			</div>
+			<Button href="/connect">
+				Get Started
+				<ArrowRightIcon class="ml-2 size-4" />
+			</Button>
+		</Card.Header>
+	</Card.Root>
 
 	<div class="grid gap-4 md:grid-cols-3">
 		<Card.Root>

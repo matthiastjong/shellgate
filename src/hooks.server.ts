@@ -2,6 +2,7 @@ import type { Handle } from "@sveltejs/kit";
 import { redirect } from "@sveltejs/kit";
 import { countUsers, getUserByEmail } from "$lib/server/services/users";
 import { validateSession } from "$lib/server/auth";
+import { checkHasTokens } from "$lib/server/cache";
 
 let hasUsers: boolean | null = null;
 let lastCheck = 0;
@@ -23,6 +24,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		pathname.startsWith("/api/") ||
 		pathname.startsWith("/gateway/") ||
 		pathname.startsWith("/discovery") ||
+		pathname.startsWith("/verify-connection") ||
 		pathname.startsWith("/_app/") ||
 		pathname === "/favicon.ico"
 	) {
@@ -65,5 +67,14 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 
 	event.locals.user = { id: user.id, email: user.email };
+
+	// Onboarding redirect: if no API keys exist, force onboarding
+	if (!pathname.startsWith("/onboarding") && !pathname.startsWith("/logout")) {
+		const tokensExist = await checkHasTokens();
+		if (!tokensExist) {
+			redirect(303, "/onboarding");
+		}
+	}
+
 	return resolve(event);
 };

@@ -4,7 +4,7 @@ import { requireBearer } from "$lib/server/api-auth";
 import { listPermissions } from "$lib/server/services/permissions";
 import { getTargetById } from "$lib/server/services/targets";
 
-export const GET: RequestHandler = async ({ request }) => {
+export const GET: RequestHandler = async ({ request, url }) => {
 	const token = await requireBearer(request);
 
 	const permissions = await listPermissions(token.id);
@@ -22,7 +22,12 @@ export const GET: RequestHandler = async ({ request }) => {
 		})
 	);
 
+	const filtered = targets.filter(Boolean);
+
 	return json({
-		targets: targets.filter(Boolean),
+		targets: filtered,
+		...(filtered.length === 0 && {
+			message: `No targets are assigned to this API key. Tell the user to go to ${url.origin}/api-keys to add targets to this key.`,
+		}),
 	});
 };

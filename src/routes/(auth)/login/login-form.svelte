@@ -31,9 +31,9 @@ const id = $props.id();
 					<div class="flex size-8 items-center justify-center rounded-md">
 						<ShieldCheckIcon class="size-6" />
 					</div>
-					<span class="sr-only">ShellGate</span>
+					<span class="sr-only">Shellgate</span>
 				</div>
-				<h1 class="text-xl font-bold">Welcome to ShellGate</h1>
+				<h1 class="text-xl font-bold">Welcome to Shellgate</h1>
 				<FieldDescription>
 					Sign in to access the dashboard
 				</FieldDescription>
