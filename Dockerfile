@@ -15,6 +15,7 @@ COPY --from=builder /app/package.json ./
 COPY --from=builder /app/package-lock.json ./
 COPY --from=builder /app/drizzle ./drizzle
 RUN npm ci --omit=dev
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s CMD wget -qO- http://localhost:3000/health || exit 1
+RUN apk add --no-cache curl
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s CMD curl -sf http://localhost:3000/health || exit 1
 EXPOSE 3000
 CMD ["node", "build"]
