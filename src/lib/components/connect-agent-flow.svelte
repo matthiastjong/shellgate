@@ -6,11 +6,8 @@ import { Badge } from "$lib/components/ui/badge/index.js";
 import { Input } from "$lib/components/ui/input/index.js";
 import { Label } from "$lib/components/ui/label/index.js";
 import { Switch } from "$lib/components/ui/switch/index.js";
-import { Checkbox } from "$lib/components/ui/checkbox/index.js";
 import CopyIcon from "@lucide/svelte/icons/copy";
 import PlusIcon from "@lucide/svelte/icons/plus";
-import EyeIcon from "@lucide/svelte/icons/eye";
-import EyeOffIcon from "@lucide/svelte/icons/eye-off";
 import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
 
 type Target = { id: string; name: string; slug: string; type: string; baseUrl: string | null; enabled: boolean };
@@ -30,24 +27,19 @@ let {
 	onComplete?: () => void;
 } = $props();
 
-// Local target list (updated inline when step 0 creates one)
+// Local target list (updated inline when step 3 creates one)
 let localTargets = $state<Target[]>([...targets]);
 
-// Steps: 0=create target (onboarding only), 1=select agent, 2=name key, 3=select targets, 4=install
-let step = $state(mode === "onboarding" && targets.length === 0 ? 0 : 1);
+// Steps: 1=select agent, 2=name key, 3=select targets, 4=install
+let step = $state(1);
 let selectedAgent = $state<AgentType | null>(null);
 let newKeyName = $state("");
 let selectedTargetIds = $state<Set<string>>(new Set());
 let createdToken = $state<string | null>(null);
 let submitting = $state(false);
 
-// Step 0: target creation state
+// Inline target creation state (step 3)
 let targetSubmitting = $state(false);
-let createdTarget = $state<Target | null>(null);
-let showAddAuth = $state(false);
-let authSubmitting = $state(false);
-let showCredential = $state(false);
-let isDefaultChecked = $state(true);
 let showInlineTargetCreate = $state(false);
 
 let agentDisplayName = $derived(
@@ -57,9 +49,9 @@ let agentDisplayName = $derived(
 	: ""
 );
 
-// Step indicator: onboarding has 5 steps (0-4), modal has 4 steps (1-4)
-let totalSteps = $derived(mode === "onboarding" ? 5 : 4);
-let displayStep = $derived(mode === "onboarding" ? step + 1 : step);
+// Step indicator: 4 steps (1-4)
+let totalSteps = 4;
+let displayStep = $derived(step);
 
 let hasTargetsOnKey = $derived(selectedTargetIds.size > 0);
 
@@ -108,132 +100,8 @@ async function copyToClipboard(text: string | null) {
 		<span class="text-muted-foreground text-xs ml-2">Step {displayStep} of {totalSteps}</span>
 	</div>
 
-	<!-- Step 0: Create target (onboarding only) -->
-	{#if step === 0}
-		<div class="space-y-6">
-			{#if !showAddAuth}
-				<h2 class="text-center font-semibold">Connect your first target</h2>
-				<p class="text-muted-foreground text-sm text-center">Add an API or service that your agents will access through Shellgate.</p>
-
-				<form
-					method="POST"
-					action="{actionUrl}?/createTarget"
-					use:enhance={() => {
-						targetSubmitting = true;
-						return async ({ result, update }) => {
-							targetSubmitting = false;
-							if (result.type === "success" && result.data?.created) {
-								const created = result.data.created as Target;
-								createdTarget = created;
-								localTargets = [...localTargets, created];
-								selectedTargetIds = new Set([...selectedTargetIds, created.id]);
-								showAddAuth = true;
-								toast.success("Target created");
-							} else if (result.type === "failure") {
-								toast.error((result.data?.error as string) ?? "Failed to create target");
-							}
-							await update({ reset: true, invalidateAll: false });
-						};
-					}}
-				>
-					<div class="space-y-4">
-						<div class="space-y-2">
-							<Label for="target-name">Name</Label>
-							<Input id="target-name" name="name" placeholder="e.g. OpenAI API" required />
-						</div>
-						<div class="space-y-2">
-							<Label for="target-base-url">Base URL</Label>
-							<Input id="target-base-url" name="base_url" placeholder="e.g. https://api.openai.com" required />
-						</div>
-						<Button type="submit" class="w-full" disabled={targetSubmitting}>
-							{#if targetSubmitting}
-								<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
-							{/if}
-							Create Target
-						</Button>
-					</div>
-				</form>
-
-				<button
-					class="block w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors"
-					onclick={() => (step = 1)}
-				>
-					Skip — you can add targets later
-				</button>
-			{:else}
-				<h2 class="text-center font-semibold">Add credentials for {createdTarget?.name}</h2>
-				<p class="text-muted-foreground text-sm text-center">Add an auth method so Shellgate can authenticate with this API. You can also do this later.</p>
-
-				<form
-					method="POST"
-					action="{actionUrl}?/addAuthMethod"
-					use:enhance={() => {
-						authSubmitting = true;
-						return async ({ result, update }) => {
-							authSubmitting = false;
-							if (result.type === "success" && result.data?.authMethodAdded) {
-								toast.success("Credential added");
-								step = 1;
-								showAddAuth = false;
-							} else if (result.type === "failure") {
-								toast.error((result.data?.error as string) ?? "Failed to add credential");
-							}
-							await update({ reset: true, invalidateAll: false });
-						};
-					}}
-				>
-					<input type="hidden" name="slug" value={createdTarget?.slug ?? ""} />
-					<div class="space-y-4">
-						<div class="space-y-2">
-							<Label for="auth-label">Label</Label>
-							<Input id="auth-label" name="label" placeholder="e.g. Production Key" required />
-						</div>
-						<div class="space-y-2">
-							<Label for="auth-credential">Credential</Label>
-							<div class="relative">
-								<Input
-									id="auth-credential"
-									name="credential"
-									type={showCredential ? "text" : "password"}
-									placeholder="e.g. sk-..."
-									required
-								/>
-								<Button
-									type="button"
-									variant="ghost"
-									size="icon"
-									class="absolute right-0 top-0 h-full px-3"
-									onclick={() => (showCredential = !showCredential)}
-								>
-									{#if showCredential}
-										<EyeOffIcon class="size-4" />
-									{:else}
-										<EyeIcon class="size-4" />
-									{/if}
-								</Button>
-							</div>
-						</div>
-						<input type="hidden" name="isDefault" value={isDefaultChecked ? "on" : ""} />
-						<div class="flex items-center gap-2">
-							<Checkbox id="auth-default" checked={isDefaultChecked} onCheckedChange={(v) => (isDefaultChecked = v === true)} />
-							<Label for="auth-default" class="text-sm font-normal">Set as default auth method</Label>
-						</div>
-						<div class="flex gap-2">
-							<Button variant="ghost" type="button" onclick={() => { step = 1; showAddAuth = false; }}>Skip</Button>
-							<Button type="submit" class="flex-1" disabled={authSubmitting}>
-								{#if authSubmitting}
-									<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
-								{/if}
-								Add Credential
-							</Button>
-						</div>
-					</div>
-				</form>
-			{/if}
-		</div>
-
 	<!-- Step 1: Select agent -->
-	{:else if step === 1}
+	{#if step === 1}
 		<div class="space-y-6">
 			<h2 class="text-center font-semibold">What agent are you connecting?</h2>
 			<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
