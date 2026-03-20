@@ -52,6 +52,7 @@ let createdTarget = $state<Target | null>(null);
 let authSubmitting = $state(false);
 let showCredential = $state(false);
 let isDefaultChecked = $state(true);
+let authType = $state('bearer');
 let copied = $state(false);
 
 function resetCreateState() {
@@ -61,6 +62,7 @@ function resetCreateState() {
 	authSubmitting = false;
 	showCredential = false;
 	isDefaultChecked = true;
+	authType = 'bearer';
 	copied = false;
 }
 
@@ -189,30 +191,100 @@ async function copyToClipboard(text: string) {
 						<Input id="auth-label" name="label" placeholder="e.g. Production Key" required />
 					</div>
 					<div class="grid gap-2">
-						<Label for="auth-credential">Credential</Label>
-						<div class="relative">
-							<Input
-								id="auth-credential"
-								name="credential"
-								type={showCredential ? 'text' : 'password'}
-								placeholder="e.g. sk-..."
-								required
-							/>
-							<Button
-								type="button"
-								variant="ghost"
-								size="icon"
-								class="absolute right-0 top-0 h-full px-3"
-								onclick={() => (showCredential = !showCredential)}
-							>
-								{#if showCredential}
-									<EyeOffIcon class="size-4" />
-								{:else}
-									<EyeIcon class="size-4" />
-								{/if}
-							</Button>
-						</div>
+						<Label for="auth-type">Type</Label>
+						<select id="auth-type" name="type" bind:value={authType} class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+							<option value="bearer">Bearer Token</option>
+							<option value="basic">Basic Auth</option>
+							<option value="custom_header">Custom Header</option>
+						</select>
 					</div>
+					{#if authType === 'basic'}
+						<div class="grid gap-2">
+							<Label for="auth-username">Username</Label>
+							<Input id="auth-username" name="credential1" placeholder="username" required />
+						</div>
+						<div class="grid gap-2">
+							<Label for="auth-password">Password</Label>
+							<div class="relative">
+								<Input
+									id="auth-password"
+									name="credential2"
+									type={showCredential ? 'text' : 'password'}
+									placeholder="password"
+									required
+								/>
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon"
+									class="absolute right-0 top-0 h-full px-3"
+									onclick={() => (showCredential = !showCredential)}
+								>
+									{#if showCredential}
+										<EyeOffIcon class="size-4" />
+									{:else}
+										<EyeIcon class="size-4" />
+									{/if}
+								</Button>
+							</div>
+						</div>
+					{:else if authType === 'custom_header'}
+						<div class="grid gap-2">
+							<Label for="auth-header-name">Header Name</Label>
+							<Input id="auth-header-name" name="credential1" placeholder="X-API-Key" required />
+						</div>
+						<div class="grid gap-2">
+							<Label for="auth-header-value">Header Value</Label>
+							<div class="relative">
+								<Input
+									id="auth-header-value"
+									name="credential2"
+									type={showCredential ? 'text' : 'password'}
+									placeholder="your-key-here"
+									required
+								/>
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon"
+									class="absolute right-0 top-0 h-full px-3"
+									onclick={() => (showCredential = !showCredential)}
+								>
+									{#if showCredential}
+										<EyeOffIcon class="size-4" />
+									{:else}
+										<EyeIcon class="size-4" />
+									{/if}
+								</Button>
+							</div>
+						</div>
+					{:else}
+						<div class="grid gap-2">
+							<Label for="auth-credential">Credential</Label>
+							<div class="relative">
+								<Input
+									id="auth-credential"
+									name="credential"
+									type={showCredential ? 'text' : 'password'}
+									placeholder="e.g. sk-..."
+									required
+								/>
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon"
+									class="absolute right-0 top-0 h-full px-3"
+									onclick={() => (showCredential = !showCredential)}
+								>
+									{#if showCredential}
+										<EyeOffIcon class="size-4" />
+									{:else}
+										<EyeIcon class="size-4" />
+									{/if}
+								</Button>
+							</div>
+						</div>
+					{/if}
 					<div class="flex items-center gap-2">
 						<Checkbox id="auth-default" name="isDefault" checked={isDefaultChecked} onCheckedChange={(v) => (isDefaultChecked = v === true)} />
 						<Label for="auth-default" class="text-sm font-normal">Set as default auth method</Label>

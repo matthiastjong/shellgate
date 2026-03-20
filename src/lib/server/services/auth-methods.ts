@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "../db";
 import { targetAuthMethods } from "../db/schema";
 
-const VALID_TYPES = ["bearer"];
+const VALID_TYPES = ["bearer", "basic", "custom_header"];
 
 export function computeCredentialHint(credential: string): string {
 	if (credential.length < 10) return "••••••••";
@@ -175,6 +175,21 @@ export async function deleteAuthMethod(targetId: string, id: string) {
 	await db.delete(targetAuthMethods).where(eq(targetAuthMethods.id, id));
 
 	return { id, deleted: true };
+}
+
+export async function getAuthMethodCredential(targetId: string, id: string) {
+	const [row] = await db
+		.select({ id: targetAuthMethods.id, credential: targetAuthMethods.credential })
+		.from(targetAuthMethods)
+		.where(
+			and(
+				eq(targetAuthMethods.id, id),
+				eq(targetAuthMethods.targetId, targetId),
+			),
+		)
+		.limit(1);
+
+	return row ?? null;
 }
 
 export async function getDefaultAuthMethod(targetId: string) {

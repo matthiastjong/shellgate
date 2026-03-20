@@ -53,6 +53,45 @@ describe("auth method default toggling", () => {
 		expect(b!.isDefault).toBe(true);
 	});
 
+	it("accepts basic type", async () => {
+		const target = await createTestTarget();
+
+		const method = await createAuthMethod(target.id, {
+			label: "Basic Auth",
+			type: "basic",
+			credential: "admin:password123",
+			isDefault: false,
+		});
+
+		expect(method.type).toBe("basic");
+	});
+
+	it("accepts custom_header type", async () => {
+		const target = await createTestTarget();
+
+		const method = await createAuthMethod(target.id, {
+			label: "Custom Header",
+			type: "custom_header",
+			credential: "X-API-Key: my-secret",
+			isDefault: false,
+		});
+
+		expect(method.type).toBe("custom_header");
+	});
+
+	it("rejects invalid type", async () => {
+		const target = await createTestTarget();
+
+		await expect(
+			createAuthMethod(target.id, {
+				label: "Invalid",
+				type: "oauth2",
+				credential: "token",
+				isDefault: false,
+			}),
+		).rejects.toThrow("type must be one of");
+	});
+
 	it("generates correct credential hint", async () => {
 		const target = await createTestTarget();
 
