@@ -82,7 +82,7 @@ BORDER=\$(printf '─%.0s' \$(seq 1 \$(( WIDTH - 2 ))))
 echo ""
 echo "🐚 Shellgate → OpenClaw connected"
 echo ""
-echo "Try it out:"
+echo "Try it out, ask your agent:"
 echo "╭\${BORDER}╮"
 echo "│ \${PROMPT} │"
 echo "╰\${BORDER}╯"
