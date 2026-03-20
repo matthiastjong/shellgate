@@ -13,7 +13,7 @@ const CHECK_TTL_MS = 60_000;
 
 async function checkHasUsers(): Promise<boolean> {
 	const now = Date.now();
-	if (hasUsers === true && now - lastCheck < CHECK_TTL_MS) return true;
+	if (hasUsers !== null && now - lastCheck < CHECK_TTL_MS) return hasUsers;
 	const count = await countUsers();
 	hasUsers = count > 0;
 	lastCheck = now;
