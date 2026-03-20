@@ -7,17 +7,9 @@ import { runMigrations } from "$lib/server/migrate";
 
 const migrationPromise = runMigrations();
 
-let hasUsers: boolean | null = null;
-let lastCheck = 0;
-const CHECK_TTL_MS = 60_000;
-
 async function checkHasUsers(): Promise<boolean> {
-	const now = Date.now();
-	if (hasUsers === true && now - lastCheck < CHECK_TTL_MS) return true;
 	const count = await countUsers();
-	hasUsers = count > 0;
-	lastCheck = now;
-	return hasUsers;
+	return count > 0;
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
