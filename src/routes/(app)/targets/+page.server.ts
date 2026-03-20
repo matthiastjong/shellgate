@@ -1,14 +1,20 @@
 import { fail } from "@sveltejs/kit";
 import { listTargets, createTarget, updateTarget, deleteTarget, getTargetBySlug } from "$lib/server/services/targets";
 import { createAuthMethod } from "$lib/server/services/auth-methods";
+import { listTokens } from "$lib/server/services/tokens";
+import { addPermission } from "$lib/server/services/permissions";
 import type { Actions, PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async () => {
 	try {
-		const targets = await listTargets();
-		return { targets: targets.map((t) => ({ ...t, enabled: t.enabled !== false })) };
+		const [targets, allTokens] = await Promise.all([listTargets(), listTokens()]);
+		const activeTokens = allTokens.filter((t) => !t.revokedAt);
+		return {
+			targets: targets.map((t) => ({ ...t, enabled: t.enabled !== false })),
+			activeTokens: activeTokens.map((t) => ({ id: t.id, name: t.name })),
+		};
 	} catch {
-		return { targets: [] };
+		return { targets: [], activeTokens: [] };
 	}
 };
 
@@ -80,6 +86,22 @@ export const actions = {
 			return { authMethodAdded: authMethod };
 		} catch (err) {
 			return fail(400, { error: err instanceof Error ? err.message : "Failed to add auth method" });
+		}
+	},
+
+	grantAccess: async ({ request }) => {
+		const data = await request.formData();
+		const targetId = data.get("targetId")?.toString() ?? "";
+		const tokenIds = data.getAll("tokenIds").map((v) => v.toString());
+		if (!targetId) return fail(400, { error: "Target ID is required" });
+
+		try {
+			for (const tokenId of tokenIds) {
+				await addPermission(tokenId, targetId);
+			}
+			return { accessGranted: true };
+		} catch (err) {
+			return fail(400, { error: err instanceof Error ? err.message : "Failed to grant access" });
 		}
 	},
 
