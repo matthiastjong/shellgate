@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>%sveltekit.status% — Shellgate</title>
+	<style>
+		*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+		body {
+			font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+			min-height: 100svh;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			background: hsl(0 0% 100%);
+			color: hsl(229 53% 10%);
+			padding: 1.5rem;
+			-webkit-font-smoothing: antialiased;
+		}
+		.container {
+			max-width: 28rem;
+			width: 100%;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			gap: 1.5rem;
+		}
+		.header {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			gap: 1rem;
+			text-align: center;
+		}
+		.icon {
+			width: 3rem;
+			height: 3rem;
+			background: hsl(0 86% 95%);
+			border-radius: 9999px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+		}
+		.icon svg { width: 1.5rem; height: 1.5rem; stroke: hsl(0 72% 51%); }
+		h1 {
+			font-size: 2.25rem;
+			font-weight: 700;
+			letter-spacing: -0.025em;
+			line-height: 1;
+		}
+		.message {
+			color: hsl(229 10% 46%);
+			font-size: 1.125rem;
+			line-height: 1.6;
+			margin-top: 0.25rem;
+		}
+		.hint {
+			width: 100%;
+			text-align: left;
+		}
+		.hint-text {
+			font-size: 0.875rem;
+			color: hsl(229 10% 46%);
+			margin-bottom: 0.75rem;
+		}
+		.hint-text code {
+			background: hsl(229 20% 94%);
+			padding: 0.1rem 0.4rem;
+			border-radius: 0.25rem;
+			font-size: 0.75rem;
+			font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+		}
+		.secret-output {
+			display: none;
+			background: hsl(229 20% 94%);
+			border-radius: 0.5rem;
+			padding: 0.75rem;
+			font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+			font-size: 0.8rem;
+			word-break: break-all;
+			line-height: 1.5;
+			margin-bottom: 0.5rem;
+		}
+		.secret-output .label {
+			font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+			font-size: 0.75rem;
+			color: hsl(229 10% 46%);
+			margin-bottom: 0.375rem;
+		}
+		.restart-note {
+			font-size: 0.75rem;
+			color: hsl(229 10% 46%);
+			margin-top: 0.25rem;
+		}
+		.btn {
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			gap: 0.5rem;
+			height: 2.25rem;
+			padding: 0 1rem;
+			border-radius: 0.375rem;
+			font-size: 0.875rem;
+			font-weight: 500;
+			font-family: inherit;
+			cursor: pointer;
+			border: 1px solid hsl(229 20% 88%);
+			background: hsl(0 0% 100%);
+			color: hsl(229 53% 10%);
+			transition: background 0.15s, box-shadow 0.15s;
+			width: 100%;
+			text-decoration: none;
+		}
+		.btn:hover { background: hsl(229 20% 96%); }
+		.btn-primary {
+			background: hsl(229 53% 10%);
+			color: hsl(0 0% 100%);
+			border-color: hsl(229 53% 10%);
+			box-shadow: 0 1px 2px 0 rgba(0,0,0,.05);
+		}
+		.btn-primary:hover { background: hsl(229 40% 18%); }
+		.copied-toast {
+			display: none;
+			font-size: 0.75rem;
+			color: hsl(142 72% 29%);
+			text-align: center;
+			margin-top: 0.25rem;
+		}
+	</style>
+</head>
+<body>
+	<div class="container">
+		<div class="header">
+			<div class="icon">
+				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
+					<path d="m9 12 2 2 4-4"/>
+				</svg>
+			</div>
+			<div>
+				<h1>%sveltekit.status%</h1>
+				<p class="message">%sveltekit.error.message%</p>
+			</div>
+		</div>
+
+		<div id="session-secret-help" class="hint" style="display:none">
+			<p class="hint-text">Add a <code>SESSION_SECRET</code> to your <code>.env</code> file, then restart the app.</p>
+			<button class="btn" id="generate-btn" onclick="generateSecret()">Generate a secret</button>
+			<div class="secret-output" id="secret-output">
+				<div class="label">Add this to your .env file:</div>
+				<span id="secret-value"></span>
+			</div>
+			<button class="btn" id="copy-btn" style="display:none" onclick="copySecret()">Copy to clipboard</button>
+			<p class="copied-toast" id="copied-msg">Copied!</p>
+			<p class="restart-note" id="restart-note" style="display:none">Then restart the app.</p>
+		</div>
+
+		<a href="/" class="btn btn-primary">Go to Dashboard</a>
+	</div>
+	<script>
+		if (document.querySelector('.message').textContent.includes('SESSION_SECRET')) {
+			document.getElementById('session-secret-help').style.display = '';
+		}
+		function generateSecret() {
+			var arr = new Uint8Array(32);
+			crypto.getRandomValues(arr);
+			var hex = Array.from(arr, function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+			document.getElementById('secret-value').textContent = 'SESSION_SECRET=' + hex;
+			document.getElementById('secret-output').style.display = 'block';
+			document.getElementById('copy-btn').style.display = 'flex';
+			document.getElementById('generate-btn').style.display = 'none';
+			document.getElementById('restart-note').style.display = '';
+		}
+		function copySecret() {
+			navigator.clipboard.writeText(document.getElementById('secret-value').textContent).then(function() {
+				var msg = document.getElementById('copied-msg');
+				msg.style.display = 'block';
+				setTimeout(function() { msg.style.display = 'none'; }, 2000);
+			});
+		}
+	</script>
+</body>
+</html>

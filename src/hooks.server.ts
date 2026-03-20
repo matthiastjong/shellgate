@@ -1,4 +1,4 @@
-import type { Handle } from "@sveltejs/kit";
+import type { Handle, HandleServerError } from "@sveltejs/kit";
 import { error, redirect } from "@sveltejs/kit";
 import { countUsers, getUserByEmail } from "$lib/server/services/users";
 import { validateSession } from "$lib/server/auth";
@@ -12,6 +12,12 @@ async function checkHasUsers(): Promise<boolean> {
 	const count = await countUsers();
 	return count > 0;
 }
+
+export const handleError: HandleServerError = async ({ error }) => {
+	const message = error instanceof Error ? error.message : String(error);
+	console.error(error);
+	return { message };
+};
 
 export const handle: Handle = async ({ event, resolve }) => {
 	await migrationPromise;
