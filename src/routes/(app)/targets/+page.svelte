@@ -53,6 +53,9 @@ let authSubmitting = $state(false);
 let showCredential = $state(false);
 let isDefaultChecked = $state(true);
 let authType = $state('bearer');
+let grantSubmitting = $state(false);
+let selectedTokenIds = $state<Set<string>>(new Set());
+let activeTokens = $derived((data.activeTokens ?? []) as { id: string; name: string }[]);
 let copied = $state(false);
 
 function resetCreateState() {
@@ -64,6 +67,8 @@ function resetCreateState() {
 	isDefaultChecked = true;
 	authType = 'bearer';
 	copied = false;
+	grantSubmitting = false;
+	selectedTokenIds = new Set();
 }
 
 function updateTargetList(updater: (targets: Target[]) => Target[]) {
@@ -301,6 +306,71 @@ async function copyToClipboard(text: string) {
 				</div>
 			</form>
 		{:else if createStep === 3}
+			<Dialog.Header>
+				<Dialog.Title>Grant Access</Dialog.Title>
+				<Dialog.Description>Which API keys should have access to {createdTarget?.name ?? 'this target'}?</Dialog.Description>
+			</Dialog.Header>
+			{#if activeTokens.length === 0}
+				<div class="flex flex-col items-center gap-3 py-6">
+					<p class="text-muted-foreground text-sm text-center">No API keys yet. You can grant access later from the API Keys page.</p>
+				</div>
+				<Dialog.Footer>
+					<Button class="w-full" onclick={() => (createStep = 4)}>Continue</Button>
+				</Dialog.Footer>
+			{:else}
+				<form
+					method="POST"
+					action="?/grantAccess"
+					use:enhance={() => {
+						grantSubmitting = true;
+						return async ({ result, update }) => {
+							grantSubmitting = false;
+							if (result.type === 'success' && result.data?.accessGranted) {
+								const { granted } = result.data.accessGranted as { targetId: string; granted: number };
+								if (granted > 0) {
+									toast.success(`Access granted to ${granted} API key${granted > 1 ? 's' : ''}`);
+								}
+								createStep = 4;
+							} else if (result.type === 'failure') {
+								toast.error((result.data?.error as string) ?? 'Failed to grant access');
+							}
+							await update({ reset: false, invalidateAll: false });
+						};
+					}}
+				>
+					<input type="hidden" name="targetId" value={createdTarget?.id ?? ''} />
+					<div class="grid gap-3 py-4 max-h-[300px] overflow-y-auto">
+						{#each activeTokens as token}
+							<label class="flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors hover:bg-muted/50" class:border-primary={selectedTokenIds.has(token.id)} class:bg-muted={selectedTokenIds.has(token.id)}>
+								<Checkbox
+									checked={selectedTokenIds.has(token.id)}
+									onCheckedChange={(checked) => {
+										const next = new Set(selectedTokenIds);
+										if (checked) {
+											next.add(token.id);
+										} else {
+											next.delete(token.id);
+										}
+										selectedTokenIds = next;
+									}}
+								/>
+								<input type="hidden" name="tokenIds" value={token.id} disabled={!selectedTokenIds.has(token.id)} />
+								<span class="text-sm font-medium">{token.name}</span>
+							</label>
+						{/each}
+					</div>
+					<div class="flex gap-2">
+						<Button variant="ghost" type="button" onclick={() => (createStep = 4)}>Skip</Button>
+						<Button type="submit" class="flex-1" disabled={grantSubmitting || selectedTokenIds.size === 0}>
+							{#if grantSubmitting}
+								<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
+							{/if}
+							Grant Access ({selectedTokenIds.size})
+						</Button>
+					</div>
+				</form>
+			{/if}
+		{:else if createStep === 4}
 			<Dialog.Header>
 				<Dialog.Title>Target Ready</Dialog.Title>
 				<Dialog.Description>Your target is ready!</Dialog.Description>
