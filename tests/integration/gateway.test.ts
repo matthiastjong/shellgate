@@ -52,6 +52,51 @@ describe("gateway proxy", () => {
 		expect((init!.headers as Headers).get("Authorization")).toBe("Bearer sk-real-key-1234567890");
 	});
 
+	it("proxies request with basic auth credential injected", async () => {
+		const { token: tokenRow } = await createTestToken();
+		const target = await createTestTarget("BasicAPI", "https://api.basic.com");
+		await createTestAuthMethod(target.id, { type: "basic", credential: "admin:secret123" });
+		await grantPermission(tokenRow.id, target.id);
+
+		const fullToken = await getFullToken(tokenRow.id);
+
+		const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ ok: true }));
+
+		const request = new Request(`http://localhost/gateway/${target.slug}/data`, {
+			method: "GET",
+		});
+
+		const response = await proxyRequest(fullToken, target.slug, "data", request);
+
+		expect(response.status).toBe(200);
+		expect(fetchSpy).toHaveBeenCalledOnce();
+		const [, init] = fetchSpy.mock.calls[0];
+		const expectedBasic = `Basic ${Buffer.from("admin:secret123").toString("base64")}`;
+		expect((init!.headers as Headers).get("Authorization")).toBe(expectedBasic);
+	});
+
+	it("proxies request with custom header credential injected", async () => {
+		const { token: tokenRow } = await createTestToken();
+		const target = await createTestTarget("CustomAPI", "https://api.custom.com");
+		await createTestAuthMethod(target.id, { type: "custom_header", credential: "X-API-Key: my-secret-key" });
+		await grantPermission(tokenRow.id, target.id);
+
+		const fullToken = await getFullToken(tokenRow.id);
+
+		const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ ok: true }));
+
+		const request = new Request(`http://localhost/gateway/${target.slug}/data`, {
+			method: "GET",
+		});
+
+		const response = await proxyRequest(fullToken, target.slug, "data", request);
+
+		expect(response.status).toBe(200);
+		expect(fetchSpy).toHaveBeenCalledOnce();
+		const [, init] = fetchSpy.mock.calls[0];
+		expect((init!.headers as Headers).get("X-API-Key")).toBe("my-secret-key");
+	});
+
 	it("passes query string to upstream", async () => {
 		const { token: tokenRow } = await createTestToken();
 		const target = await createTestTarget("QueryTest", "https://api.example.com");

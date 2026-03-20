@@ -69,6 +69,16 @@ export async function proxyRequest(
 	if (authMethod) {
 		if (authMethod.type === "bearer") {
 			headers.set("Authorization", `Bearer ${authMethod.credential}`);
+		} else if (authMethod.type === "basic") {
+			const encoded = Buffer.from(authMethod.credential).toString("base64");
+			headers.set("Authorization", `Basic ${encoded}`);
+		} else if (authMethod.type === "custom_header") {
+			const separatorIndex = authMethod.credential.indexOf(":");
+			if (separatorIndex > 0) {
+				const headerName = authMethod.credential.slice(0, separatorIndex).trim();
+				const headerValue = authMethod.credential.slice(separatorIndex + 1).trim();
+				headers.set(headerName, headerValue);
+			}
 		}
 	}
 

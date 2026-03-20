@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "../db";
 import { targetAuthMethods } from "../db/schema";
 
-const VALID_TYPES = ["bearer"];
+const VALID_TYPES = ["bearer", "basic", "custom_header"];
 
 export function computeCredentialHint(credential: string): string {
 	if (credential.length < 10) return "••••••••";

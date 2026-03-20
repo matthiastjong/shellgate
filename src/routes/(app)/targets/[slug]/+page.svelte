@@ -76,6 +76,7 @@ let editBaseUrl = $state("");
 
 // Add auth state
 let authLabel = $state("");
+let authType = $state("bearer");
 let authCredential = $state("");
 let showCredential = $state(false);
 let isDefaultChecked = $state(true);
@@ -109,6 +110,7 @@ function openBaseUrlSheet() {
 function openAddAuthSheet() {
 	sheetMode = "addAuth";
 	authLabel = "";
+	authType = "bearer";
 	authCredential = "";
 	showCredential = false;
 	isDefaultChecked = true;
@@ -270,17 +272,21 @@ async function copyToClipboard(text: string) {
 					</div>
 					<div class="grid gap-2">
 						<Label for="add-auth-type">Type</Label>
-						<Input id="add-auth-type" value="bearer" disabled />
+						<select id="add-auth-type" name="type" bind:value={authType} class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+							<option value="bearer">Bearer Token</option>
+							<option value="basic">Basic Auth</option>
+							<option value="custom_header">Custom Header</option>
+						</select>
 					</div>
 					<div class="grid gap-2">
-						<Label for="add-auth-credential">Credential</Label>
+						<Label for="add-auth-credential">{authType === 'basic' ? 'Credentials (user:password)' : authType === 'custom_header' ? 'Header (Name: Value)' : 'Credential'}</Label>
 						<div class="relative">
 							<Input
 								id="add-auth-credential"
 								name="credential"
 								type={showCredential ? 'text' : 'password'}
 								bind:value={authCredential}
-								placeholder="e.g. sk-..."
+								placeholder={authType === 'basic' ? 'user:password' : authType === 'custom_header' ? 'X-API-Key: your-key-here' : 'e.g. sk-...'}
 								required
 							/>
 							<Button
@@ -576,7 +582,7 @@ async function copyToClipboard(text: string) {
 										<Table.Row>
 											<Table.Cell class="font-medium">{method.label}</Table.Cell>
 											<Table.Cell><span class="text-muted-foreground font-mono text-sm">{method.credentialHint ?? '••••••••'}</span></Table.Cell>
-											<Table.Cell><Badge variant="outline">{method.type}</Badge></Table.Cell>
+											<Table.Cell><Badge variant="outline">{method.type === 'custom_header' ? 'Custom Header' : method.type === 'basic' ? 'Basic Auth' : 'Bearer'}</Badge></Table.Cell>
 											<Table.Cell>
 												{#if method.isDefault}
 													<StarIcon class="size-4 fill-amber-400 text-amber-400" />

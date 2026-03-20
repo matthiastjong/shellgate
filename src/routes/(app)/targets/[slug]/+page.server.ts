@@ -89,6 +89,7 @@ export const actions = {
 		const data = await request.formData();
 		const slug = data.get("slug")?.toString() ?? "";
 		const label = data.get("label")?.toString()?.trim() ?? "";
+		const type = data.get("type")?.toString() ?? "bearer";
 		const credential = data.get("credential")?.toString() ?? "";
 		const isDefault = data.get("isDefault") === "on";
 		if (!label) return fail(400, { error: "Label is required" });
@@ -100,7 +101,7 @@ export const actions = {
 		try {
 			const authMethod = await createAuthMethod(target.id, {
 				label,
-				type: "bearer",
+				type,
 				credential,
 				isDefault,
 			});

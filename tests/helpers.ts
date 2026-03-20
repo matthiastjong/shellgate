@@ -20,11 +20,11 @@ export async function createTestTarget(name?: string, baseUrl = "https://api.exa
 
 export async function createTestAuthMethod(
 	targetId: string,
-	opts: { label?: string; credential?: string; isDefault?: boolean } = {},
+	opts: { label?: string; type?: string; credential?: string; isDefault?: boolean } = {},
 ) {
 	return createAuthMethod(targetId, {
 		label: opts.label ?? "Test Key",
-		type: "bearer",
+		type: opts.type ?? "bearer",
 		credential: opts.credential ?? "sk-test-credential-12345678",
 		isDefault: opts.isDefault ?? true,
 	});
