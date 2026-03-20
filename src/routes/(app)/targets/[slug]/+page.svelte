@@ -67,7 +67,7 @@ let copied = $state(false);
 // Sheet state
 let sheetOpen = $state(false);
 let sheetMode = $state<
-	"rename" | "baseUrl" | "addAuth" | "renameAuth" | "updateCredential"
+	"rename" | "baseUrl" | "connection" | "addAuth" | "renameAuth" | "updateCredential"
 >("rename");
 let sheetSubmitting = $state(false);
 
@@ -76,6 +76,11 @@ let editName = $state("");
 
 // Base URL state
 let editBaseUrl = $state("");
+
+// SSH connection state
+let editHost = $state("");
+let editPort = $state("22");
+let editUsername = $state("");
 
 // Add auth state
 let authLabel = $state("");
@@ -127,6 +132,15 @@ function openRenameSheet() {
 function openBaseUrlSheet() {
 	sheetMode = "baseUrl";
 	editBaseUrl = target.baseUrl ?? "";
+	sheetSubmitting = false;
+	sheetOpen = true;
+}
+
+function openConnectionSheet() {
+	sheetMode = "connection";
+	editHost = target.config?.host ?? "";
+	editPort = String(target.config?.port ?? 22);
+	editUsername = target.config?.username ?? "";
 	sheetSubmitting = false;
 	sheetOpen = true;
 }
@@ -215,6 +229,52 @@ async function copyToClipboard(text: string) {
 						<Input id="edit-name" name="name" bind:value={editName} required />
 					</div>
 					<Button type="submit" disabled={sheetSubmitting || !editName.trim()}>
+						{#if sheetSubmitting}
+							<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
+						{/if}
+						Save
+					</Button>
+				</div>
+			</form>
+		{:else if sheetMode === 'connection'}
+			<Sheet.Header>
+				<Sheet.Title>Update Connection</Sheet.Title>
+				<Sheet.Description>Change the SSH connection details for this target.</Sheet.Description>
+			</Sheet.Header>
+			<form
+				method="POST"
+				action="?/updateConnection"
+				use:enhance={() => {
+					sheetSubmitting = true;
+					return async ({ result, update }) => {
+						sheetSubmitting = false;
+						if (result.type === 'success' && result.data?.updatedConnection) {
+							const { config } = result.data.updatedConnection as { id: string; config: { host: string; port: number; username: string } };
+							localTarget = { ...target, config };
+							sheetOpen = false;
+							toast.success('Connection updated');
+						} else if (result.type === 'failure') {
+							toast.error((result.data?.error as string) ?? 'Failed to update');
+						}
+						await update({ reset: false, invalidateAll: false });
+					};
+				}}
+			>
+				<input type="hidden" name="id" value={target.id} />
+				<div class="grid gap-4 px-4">
+					<div class="grid gap-2">
+						<Label for="edit-host">Host</Label>
+						<Input id="edit-host" name="host" bind:value={editHost} placeholder="e.g. 192.168.1.1" required />
+					</div>
+					<div class="grid gap-2">
+						<Label for="edit-port">Port</Label>
+						<Input id="edit-port" name="port" type="number" bind:value={editPort} placeholder="22" />
+					</div>
+					<div class="grid gap-2">
+						<Label for="edit-username">Username</Label>
+						<Input id="edit-username" name="username" bind:value={editUsername} placeholder="e.g. root" required />
+					</div>
+					<Button type="submit" disabled={sheetSubmitting || !editHost.trim() || !editUsername.trim()}>
 						{#if sheetSubmitting}
 							<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
 						{/if}
@@ -563,12 +623,11 @@ async function copyToClipboard(text: string) {
 					</div>
 					{#if target.type === 'ssh' && target.config}
 					<div>
-						<dt class="text-muted-foreground text-sm">Host</dt>
-						<dd><code class="text-sm font-mono">{target.config.host}:{target.config.port}</code></dd>
-					</div>
-					<div>
-						<dt class="text-muted-foreground text-sm">Username</dt>
-						<dd><code class="text-sm font-mono">{target.config.username}</code></dd>
+						<dt class="text-muted-foreground text-sm">Connection</dt>
+						<dd class="flex items-center gap-2">
+							<code class="text-sm font-mono">{target.config.username}@{target.config.host}:{target.config.port}</code>
+							<Button variant="ghost" size="sm" class="h-6 text-xs" onclick={openConnectionSheet}>Edit</Button>
+						</dd>
 					</div>
 				{:else}
 					<div>

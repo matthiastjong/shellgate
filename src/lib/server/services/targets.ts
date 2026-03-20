@@ -20,6 +20,7 @@ export async function listTargets() {
 			slug: targets.slug,
 			type: targets.type,
 			baseUrl: targets.baseUrl,
+			config: targets.config,
 			enabled: targets.enabled,
 			createdAt: targets.createdAt,
 			updatedAt: targets.updatedAt,
