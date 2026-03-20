@@ -1,5 +1,7 @@
 import {
 	boolean,
+	index,
+	integer,
 	jsonb,
 	pgTable,
 	text,
@@ -99,3 +101,34 @@ export const users = pgTable("users", {
 });
 
 export type User = typeof users.$inferSelect;
+
+export const auditLogs = pgTable(
+	"audit_logs",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		tokenId: uuid("token_id").references(() => tokens.id, {
+			onDelete: "set null",
+		}),
+		tokenName: varchar("token_name", { length: 255 }),
+		targetId: uuid("target_id").references(() => targets.id, {
+			onDelete: "set null",
+		}),
+		targetSlug: varchar("target_slug", { length: 255 }),
+		type: text("type").notNull().$type<"gateway" | "ssh">(),
+		method: text("method"),
+		path: text("path"),
+		statusCode: integer("status_code"),
+		clientIp: text("client_ip").notNull(),
+		durationMs: integer("duration_ms"),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(t) => [
+		index("audit_logs_token_id_idx").on(t.tokenId),
+		index("audit_logs_target_id_idx").on(t.targetId),
+		index("audit_logs_created_at_idx").on(t.createdAt.desc()),
+	],
+);
+
+export type AuditLog = typeof auditLogs.$inferSelect;

@@ -11,7 +11,10 @@ const data = {
 		},
 		{
 			title: "Security",
-			items: [{ title: "API Keys", url: "/api-keys" }],
+			items: [
+				{ title: "API Keys", url: "/api-keys" },
+				{ title: "Audit Log", url: "/logs" },
+			],
 		},
 		{
 			title: "Integrations",

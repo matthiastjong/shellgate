@@ -6,21 +6,46 @@ import { getTargetBySlug } from "$lib/server/services/targets";
 import { hasPermission } from "$lib/server/services/permissions";
 import { getDefaultAuthMethod } from "$lib/server/services/auth-methods";
 import { executeCommand } from "$lib/server/services/ssh";
+import { logRequest } from "$lib/server/services/audit";
 import type { SshConfig } from "$lib/server/db/schema";
 
 export const POST: RequestHandler = async ({ request, params, getClientAddress }) => {
 	const token = await requireBearer(request);
+	const clientIp = getClientAddress();
 
 	// IP whitelist check
 	if (token.allowedIps && token.allowedIps.length > 0) {
-		const clientIp = getClientAddress();
 		if (!ipMatchesAny(clientIp, token.allowedIps)) {
+			logRequest({
+				tokenId: token.id,
+				tokenName: token.name,
+				targetId: null,
+				targetSlug: params.target,
+				type: "ssh",
+				method: null,
+				path: null,
+				statusCode: 403,
+				clientIp,
+				durationMs: null,
+			});
 			throw error(403, "IP not allowed");
 		}
 	}
 
 	const target = await getTargetBySlug(params.target);
 	if (!target || !target.enabled) {
+		logRequest({
+			tokenId: token.id,
+			tokenName: token.name,
+			targetId: null,
+			targetSlug: params.target,
+			type: "ssh",
+			method: null,
+			path: null,
+			statusCode: 404,
+			clientIp,
+			durationMs: null,
+		});
 		throw error(404, "target not found");
 	}
 
@@ -30,6 +55,18 @@ export const POST: RequestHandler = async ({ request, params, getClientAddress }
 
 	const permitted = await hasPermission(token.id, target.id);
 	if (!permitted) {
+		logRequest({
+			tokenId: token.id,
+			tokenName: token.name,
+			targetId: target.id,
+			targetSlug: target.slug,
+			type: "ssh",
+			method: null,
+			path: null,
+			statusCode: 403,
+			clientIp,
+			durationMs: null,
+		});
 		throw error(403, "forbidden");
 	}
 
@@ -52,12 +89,38 @@ export const POST: RequestHandler = async ({ request, params, getClientAddress }
 
 	try {
 		const result = await executeCommand(config, authMethod.credential, body.command, timeoutMs);
+
+		logRequest({
+			tokenId: token.id,
+			tokenName: token.name,
+			targetId: target.id,
+			targetSlug: target.slug,
+			type: "ssh",
+			method: null,
+			path: body.command,
+			statusCode: result.exitCode,
+			clientIp,
+			durationMs: result.durationMs,
+		});
+
 		return Response.json(result);
 	} catch (err) {
 		const message = err instanceof Error ? err.message : "SSH execution failed";
-		if (message.includes("timed out")) {
-			return Response.json({ error: message }, { status: 408 });
-		}
-		return Response.json({ error: message }, { status: 502 });
+		const statusCode = message.includes("timed out") ? 408 : 502;
+
+		logRequest({
+			tokenId: token.id,
+			tokenName: token.name,
+			targetId: target.id,
+			targetSlug: target.slug,
+			type: "ssh",
+			method: null,
+			path: body.command,
+			statusCode,
+			clientIp,
+			durationMs: null,
+		});
+
+		return Response.json({ error: message }, { status: statusCode });
 	}
 };
