@@ -16,15 +16,30 @@ export const actions = {
 	create: async ({ request }) => {
 		const data = await request.formData();
 		const name = data.get("name")?.toString()?.trim() ?? "";
-		const base_url = data.get("base_url")?.toString()?.trim() ?? "";
+		const type = (data.get("type")?.toString() ?? "api") as "api" | "ssh";
 		if (!name) return fail(400, { error: "Name is required" });
-		if (!base_url) return fail(400, { error: "Base URL is required" });
 
-		try {
-			const target = await createTarget({ name, type: "api", base_url });
-			return { created: { ...target, enabled: target.enabled !== false } };
-		} catch (err) {
-			return fail(400, { error: err instanceof Error ? err.message : "Failed to create target" });
+		if (type === "ssh") {
+			const host = data.get("host")?.toString()?.trim() ?? "";
+			const port = parseInt(data.get("port")?.toString() ?? "22", 10) || 22;
+			const username = data.get("username")?.toString()?.trim() ?? "";
+			if (!host) return fail(400, { error: "Host is required" });
+			if (!username) return fail(400, { error: "Username is required" });
+			try {
+				const target = await createTarget({ name, type: "ssh", config: { host, port, username } });
+				return { created: { ...target, enabled: target.enabled !== false } };
+			} catch (err) {
+				return fail(400, { error: err instanceof Error ? err.message : "Failed to create target" });
+			}
+		} else {
+			const base_url = data.get("base_url")?.toString()?.trim() ?? "";
+			if (!base_url) return fail(400, { error: "Base URL is required" });
+			try {
+				const target = await createTarget({ name, type: "api", base_url });
+				return { created: { ...target, enabled: target.enabled !== false } };
+			} catch (err) {
+				return fail(400, { error: err instanceof Error ? err.message : "Failed to create target" });
+			}
 		}
 	},
 

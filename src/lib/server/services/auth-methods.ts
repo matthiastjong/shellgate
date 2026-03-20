@@ -2,9 +2,15 @@ import { and, eq } from "drizzle-orm";
 import { db } from "../db";
 import { targetAuthMethods } from "../db/schema";
 
-const VALID_TYPES = ["bearer", "basic", "custom_header"];
+const VALID_TYPES = ["bearer", "basic", "custom_header", "ssh_key"];
 
-export function computeCredentialHint(credential: string): string {
+export function computeCredentialHint(credential: string, type?: string): string {
+	if (type === "ssh_key") {
+		if (credential.includes("RSA")) return "SSH Key (RSA)";
+		if (credential.includes("ED25519")) return "SSH Key (Ed25519)";
+		if (credential.includes("ECDSA")) return "SSH Key (ECDSA)";
+		return "SSH Private Key";
+	}
 	if (credential.length < 10) return "••••••••";
 	return `${credential.slice(0, 3)}••••••••${credential.slice(-4)}`;
 }
@@ -66,7 +72,7 @@ export async function createAuthMethod(
 				label,
 				type: data.type,
 				credential: data.credential,
-				credentialHint: computeCredentialHint(data.credential),
+				credentialHint: computeCredentialHint(data.credential, data.type),
 				isDefault,
 			})
 			.returning({

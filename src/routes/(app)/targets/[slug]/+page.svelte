@@ -30,6 +30,7 @@ type Target = {
 	slug: string;
 	type: string;
 	baseUrl: string | null;
+	config: { host: string; port: number; username: string } | null;
 	enabled: boolean;
 	createdAt: string | Date;
 	updatedAt: string | Date;
@@ -117,7 +118,7 @@ function openBaseUrlSheet() {
 function openAddAuthSheet() {
 	sheetMode = "addAuth";
 	authLabel = "";
-	authType = "bearer";
+	authType = target.type === "ssh" ? "ssh_key" : "bearer";
 	authCredential = "";
 	showCredential = false;
 	isDefaultChecked = true;
@@ -280,12 +281,28 @@ async function copyToClipboard(text: string) {
 					<div class="grid gap-2">
 						<Label for="add-auth-type">Type</Label>
 						<select id="add-auth-type" name="type" bind:value={authType} class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-							<option value="bearer">Bearer Token</option>
-							<option value="basic">Basic Auth</option>
-							<option value="custom_header">Custom Header</option>
+							{#if target.type === 'ssh'}
+								<option value="ssh_key">SSH Key</option>
+							{:else}
+								<option value="bearer">Bearer Token</option>
+								<option value="basic">Basic Auth</option>
+								<option value="custom_header">Custom Header</option>
+							{/if}
 						</select>
 					</div>
-					{#if authType === 'basic'}
+					{#if authType === 'ssh_key'}
+						<div class="grid gap-2">
+							<Label for="add-auth-credential">Private Key (PEM)</Label>
+							<textarea
+								id="add-auth-credential"
+								name="credential"
+								class="flex min-h-[120px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono"
+								bind:value={authCredential}
+								placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;...&#10;-----END OPENSSH PRIVATE KEY-----"
+								required
+							></textarea>
+						</div>
+					{:else if authType === 'basic'}
 						<div class="grid gap-2">
 							<Label for="add-auth-username">Username</Label>
 							<Input id="add-auth-username" name="credential1" bind:value={authCredential} placeholder="username" required />
@@ -528,6 +545,16 @@ async function copyToClipboard(text: string) {
 						<dt class="text-muted-foreground text-sm">Type</dt>
 						<dd><Badge variant="outline">{target.type}</Badge></dd>
 					</div>
+					{#if target.type === 'ssh' && target.config}
+					<div>
+						<dt class="text-muted-foreground text-sm">Host</dt>
+						<dd><code class="text-sm font-mono">{target.config.host}:{target.config.port}</code></dd>
+					</div>
+					<div>
+						<dt class="text-muted-foreground text-sm">Username</dt>
+						<dd><code class="text-sm font-mono">{target.config.username}</code></dd>
+					</div>
+				{:else}
 					<div>
 						<dt class="text-muted-foreground text-sm">Base URL</dt>
 						<dd class="flex items-center gap-2">
@@ -539,6 +566,7 @@ async function copyToClipboard(text: string) {
 							<Button variant="ghost" size="sm" class="h-6 text-xs" onclick={openBaseUrlSheet}>Edit</Button>
 						</dd>
 					</div>
+				{/if}
 					<div>
 						<dt class="text-muted-foreground text-sm">Status</dt>
 						<dd class="flex items-center gap-2">
@@ -649,7 +677,7 @@ async function copyToClipboard(text: string) {
 									{:else}
 										<Table.Row>
 											<Table.Cell class="font-medium">{method.label}</Table.Cell>
-											<Table.Cell><Badge variant="outline">{method.type === 'custom_header' ? 'Custom Header' : method.type === 'basic' ? 'Basic Auth' : 'Bearer'}</Badge></Table.Cell>
+											<Table.Cell><Badge variant="outline">{method.type === 'ssh_key' ? 'SSH Key' : method.type === 'custom_header' ? 'Custom Header' : method.type === 'basic' ? 'Basic Auth' : 'Bearer'}</Badge></Table.Cell>
 											<Table.Cell>
 												{#if method.isDefault}
 													<StarIcon class="size-4 fill-amber-400 text-amber-400" />
@@ -795,13 +823,26 @@ async function copyToClipboard(text: string) {
 				<Card.Content>
 					<div class="rounded-lg border bg-muted/50 p-3">
 						<div class="flex items-start justify-between gap-2">
-							<pre class="break-all font-mono text-xs whitespace-pre-wrap">{`curl ${gatewayUrl}/gateway/${target.slug}/health \
+							{#if target.type === 'ssh'}
+								<pre class="break-all font-mono text-xs whitespace-pre-wrap">{`curl -X POST ${gatewayUrl}/ssh/${target.slug}/exec \
+  -H "Authorization: Bearer <your-shellgate-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"command": "whoami"}'`}</pre>
+							{:else}
+								<pre class="break-all font-mono text-xs whitespace-pre-wrap">{`curl ${gatewayUrl}/gateway/${target.slug}/health \
   -H "Authorization: Bearer <your-shellgate-token>"`}</pre>
+							{/if}
 							<Button
 								variant="ghost"
 								size="icon"
 								class="size-7 shrink-0"
-								onclick={() => copyToClipboard(`curl ${gatewayUrl}/gateway/${target.slug}/health \\\n  -H "Authorization: Bearer <your-shellgate-token>"`)}
+								onclick={() => {
+									if (target.type === 'ssh') {
+										copyToClipboard(`curl -X POST ${gatewayUrl}/ssh/${target.slug}/exec \\\n  -H "Authorization: Bearer <your-shellgate-token>" \\\n  -H "Content-Type: application/json" \\\n  -d '{"command": "whoami"}'`);
+									} else {
+										copyToClipboard(`curl ${gatewayUrl}/gateway/${target.slug}/health \\\n  -H "Authorization: Bearer <your-shellgate-token>"`);
+									}
+								}}
 							>
 								{#if copied}
 									<CheckIcon class="size-3.5" />
@@ -811,7 +852,11 @@ async function copyToClipboard(text: string) {
 							</Button>
 						</div>
 					</div>
-					<p class="text-muted-foreground mt-2 text-xs">Replace <code class="font-mono">/health</code> with any path your target API supports.</p>
+					{#if target.type === 'ssh'}
+						<p class="text-muted-foreground mt-2 text-xs">Replace <code class="font-mono">whoami</code> with any command. Add <code class="font-mono">"timeout": 30</code> for a custom timeout (max 60s).</p>
+					{:else}
+						<p class="text-muted-foreground mt-2 text-xs">Replace <code class="font-mono">/health</code> with any path your target API supports.</p>
+					{/if}
 				</Card.Content>
 			</Card.Root>
 		</div>

@@ -105,14 +105,17 @@ async function copyToClipboard(text: string) {
 						<p class="text-muted-foreground text-xs">Proxy to an external API</p>
 					</div>
 				</button>
-				<div class="relative flex flex-col items-center gap-3 rounded-lg border-2 border-transparent bg-muted/50 p-6 text-center opacity-50">
-					<Badge variant="secondary" class="absolute top-2 right-2 text-[10px]">Coming soon</Badge>
-					<MonitorIcon class="size-8 text-muted-foreground" />
+				<button
+					type="button"
+					class="flex flex-col items-center gap-3 rounded-lg border-2 border-transparent bg-muted/50 p-6 text-center transition-colors hover:border-primary hover:bg-muted"
+					onclick={() => (createStep = 4)}
+				>
+					<MonitorIcon class="size-8 text-primary" />
 					<div>
 						<p class="font-semibold">Server</p>
-						<p class="text-muted-foreground text-xs">Connect to a server or service</p>
+						<p class="text-muted-foreground text-xs">Execute commands via SSH</p>
 					</div>
-				</div>
+				</button>
 			</div>
 		{:else if createStep === 1}
 			<Dialog.Header>
@@ -329,6 +332,150 @@ async function copyToClipboard(text: string) {
 					</div>
 				</div>
 				<p class="text-muted-foreground text-xs">Replace <code class="font-mono">/health</code> with any path your target API supports.</p>
+			</div>
+			<Dialog.Footer>
+				<Button class="w-full" onclick={() => (createOpen = false)}>Done</Button>
+			</Dialog.Footer>
+		{:else if createStep === 4}
+			<Dialog.Header>
+				<Dialog.Title>Server Details</Dialog.Title>
+				<Dialog.Description>Enter the SSH connection details for your server.</Dialog.Description>
+			</Dialog.Header>
+			<form
+				method="POST"
+				action="?/create"
+				use:enhance={() => {
+					createSubmitting = true;
+					return async ({ result, update }) => {
+						createSubmitting = false;
+						if (result.type === 'success' && result.data?.created) {
+							const created = result.data.created as Target;
+							createdTarget = created;
+							updateTargetList((targets) => [...targets, created]);
+							createStep = 5;
+						} else if (result.type === 'failure') {
+							toast.error((result.data?.error as string) ?? 'Failed to create target');
+						}
+						await update({ reset: true, invalidateAll: false });
+					};
+				}}
+			>
+				<input type="hidden" name="type" value="ssh" />
+				<div class="grid gap-4 py-4">
+					<div class="grid gap-2">
+						<Label for="create-ssh-name">Name</Label>
+						<Input id="create-ssh-name" name="name" placeholder="e.g. Production Server" required />
+					</div>
+					<div class="grid gap-2">
+						<Label for="create-ssh-host">Host</Label>
+						<Input id="create-ssh-host" name="host" placeholder="e.g. 10.0.0.1 or server.example.com" required />
+					</div>
+					<div class="grid grid-cols-2 gap-4">
+						<div class="grid gap-2">
+							<Label for="create-ssh-port">Port</Label>
+							<Input id="create-ssh-port" name="port" type="number" value="22" min="1" max="65535" />
+						</div>
+						<div class="grid gap-2">
+							<Label for="create-ssh-username">Username</Label>
+							<Input id="create-ssh-username" name="username" value="root" placeholder="e.g. root" required />
+						</div>
+					</div>
+					<div class="flex gap-2">
+						<Button variant="outline" type="button" onclick={() => (createStep = 0)}>Back</Button>
+						<Button type="submit" class="flex-1" disabled={createSubmitting}>
+							{#if createSubmitting}
+								<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
+							{/if}
+							Create Target
+						</Button>
+					</div>
+				</div>
+			</form>
+		{:else if createStep === 5}
+			<Dialog.Header>
+				<Dialog.Title>Add SSH Key</Dialog.Title>
+				<Dialog.Description>Add a private key for {createdTarget?.name ?? 'your server'}. You can also do this later.</Dialog.Description>
+			</Dialog.Header>
+			<form
+				method="POST"
+				action="?/addAuthMethod"
+				use:enhance={() => {
+					authSubmitting = true;
+					return async ({ result, update }) => {
+						authSubmitting = false;
+						if (result.type === 'success' && result.data?.authMethodAdded) {
+							if (createdTarget) {
+								updateTargetList((targets) => targets.map((t) =>
+									t.id === createdTarget!.id ? { ...t, authMethodCount: t.authMethodCount + 1 } : t
+								));
+							}
+							createStep = 6;
+						} else if (result.type === 'failure') {
+							toast.error((result.data?.error as string) ?? 'Failed to add SSH key');
+						}
+						await update({ reset: true, invalidateAll: false });
+					};
+				}}
+			>
+				<input type="hidden" name="slug" value={createdTarget?.slug ?? ''} />
+				<input type="hidden" name="type" value="ssh_key" />
+				<input type="hidden" name="isDefault" value="on" />
+				<div class="grid gap-4 py-4">
+					<div class="grid gap-2">
+						<Label for="ssh-key-label">Label</Label>
+						<Input id="ssh-key-label" name="label" placeholder="e.g. Deploy Key" required />
+					</div>
+					<div class="grid gap-2">
+						<Label for="ssh-key-credential">Private Key (PEM)</Label>
+						<textarea
+							id="ssh-key-credential"
+							name="credential"
+							class="flex min-h-[120px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono"
+							placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;...&#10;-----END OPENSSH PRIVATE KEY-----"
+							required
+						></textarea>
+					</div>
+					<div class="flex gap-2">
+						<Button variant="outline" type="button" onclick={() => { createStep = 6; }}>Skip</Button>
+						<Button type="submit" class="flex-1" disabled={authSubmitting}>
+							{#if authSubmitting}
+								<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
+							{/if}
+							Add SSH Key
+						</Button>
+					</div>
+				</div>
+			</form>
+		{:else if createStep === 6}
+			<Dialog.Header>
+				<Dialog.Title>Target Ready</Dialog.Title>
+				<Dialog.Description>Your SSH target is ready!</Dialog.Description>
+			</Dialog.Header>
+			<div class="flex flex-col items-center gap-4 py-6">
+				<div class="flex size-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
+					<CheckIcon class="size-6 text-green-600 dark:text-green-300" />
+				</div>
+				<p class="text-center text-sm text-muted-foreground">Your SSH target is ready! Execute commands using:</p>
+				<div class="w-full rounded-lg border bg-muted/50 p-3">
+					<div class="flex items-start justify-between gap-2">
+						<pre class="break-all font-mono text-xs whitespace-pre-wrap">{`curl -X POST ${gatewayUrl}/ssh/${createdTarget?.slug ?? 'your-target'}/exec \
+  -H "Authorization: Bearer <your-shellgate-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"command": "whoami"}'`}</pre>
+						<Button
+							variant="ghost"
+							size="icon"
+							class="size-7 shrink-0"
+							onclick={() => copyToClipboard(`curl -X POST ${gatewayUrl}/ssh/${createdTarget?.slug ?? 'your-target'}/exec \\\n  -H "Authorization: Bearer <your-shellgate-token>" \\\n  -H "Content-Type: application/json" \\\n  -d '{"command": "whoami"}'`)}
+						>
+							{#if copied}
+								<CheckIcon class="size-3.5" />
+							{:else}
+								<CopyIcon class="size-3.5" />
+							{/if}
+						</Button>
+					</div>
+				</div>
 			</div>
 			<Dialog.Footer>
 				<Button class="w-full" onclick={() => (createOpen = false)}>Done</Button>
