@@ -1,6 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { db } from "../db";
 import { targets } from "../db/schema";
+import type { SshConfig } from "../db/schema";
 import { isUniqueViolation } from "../utils/db-error";
 import { validateBaseUrl } from "../utils/url";
 
@@ -50,10 +51,25 @@ export async function getTargetById(id: string) {
 	return row ?? null;
 }
 
+function validateSshConfig(config: unknown): SshConfig {
+	if (!config || typeof config !== "object") {
+		throw new Error("SSH config is required for ssh targets");
+	}
+	const c = config as Record<string, unknown>;
+	const host = typeof c.host === "string" ? c.host.trim() : "";
+	if (!host) throw new Error("host is required for ssh targets");
+	const port = typeof c.port === "number" ? c.port : 22;
+	if (port < 1 || port > 65535) throw new Error("port must be between 1 and 65535");
+	const username = typeof c.username === "string" ? c.username.trim() : "";
+	if (!username) throw new Error("username is required for ssh targets");
+	return { host, port, username };
+}
+
 export async function createTarget(data: {
 	name: string;
 	type: "api" | "ssh";
 	base_url?: string | null;
+	config?: SshConfig | null;
 }) {
 	const name = data.name.trim();
 	if (!name) throw new Error("name is required");
@@ -63,11 +79,15 @@ export async function createTarget(data: {
 	}
 
 	let baseUrl: string | null = null;
+	let config: SshConfig | null = null;
+
 	if (data.type === "api") {
 		baseUrl = data.base_url ?? "";
 		if (!baseUrl) throw new Error("base_url is required for api targets");
 		const urlError = validateBaseUrl(baseUrl);
 		if (urlError) throw new Error(urlError);
+	} else if (data.type === "ssh") {
+		config = validateSshConfig(data.config);
 	}
 
 	const slug = slugify(name);
@@ -76,7 +96,7 @@ export async function createTarget(data: {
 	try {
 		const [row] = await db
 			.insert(targets)
-			.values({ name, slug, type: data.type, baseUrl })
+			.values({ name, slug, type: data.type, baseUrl, config })
 			.returning();
 		return row;
 	} catch (err: unknown) {
@@ -93,6 +113,7 @@ export async function updateTarget(
 		name?: string;
 		type?: "api" | "ssh";
 		base_url?: string | null;
+		config?: SshConfig | null;
 		enabled?: boolean;
 	},
 ) {
@@ -131,6 +152,14 @@ export async function updateTarget(
 			const urlError = validateBaseUrl(baseUrl);
 			if (urlError) throw new Error(urlError);
 			updates.baseUrl = baseUrl;
+		}
+	}
+
+	if (data.config !== undefined) {
+		if (data.config === null) {
+			updates.config = null;
+		} else {
+			updates.config = validateSshConfig(data.config);
 		}
 	}
 

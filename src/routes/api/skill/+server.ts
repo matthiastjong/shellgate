@@ -41,9 +41,15 @@ For targets with type \`ssh\`, execute commands on remote servers:
 
 \`\`\`bash
 curl -s -X POST -H "Authorization: Bearer $SHELLGATE_API_KEY" \\
-  $SHELLGATE_URL/gateway/{target-slug}/execute \\
-  -d '{"command": "docker ps"}'
+  -H "Content-Type: application/json" \\
+  $SHELLGATE_URL/ssh/{target-slug}/exec \\
+  -d '{"command": "docker ps", "timeout": 30}'
 \`\`\`
+
+- The endpoint is \`POST /ssh/{target-slug}/exec\` (NOT \`/gateway/\`)
+- \`command\` (required): the shell command to execute
+- \`timeout\` (optional): max seconds to wait, default 30, max 60
+- Response: \`{"exitCode": 0, "stdout": "...", "stderr": "...", "durationMs": 123}\`
 
 ## Rules
 - **ALWAYS** run the discovery curl command above to get your available targets — never assume target slugs

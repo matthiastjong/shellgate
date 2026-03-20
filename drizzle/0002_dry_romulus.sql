@@ -1,0 +1,1 @@
+ALTER TABLE "targets" ADD COLUMN "config" jsonb;

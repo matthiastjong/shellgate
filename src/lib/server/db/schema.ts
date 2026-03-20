@@ -26,12 +26,19 @@ export const tokens = pgTable("tokens", {
 
 export type Token = typeof tokens.$inferSelect;
 
+export type SshConfig = {
+	host: string;
+	port: number;
+	username: string;
+};
+
 export const targets = pgTable("targets", {
 	id: uuid("id").primaryKey().defaultRandom(),
 	name: varchar("name", { length: 255 }).notNull(),
 	slug: varchar("slug", { length: 255 }).notNull().unique(),
 	type: text("type").notNull().$type<"api" | "ssh">(),
 	baseUrl: text("base_url"),
+	config: jsonb("config").$type<SshConfig>(),
 	enabled: boolean("enabled").notNull().default(true),
 	createdAt: timestamp("created_at", { withTimezone: true })
 		.notNull()
