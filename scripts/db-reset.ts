@@ -25,8 +25,21 @@ if (answer.trim().toLowerCase() !== "yes") {
 const sql = postgres(DATABASE_URL);
 
 try {
-	await sql`TRUNCATE token_permissions, target_auth_methods, tokens, targets, users CASCADE`;
-	console.log("\nDatabase wiped. All data has been removed.");
+	const tables = await sql<{ table_name: string }[]>`
+		SELECT table_name FROM information_schema.tables
+		WHERE table_schema = 'public'
+		  AND table_type = 'BASE TABLE'
+		  AND table_name != '__drizzle_migrations'
+	`;
+
+	if (tables.length === 0) {
+		console.log("No tables found to truncate.");
+		process.exit(0);
+	}
+
+	const tableNames = tables.map((t) => t.table_name).join(", ");
+	await sql.unsafe(`TRUNCATE ${tableNames} CASCADE`);
+	console.log(`\nDatabase wiped. Truncated: ${tableNames}`);
 	console.log("Restart the app to begin setup from scratch.");
 } catch (err) {
 	console.error("Failed to reset database:", err);
