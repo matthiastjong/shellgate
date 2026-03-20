@@ -177,6 +177,21 @@ export async function deleteAuthMethod(targetId: string, id: string) {
 	return { id, deleted: true };
 }
 
+export async function getAuthMethodCredential(targetId: string, id: string) {
+	const [row] = await db
+		.select({ id: targetAuthMethods.id, credential: targetAuthMethods.credential })
+		.from(targetAuthMethods)
+		.where(
+			and(
+				eq(targetAuthMethods.id, id),
+				eq(targetAuthMethods.targetId, targetId),
+			),
+		)
+		.limit(1);
+
+	return row ?? null;
+}
+
 export async function getDefaultAuthMethod(targetId: string) {
 	const [row] = await db
 		.select()

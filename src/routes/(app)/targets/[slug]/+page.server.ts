@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "$lib/server/db";
 import { tokenPermissions, tokens } from "$lib/server/db/schema";
 import { getTargetBySlug, updateTarget } from "$lib/server/services/targets";
-import { listAuthMethods, createAuthMethod, updateAuthMethod, deleteAuthMethod } from "$lib/server/services/auth-methods";
+import { listAuthMethods, createAuthMethod, updateAuthMethod, deleteAuthMethod, getAuthMethodCredential } from "$lib/server/services/auth-methods";
 import type { Actions, PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async ({ params }) => {
@@ -90,10 +90,24 @@ export const actions = {
 		const slug = data.get("slug")?.toString() ?? "";
 		const label = data.get("label")?.toString()?.trim() ?? "";
 		const type = data.get("type")?.toString() ?? "bearer";
-		const credential = data.get("credential")?.toString() ?? "";
 		const isDefault = data.get("isDefault") === "on";
 		if (!label) return fail(400, { error: "Label is required" });
-		if (!credential) return fail(400, { error: "Credential is required" });
+
+		let credential: string;
+		if (type === "basic") {
+			const username = data.get("credential1")?.toString() ?? "";
+			const password = data.get("credential2")?.toString() ?? "";
+			if (!username || !password) return fail(400, { error: "Username and password are required" });
+			credential = `${username}:${password}`;
+		} else if (type === "custom_header") {
+			const headerName = data.get("credential1")?.toString() ?? "";
+			const headerValue = data.get("credential2")?.toString() ?? "";
+			if (!headerName || !headerValue) return fail(400, { error: "Header name and value are required" });
+			credential = `${headerName}: ${headerValue}`;
+		} else {
+			credential = data.get("credential")?.toString() ?? "";
+			if (!credential) return fail(400, { error: "Credential is required" });
+		}
 
 		const target = await getTargetBySlug(slug);
 		if (!target) return fail(404, { error: "Target not found" });
@@ -165,5 +179,18 @@ export const actions = {
 		const result = await deleteAuthMethod(target.id, id);
 		if (!result) return fail(404, { error: "Auth method not found" });
 		return { authMethodDeleted: id };
+	},
+
+	revealCredential: async ({ request }) => {
+		const data = await request.formData();
+		const slug = data.get("slug")?.toString() ?? "";
+		const id = data.get("id")?.toString() ?? "";
+
+		const target = await getTargetBySlug(slug);
+		if (!target) return fail(404, { error: "Target not found" });
+
+		const result = await getAuthMethodCredential(target.id, id);
+		if (!result) return fail(404, { error: "Auth method not found" });
+		return { revealedCredential: { id, credential: result.credential } };
 	},
 } satisfies Actions;

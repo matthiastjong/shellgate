@@ -32,10 +32,25 @@ export const actions = {
 		const data = await request.formData();
 		const slug = data.get("slug")?.toString() ?? "";
 		const label = data.get("label")?.toString()?.trim() ?? "";
-		const credential = data.get("credential")?.toString() ?? "";
+		const type = data.get("type")?.toString() ?? "bearer";
 		const isDefault = data.get("isDefault") === "on";
 		if (!label) return fail(400, { error: "Label is required" });
-		if (!credential) return fail(400, { error: "Credential is required" });
+
+		let credential: string;
+		if (type === "basic") {
+			const username = data.get("credential1")?.toString() ?? "";
+			const password = data.get("credential2")?.toString() ?? "";
+			if (!username || !password) return fail(400, { error: "Username and password are required" });
+			credential = `${username}:${password}`;
+		} else if (type === "custom_header") {
+			const headerName = data.get("credential1")?.toString() ?? "";
+			const headerValue = data.get("credential2")?.toString() ?? "";
+			if (!headerName || !headerValue) return fail(400, { error: "Header name and value are required" });
+			credential = `${headerName}: ${headerValue}`;
+		} else {
+			credential = data.get("credential")?.toString() ?? "";
+			if (!credential) return fail(400, { error: "Credential is required" });
+		}
 
 		const target = await getTargetBySlug(slug);
 		if (!target) return fail(404, { error: "Target not found" });
@@ -43,7 +58,7 @@ export const actions = {
 		try {
 			const authMethod = await createAuthMethod(target.id, {
 				label,
-				type: "bearer",
+				type,
 				credential,
 				isDefault,
 			});

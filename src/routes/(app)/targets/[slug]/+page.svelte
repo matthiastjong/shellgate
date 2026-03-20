@@ -12,6 +12,7 @@ import * as Breadcrumb from "$lib/components/ui/breadcrumb/index.js";
 import { Input } from "$lib/components/ui/input/index.js";
 import { Label } from "$lib/components/ui/label/index.js";
 import { Checkbox } from "$lib/components/ui/checkbox/index.js";
+import * as Dialog from "$lib/components/ui/dialog/index.js";
 import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
 import PlusIcon from "@lucide/svelte/icons/plus";
 import StarIcon from "@lucide/svelte/icons/star";
@@ -92,6 +93,12 @@ let showUpdateCredential = $state(false);
 
 // Delete confirmation
 let confirmDeleteAuthId = $state<string | null>(null);
+
+// View credential dialog
+let viewCredentialOpen = $state(false);
+let viewCredentialLabel = $state("");
+let viewCredentialValue = $state("");
+let viewCredentialCopied = $state(false);
 
 function openRenameSheet() {
 	sheetMode = "rename";
@@ -278,32 +285,94 @@ async function copyToClipboard(text: string) {
 							<option value="custom_header">Custom Header</option>
 						</select>
 					</div>
-					<div class="grid gap-2">
-						<Label for="add-auth-credential">{authType === 'basic' ? 'Credentials (user:password)' : authType === 'custom_header' ? 'Header (Name: Value)' : 'Credential'}</Label>
-						<div class="relative">
-							<Input
-								id="add-auth-credential"
-								name="credential"
-								type={showCredential ? 'text' : 'password'}
-								bind:value={authCredential}
-								placeholder={authType === 'basic' ? 'user:password' : authType === 'custom_header' ? 'X-API-Key: your-key-here' : 'e.g. sk-...'}
-								required
-							/>
-							<Button
-								type="button"
-								variant="ghost"
-								size="icon"
-								class="absolute right-0 top-0 h-full px-3"
-								onclick={() => (showCredential = !showCredential)}
-							>
-								{#if showCredential}
-									<EyeOffIcon class="size-4" />
-								{:else}
-									<EyeIcon class="size-4" />
-								{/if}
-							</Button>
+					{#if authType === 'basic'}
+						<div class="grid gap-2">
+							<Label for="add-auth-username">Username</Label>
+							<Input id="add-auth-username" name="credential1" bind:value={authCredential} placeholder="username" required />
 						</div>
-					</div>
+						<div class="grid gap-2">
+							<Label for="add-auth-password">Password</Label>
+							<div class="relative">
+								<Input
+									id="add-auth-password"
+									name="credential2"
+									type={showCredential ? 'text' : 'password'}
+									placeholder="password"
+									required
+								/>
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon"
+									class="absolute right-0 top-0 h-full px-3"
+									onclick={() => (showCredential = !showCredential)}
+								>
+									{#if showCredential}
+										<EyeOffIcon class="size-4" />
+									{:else}
+										<EyeIcon class="size-4" />
+									{/if}
+								</Button>
+							</div>
+						</div>
+					{:else if authType === 'custom_header'}
+						<div class="grid gap-2">
+							<Label for="add-auth-header-name">Header Name</Label>
+							<Input id="add-auth-header-name" name="credential1" bind:value={authCredential} placeholder="X-API-Key" required />
+						</div>
+						<div class="grid gap-2">
+							<Label for="add-auth-header-value">Header Value</Label>
+							<div class="relative">
+								<Input
+									id="add-auth-header-value"
+									name="credential2"
+									type={showCredential ? 'text' : 'password'}
+									placeholder="your-key-here"
+									required
+								/>
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon"
+									class="absolute right-0 top-0 h-full px-3"
+									onclick={() => (showCredential = !showCredential)}
+								>
+									{#if showCredential}
+										<EyeOffIcon class="size-4" />
+									{:else}
+										<EyeIcon class="size-4" />
+									{/if}
+								</Button>
+							</div>
+						</div>
+					{:else}
+						<div class="grid gap-2">
+							<Label for="add-auth-credential">Credential</Label>
+							<div class="relative">
+								<Input
+									id="add-auth-credential"
+									name="credential"
+									type={showCredential ? 'text' : 'password'}
+									bind:value={authCredential}
+									placeholder="e.g. sk-..."
+									required
+								/>
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon"
+									class="absolute right-0 top-0 h-full px-3"
+									onclick={() => (showCredential = !showCredential)}
+								>
+									{#if showCredential}
+										<EyeOffIcon class="size-4" />
+									{:else}
+										<EyeIcon class="size-4" />
+									{/if}
+								</Button>
+							</div>
+						</div>
+					{/if}
 					<div class="flex items-center gap-2">
 						<Checkbox id="add-auth-default" name="isDefault" checked={isDefaultChecked} onCheckedChange={(v) => (isDefaultChecked = v === true)} />
 						<Label for="add-auth-default" class="text-sm font-normal">Set as default</Label>
@@ -537,7 +606,6 @@ async function copyToClipboard(text: string) {
 							<Table.Header>
 								<Table.Row>
 									<Table.Head>Label</Table.Head>
-									<Table.Head>Credential</Table.Head>
 									<Table.Head>Type</Table.Head>
 									<Table.Head>Default</Table.Head>
 									<Table.Head>Created</Table.Head>
@@ -548,7 +616,7 @@ async function copyToClipboard(text: string) {
 								{#each authMethods as method (method.id)}
 									{#if confirmDeleteAuthId === method.id}
 										<Table.Row class="bg-red-50 dark:bg-red-950/30">
-											<Table.Cell colspan={6}>
+											<Table.Cell colspan={5}>
 												<div class="flex items-center justify-between gap-4 py-1">
 													<p class="text-sm">Delete this auth method? This cannot be undone.</p>
 													<div class="flex shrink-0 gap-2">
@@ -581,7 +649,6 @@ async function copyToClipboard(text: string) {
 									{:else}
 										<Table.Row>
 											<Table.Cell class="font-medium">{method.label}</Table.Cell>
-											<Table.Cell><span class="text-muted-foreground font-mono text-sm">{method.credentialHint ?? '••••••••'}</span></Table.Cell>
 											<Table.Cell><Badge variant="outline">{method.type === 'custom_header' ? 'Custom Header' : method.type === 'basic' ? 'Basic Auth' : 'Bearer'}</Badge></Table.Cell>
 											<Table.Cell>
 												{#if method.isDefault}
@@ -590,6 +657,29 @@ async function copyToClipboard(text: string) {
 											</Table.Cell>
 											<Table.Cell class="text-muted-foreground text-sm">{formatDate(method.createdAt)}</Table.Cell>
 											<Table.Cell>
+												<form
+													method="POST"
+													action="?/revealCredential"
+													class="hidden"
+													id="reveal-credential-form-{method.id}"
+													use:enhance={() => {
+														return async ({ result, update }) => {
+															if (result.type === 'success' && result.data?.revealedCredential) {
+																const { credential } = result.data.revealedCredential as { id: string; credential: string };
+																viewCredentialLabel = method.label;
+																viewCredentialValue = credential;
+																viewCredentialCopied = false;
+																viewCredentialOpen = true;
+															} else if (result.type === 'failure') {
+																toast.error((result.data?.error as string) ?? 'Failed to reveal credential');
+															}
+															await update({ reset: false, invalidateAll: false });
+														};
+													}}
+												>
+													<input type="hidden" name="slug" value={target.slug} />
+													<input type="hidden" name="id" value={method.id} />
+												</form>
 												{#if !method.isDefault}
 													<form
 														method="POST"
@@ -625,6 +715,7 @@ async function copyToClipboard(text: string) {
 														{/snippet}
 													</DropdownMenu.Trigger>
 													<DropdownMenu.Content align="end">
+														<DropdownMenu.Item onclick={() => (document.getElementById(`reveal-credential-form-${method.id}`) as HTMLFormElement)?.requestSubmit()}>View Credential</DropdownMenu.Item>
 														<DropdownMenu.Item onclick={() => openRenameAuthSheet(method)}>Rename</DropdownMenu.Item>
 														<DropdownMenu.Item onclick={() => openUpdateCredentialSheet(method)}>Update Credential</DropdownMenu.Item>
 														{#if !method.isDefault}
@@ -726,3 +817,35 @@ async function copyToClipboard(text: string) {
 		</div>
 	</div>
 </div>
+
+<Dialog.Root bind:open={viewCredentialOpen} onOpenChange={(open) => { if (!open) viewCredentialValue = ''; }}>
+	<Dialog.Content class="sm:max-w-lg">
+		<Dialog.Header>
+			<Dialog.Title>Credential</Dialog.Title>
+			<Dialog.Description>{viewCredentialLabel}</Dialog.Description>
+		</Dialog.Header>
+		<div class="rounded-lg border bg-muted/50 p-3">
+			<pre class="break-all font-mono text-sm whitespace-pre-wrap">{viewCredentialValue}</pre>
+		</div>
+		<div class="flex justify-end gap-2">
+			<Button
+				variant="outline"
+				size="sm"
+				onclick={() => {
+					navigator.clipboard.writeText(viewCredentialValue);
+					viewCredentialCopied = true;
+					setTimeout(() => (viewCredentialCopied = false), 2000);
+				}}
+			>
+				{#if viewCredentialCopied}
+					<CheckIcon class="mr-2 size-4" />
+					Copied
+				{:else}
+					<CopyIcon class="mr-2 size-4" />
+					Copy
+				{/if}
+			</Button>
+			<Button size="sm" onclick={() => (viewCredentialOpen = false)}>Close</Button>
+		</div>
+	</Dialog.Content>
+</Dialog.Root>
