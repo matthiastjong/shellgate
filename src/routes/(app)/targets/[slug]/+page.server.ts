@@ -70,6 +70,24 @@ export const actions = {
 		}
 	},
 
+	updateConnection: async ({ request }) => {
+		const data = await request.formData();
+		const id = data.get("id")?.toString() ?? "";
+		const host = data.get("host")?.toString()?.trim() ?? "";
+		const port = parseInt(data.get("port")?.toString() ?? "22", 10) || 22;
+		const username = data.get("username")?.toString()?.trim() ?? "";
+		if (!host) return fail(400, { error: "Host is required" });
+		if (!username) return fail(400, { error: "Username is required" });
+
+		try {
+			const updated = await updateTarget(id, { config: { host, port, username } });
+			if (!updated) return fail(404, { error: "Target not found" });
+			return { updatedConnection: { id: updated.id, config: updated.config } };
+		} catch (err) {
+			return fail(400, { error: err instanceof Error ? err.message : "Failed to update connection" });
+		}
+	},
+
 	updateBaseUrl: async ({ request }) => {
 		const data = await request.formData();
 		const id = data.get("id")?.toString() ?? "";

@@ -636,7 +636,7 @@ async function copyToClipboard(text: string) {
 								</Table.Cell>
 								<Table.Cell>
 									{#if target.type === 'ssh' && target.config}
-										<code class="text-muted-foreground text-xs font-mono">{target.config.host}:{target.config.port}</code>
+										<code class="text-muted-foreground text-xs font-mono">{target.config.username}@{target.config.host}:{target.config.port}</code>
 									{:else if target.baseUrl}
 										<code class="text-muted-foreground text-xs font-mono">{target.baseUrl}</code>
 									{:else}
