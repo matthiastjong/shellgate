@@ -23,7 +23,7 @@ if (answer.trim().toLowerCase() !== "yes") {
 	process.exit(0);
 }
 
-const sql = postgres(DATABASE_URL);
+const sql = postgres(DATABASE_URL, { onnotice: () => {} });
 
 try {
 	await sql`DROP SCHEMA public CASCADE`;

@@ -13,7 +13,7 @@ export const GET: RequestHandler = async ({ request, url }) => {
 		status: "connected",
 		message: targetCount > 0
 			? "Connected to Shellgate. You can now call the discovery endpoint to see your available targets."
-			: `Connected to Shellgate, but no targets are assigned to this API key. Tell the user to go to ${url.origin}/api-keys to add targets to this key.`,
+			: `Connected to Shellgate, but no targets are assigned to this API key. Tell the user to go to ${url.origin}/targets to create targets and assign them to this key.`,
 		agent: token.name,
 		targets: targetCount,
 	});
