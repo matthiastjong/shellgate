@@ -22,6 +22,7 @@ import EllipsisIcon from "@lucide/svelte/icons/ellipsis";
 import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
 import EyeIcon from "@lucide/svelte/icons/eye";
 import EyeOffIcon from "@lucide/svelte/icons/eye-off";
+import KeyIcon from "@lucide/svelte/icons/key";
 import type { PageData } from "./$types";
 
 type Target = {
@@ -100,6 +101,21 @@ let viewCredentialOpen = $state(false);
 let viewCredentialLabel = $state("");
 let viewCredentialValue = $state("");
 let viewCredentialCopied = $state(false);
+
+// Grant access dialog state
+let grantAccessOpen = $state(false);
+let grantAccessSubmitting = $state(false);
+let selectedTokenIds = $state<Set<string>>(new Set());
+let localTokenAccess = $state<TokenAccess[] | null>(null);
+let tokenAccessList = $derived<TokenAccess[]>(localTokenAccess ?? (data.tokenAccess as TokenAccess[]));
+let localAvailableTokens = $state<{ id: string; name: string }[] | null>(null);
+let availableTokensList = $derived<{ id: string; name: string }[]>(localAvailableTokens ?? (data.availableTokens as { id: string; name: string }[]));
+
+function openGrantAccessDialog() {
+	selectedTokenIds = new Set();
+	grantAccessSubmitting = false;
+	grantAccessOpen = true;
+}
 
 function openRenameSheet() {
 	sheetMode = "rename";
@@ -770,13 +786,25 @@ async function copyToClipboard(text: string) {
 
 			<!-- API Key Access -->
 			<div>
-				<div class="mb-4">
+				<div class="mb-4 flex items-center justify-between">
 					<h2 class="text-lg font-semibold">API Key Access</h2>
+					{#if availableTokensList.length > 0}
+						<Button variant="outline" size="sm" onclick={openGrantAccessDialog}>
+							<PlusIcon class="mr-2 size-4" />
+							Grant Access
+						</Button>
+					{/if}
 				</div>
 
-				{#if (data.tokenAccess as TokenAccess[]).length === 0}
+				{#if tokenAccessList.length === 0}
 					<div class="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed py-12">
 						<p class="text-muted-foreground text-sm">No API keys have access to this target yet.</p>
+						{#if availableTokensList.length > 0}
+							<Button variant="outline" size="sm" onclick={openGrantAccessDialog}>
+								<PlusIcon class="mr-2 size-4" />
+								Grant Access
+							</Button>
+						{/if}
 					</div>
 				{:else}
 					<div class="rounded-lg border">
@@ -789,8 +817,7 @@ async function copyToClipboard(text: string) {
 								</Table.Row>
 							</Table.Header>
 							<Table.Body>
-								{#each data.tokenAccess as tokenRow (tokenRow.id)}
-									{@const ta = tokenRow as TokenAccess}
+								{#each tokenAccessList as ta (ta.id)}
 									<Table.Row>
 										<Table.Cell class="font-medium">
 											<a href="/api-keys/{ta.id}" class="hover:underline">{ta.name}</a>
@@ -892,5 +919,72 @@ async function copyToClipboard(text: string) {
 			</Button>
 			<Button size="sm" onclick={() => (viewCredentialOpen = false)}>Close</Button>
 		</div>
+	</Dialog.Content>
+</Dialog.Root>
+
+<!-- Grant Access Dialog -->
+<Dialog.Root bind:open={grantAccessOpen}>
+	<Dialog.Content class="sm:max-w-lg">
+		<Dialog.Header>
+			<Dialog.Title>Grant Access</Dialog.Title>
+			<Dialog.Description>Select which API keys should have access to {target.name}.</Dialog.Description>
+		</Dialog.Header>
+		<form
+			method="POST"
+			action="?/grantAccess"
+			use:enhance={() => {
+				grantAccessSubmitting = true;
+				return async ({ result, update }) => {
+					grantAccessSubmitting = false;
+					if (result.type === 'success' && result.data?.accessGranted) {
+						const granted = result.data.accessGranted as { id: string; name: string }[];
+						const newAccess: TokenAccess[] = granted.map((g) => ({ id: g.id, name: g.name, revokedAt: null, lastUsedAt: null }));
+						localTokenAccess = [...tokenAccessList, ...newAccess];
+						const grantedIds = new Set(granted.map((g) => g.id));
+						localAvailableTokens = availableTokensList.filter((t) => !grantedIds.has(t.id));
+						grantAccessOpen = false;
+						toast.success(`Access granted to ${granted.length} key${granted.length === 1 ? '' : 's'}`);
+					} else if (result.type === 'failure') {
+						toast.error((result.data?.error as string) ?? 'Failed to grant access');
+					}
+					await update({ reset: false, invalidateAll: false });
+				};
+			}}
+		>
+			<input type="hidden" name="targetId" value={target.id} />
+			<div class="grid gap-4 py-4">
+				<div class="max-h-64 space-y-2 overflow-y-auto">
+					{#each availableTokensList as token (token.id)}
+						<label class="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50 cursor-pointer">
+							<Checkbox
+								checked={selectedTokenIds.has(token.id)}
+								onCheckedChange={(v) => {
+									const next = new Set(selectedTokenIds);
+									if (v) next.add(token.id); else next.delete(token.id);
+									selectedTokenIds = next;
+								}}
+							/>
+							{#if selectedTokenIds.has(token.id)}
+								<input type="hidden" name="tokenIds" value={token.id} />
+								<input type="hidden" name={`tokenName_${token.id}`} value={token.name} />
+							{/if}
+							<div class="flex items-center gap-2">
+								<KeyIcon class="size-4 text-muted-foreground" />
+								<span class="text-sm font-medium">{token.name}</span>
+							</div>
+						</label>
+					{/each}
+				</div>
+				<div class="flex gap-2 justify-end">
+					<Button variant="outline" type="button" onclick={() => (grantAccessOpen = false)}>Cancel</Button>
+					<Button type="submit" disabled={grantAccessSubmitting || selectedTokenIds.size === 0}>
+						{#if grantAccessSubmitting}
+							<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
+						{/if}
+						Grant Access ({selectedTokenIds.size})
+					</Button>
+				</div>
+			</div>
+		</form>
 	</Dialog.Content>
 </Dialog.Root>

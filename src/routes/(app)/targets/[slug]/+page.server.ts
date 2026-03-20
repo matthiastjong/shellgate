@@ -4,6 +4,8 @@ import { db } from "$lib/server/db";
 import { tokenPermissions, tokens } from "$lib/server/db/schema";
 import { getTargetBySlug, updateTarget } from "$lib/server/services/targets";
 import { listAuthMethods, createAuthMethod, updateAuthMethod, deleteAuthMethod, getAuthMethodCredential } from "$lib/server/services/auth-methods";
+import { listTokens } from "$lib/server/services/tokens";
+import { addPermission } from "$lib/server/services/permissions";
 import type { Actions, PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async ({ params }) => {
@@ -33,10 +35,22 @@ export const load: PageServerLoad = async ({ params }) => {
 		// fallback to empty array
 	}
 
+	let availableTokens: { id: string; name: string }[] = [];
+	try {
+		const allTokens = await listTokens();
+		const grantedIds = new Set(tokenAccess.map((t) => t.id));
+		availableTokens = allTokens
+			.filter((t) => !t.revokedAt && !grantedIds.has(t.id))
+			.map((t) => ({ id: t.id, name: t.name }));
+	} catch {
+		// fallback to empty array
+	}
+
 	return {
 		target: { ...target, enabled: target.enabled !== false },
 		authMethods,
 		tokenAccess,
+		availableTokens,
 	};
 };
 
@@ -179,6 +193,25 @@ export const actions = {
 		const result = await deleteAuthMethod(target.id, id);
 		if (!result) return fail(404, { error: "Auth method not found" });
 		return { authMethodDeleted: id };
+	},
+
+	grantAccess: async ({ request }) => {
+		const data = await request.formData();
+		const targetId = data.get("targetId")?.toString() ?? "";
+		const tokenIds = data.getAll("tokenIds").map((v) => v.toString());
+		if (!targetId) return fail(400, { error: "Target ID is required" });
+
+		const granted: { id: string; name: string }[] = [];
+		try {
+			for (const tokenId of tokenIds) {
+				await addPermission(tokenId, targetId);
+				const tokenName = data.get(`tokenName_${tokenId}`)?.toString() ?? "";
+				granted.push({ id: tokenId, name: tokenName });
+			}
+			return { accessGranted: granted };
+		} catch (err) {
+			return fail(400, { error: err instanceof Error ? err.message : "Failed to grant access" });
+		}
 	},
 
 	revealCredential: async ({ request }) => {

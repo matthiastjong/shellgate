@@ -23,7 +23,10 @@ import EllipsisIcon from "@lucide/svelte/icons/ellipsis";
 import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
 import EyeIcon from "@lucide/svelte/icons/eye";
 import EyeOffIcon from "@lucide/svelte/icons/eye-off";
+import KeyIcon from "@lucide/svelte/icons/key";
 import type { PageData } from "./$types";
+
+type Token = { id: string; name: string };
 
 type Target = {
 	id: string;
@@ -54,6 +57,8 @@ let showCredential = $state(false);
 let isDefaultChecked = $state(true);
 let authType = $state('bearer');
 let copied = $state(false);
+let selectedTokenIds = $state<Set<string>>(new Set());
+let grantAccessSubmitting = $state(false);
 
 function resetCreateState() {
 	createStep = 0;
@@ -64,6 +69,8 @@ function resetCreateState() {
 	isDefaultChecked = true;
 	authType = 'bearer';
 	copied = false;
+	selectedTokenIds = new Set();
+	grantAccessSubmitting = false;
 }
 
 function updateTargetList(updater: (targets: Target[]) => Target[]) {
@@ -179,7 +186,7 @@ async function copyToClipboard(text: string) {
 									t.id === createdTarget!.id ? { ...t, authMethodCount: t.authMethodCount + 1 } : t
 								));
 							}
-							createStep = 3;
+							createStep = (data.activeTokens as Token[]).length > 0 ? 7 : 8;
 						} else if (result.type === 'failure') {
 							toast.error((result.data?.error as string) ?? 'Failed to add auth method');
 						}
@@ -293,7 +300,7 @@ async function copyToClipboard(text: string) {
 						<Label for="auth-default" class="text-sm font-normal">Set as default auth method</Label>
 					</div>
 					<div class="flex gap-2">
-						<Button variant="ghost" type="button" onclick={() => (createStep = 3)}>Skip for now</Button>
+						<Button variant="ghost" type="button" onclick={() => (createStep = (data.activeTokens as Token[]).length > 0 ? 7 : 8)}>Skip for now</Button>
 						<Button type="submit" class="flex-1" disabled={authSubmitting}>
 							{#if authSubmitting}
 								<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
@@ -303,39 +310,61 @@ async function copyToClipboard(text: string) {
 					</div>
 				</div>
 			</form>
-		{:else if createStep === 3}
+		{:else if createStep === 7}
 			<Dialog.Header>
-				<Dialog.Title>Target Ready</Dialog.Title>
-				<Dialog.Description>Your target is ready!</Dialog.Description>
+				<Dialog.Title>Grant Access</Dialog.Title>
+				<Dialog.Description>Select which API keys should have access to {createdTarget?.name ?? 'this target'}.</Dialog.Description>
 			</Dialog.Header>
-			<div class="flex flex-col items-center gap-4 py-6">
-				<div class="flex size-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
-					<CheckIcon class="size-6 text-green-600 dark:text-green-300" />
-				</div>
-				<p class="text-center text-sm text-muted-foreground">Your target is ready! You can proxy requests using:</p>
-				<div class="w-full rounded-lg border bg-muted/50 p-3">
-					<div class="flex items-start justify-between gap-2">
-						<pre class="break-all font-mono text-xs whitespace-pre-wrap">{`curl ${gatewayUrl}/gateway/${createdTarget?.slug ?? 'your-target'}/health \
-  -H "Authorization: Bearer <your-shellgate-token>"`}</pre>
-						<Button
-							variant="ghost"
-							size="icon"
-							class="size-7 shrink-0"
-							onclick={() => copyToClipboard(`curl ${gatewayUrl}/gateway/${createdTarget?.slug ?? 'your-target'}/health \\\n  -H "Authorization: Bearer <your-shellgate-token>"`)}
-						>
-							{#if copied}
-								<CheckIcon class="size-3.5" />
-							{:else}
-								<CopyIcon class="size-3.5" />
+			<form
+				method="POST"
+				action="?/grantAccess"
+				use:enhance={() => {
+					grantAccessSubmitting = true;
+					return async ({ result, update }) => {
+						grantAccessSubmitting = false;
+						if (result.type === 'success' && result.data?.accessGranted) {
+							createStep = 8;
+						} else if (result.type === 'failure') {
+							toast.error((result.data?.error as string) ?? 'Failed to grant access');
+						}
+						await update({ reset: false, invalidateAll: false });
+					};
+				}}
+			>
+				<input type="hidden" name="targetId" value={createdTarget?.id ?? ''} />
+				<div class="grid gap-4 py-4">
+					<div class="max-h-64 space-y-2 overflow-y-auto">
+						{#each data.activeTokens as token (token.id)}
+							<label class="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50 cursor-pointer">
+								<Checkbox
+									checked={selectedTokenIds.has(token.id)}
+									onCheckedChange={(v) => {
+										const next = new Set(selectedTokenIds);
+										if (v) next.add(token.id); else next.delete(token.id);
+										selectedTokenIds = next;
+									}}
+								/>
+								{#if selectedTokenIds.has(token.id)}
+									<input type="hidden" name="tokenIds" value={token.id} />
+								{/if}
+								<div class="flex items-center gap-2">
+									<KeyIcon class="size-4 text-muted-foreground" />
+									<span class="text-sm font-medium">{token.name}</span>
+								</div>
+							</label>
+						{/each}
+					</div>
+					<div class="flex gap-2">
+						<Button variant="ghost" type="button" onclick={() => (createStep = 8)}>Skip</Button>
+						<Button type="submit" class="flex-1" disabled={grantAccessSubmitting || selectedTokenIds.size === 0}>
+							{#if grantAccessSubmitting}
+								<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
 							{/if}
+							Grant Access ({selectedTokenIds.size})
 						</Button>
 					</div>
 				</div>
-				<p class="text-muted-foreground text-xs">Replace <code class="font-mono">/health</code> with any path your target API supports.</p>
-			</div>
-			<Dialog.Footer>
-				<Button class="w-full" onclick={() => (createOpen = false)}>Done</Button>
-			</Dialog.Footer>
+			</form>
 		{:else if createStep === 4}
 			<Dialog.Header>
 				<Dialog.Title>Server Details</Dialog.Title>
@@ -409,7 +438,7 @@ async function copyToClipboard(text: string) {
 									t.id === createdTarget!.id ? { ...t, authMethodCount: t.authMethodCount + 1 } : t
 								));
 							}
-							createStep = 6;
+							createStep = (data.activeTokens as Token[]).length > 0 ? 7 : 8;
 						} else if (result.type === 'failure') {
 							toast.error((result.data?.error as string) ?? 'Failed to add SSH key');
 						}
@@ -436,7 +465,7 @@ async function copyToClipboard(text: string) {
 						></textarea>
 					</div>
 					<div class="flex gap-2">
-						<Button variant="outline" type="button" onclick={() => { createStep = 6; }}>Skip</Button>
+						<Button variant="outline" type="button" onclick={() => { createStep = (data.activeTokens as Token[]).length > 0 ? 7 : 8; }}>Skip</Button>
 						<Button type="submit" class="flex-1" disabled={authSubmitting}>
 							{#if authSubmitting}
 								<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
@@ -446,36 +475,59 @@ async function copyToClipboard(text: string) {
 					</div>
 				</div>
 			</form>
-		{:else if createStep === 6}
+		{:else if createStep === 8}
 			<Dialog.Header>
 				<Dialog.Title>Target Ready</Dialog.Title>
-				<Dialog.Description>Your SSH target is ready!</Dialog.Description>
+				<Dialog.Description>Your {createdTarget?.type === 'ssh' ? 'SSH target' : 'target'} is ready!</Dialog.Description>
 			</Dialog.Header>
 			<div class="flex flex-col items-center gap-4 py-6">
 				<div class="flex size-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
 					<CheckIcon class="size-6 text-green-600 dark:text-green-300" />
 				</div>
-				<p class="text-center text-sm text-muted-foreground">Your SSH target is ready! Execute commands using:</p>
-				<div class="w-full rounded-lg border bg-muted/50 p-3">
-					<div class="flex items-start justify-between gap-2">
-						<pre class="break-all font-mono text-xs whitespace-pre-wrap">{`curl -X POST ${gatewayUrl}/ssh/${createdTarget?.slug ?? 'your-target'}/exec \
+				{#if createdTarget?.type === 'ssh'}
+					<p class="text-center text-sm text-muted-foreground">Your SSH target is ready! Execute commands using:</p>
+					<div class="w-full rounded-lg border bg-muted/50 p-3">
+						<div class="flex items-start justify-between gap-2">
+							<pre class="break-all font-mono text-xs whitespace-pre-wrap">{`curl -X POST ${gatewayUrl}/ssh/${createdTarget?.slug ?? 'your-target'}/exec \
   -H "Authorization: Bearer <your-shellgate-token>" \
   -H "Content-Type: application/json" \
   -d '{"command": "whoami"}'`}</pre>
-						<Button
-							variant="ghost"
-							size="icon"
-							class="size-7 shrink-0"
-							onclick={() => copyToClipboard(`curl -X POST ${gatewayUrl}/ssh/${createdTarget?.slug ?? 'your-target'}/exec \\\n  -H "Authorization: Bearer <your-shellgate-token>" \\\n  -H "Content-Type: application/json" \\\n  -d '{"command": "whoami"}'`)}
-						>
-							{#if copied}
-								<CheckIcon class="size-3.5" />
-							{:else}
-								<CopyIcon class="size-3.5" />
-							{/if}
-						</Button>
+							<Button
+								variant="ghost"
+								size="icon"
+								class="size-7 shrink-0"
+								onclick={() => copyToClipboard(`curl -X POST ${gatewayUrl}/ssh/${createdTarget?.slug ?? 'your-target'}/exec \\\n  -H "Authorization: Bearer <your-shellgate-token>" \\\n  -H "Content-Type: application/json" \\\n  -d '{"command": "whoami"}'`)}
+							>
+								{#if copied}
+									<CheckIcon class="size-3.5" />
+								{:else}
+									<CopyIcon class="size-3.5" />
+								{/if}
+							</Button>
+						</div>
 					</div>
-				</div>
+				{:else}
+					<p class="text-center text-sm text-muted-foreground">Your target is ready! You can proxy requests using:</p>
+					<div class="w-full rounded-lg border bg-muted/50 p-3">
+						<div class="flex items-start justify-between gap-2">
+							<pre class="break-all font-mono text-xs whitespace-pre-wrap">{`curl ${gatewayUrl}/gateway/${createdTarget?.slug ?? 'your-target'}/health \
+  -H "Authorization: Bearer <your-shellgate-token>"`}</pre>
+							<Button
+								variant="ghost"
+								size="icon"
+								class="size-7 shrink-0"
+								onclick={() => copyToClipboard(`curl ${gatewayUrl}/gateway/${createdTarget?.slug ?? 'your-target'}/health \\\n  -H "Authorization: Bearer <your-shellgate-token>"`)}
+							>
+								{#if copied}
+									<CheckIcon class="size-3.5" />
+								{:else}
+									<CopyIcon class="size-3.5" />
+								{/if}
+							</Button>
+						</div>
+					</div>
+					<p class="text-muted-foreground text-xs">Replace <code class="font-mono">/health</code> with any path your target API supports.</p>
+				{/if}
 			</div>
 			<Dialog.Footer>
 				<Button class="w-full" onclick={() => (createOpen = false)}>Done</Button>
