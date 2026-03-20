@@ -20,6 +20,10 @@ const data = {
 			title: "Integrations",
 			items: [{ title: "Connect Agent", url: "/connect" }],
 		},
+		{
+			title: "System",
+			items: [{ title: "Settings", url: "/settings" }],
+		},
 	],
 };
 </script>
