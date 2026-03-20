@@ -75,12 +75,16 @@ if command -v openclaw &> /dev/null; then
   openclaw gateway restart 2>/dev/null || true
 fi
 
+PROMPT="Use the Shellgate skill to find out which targets you have access to"
+WIDTH=\$(( \${#PROMPT} + 4 ))
+BORDER=\$(printf '─%.0s' \$(seq 1 \$(( WIDTH - 2 ))))
+
 echo ""
-echo "✅ Shellgate connected to OpenClaw"
-echo "   URL: $SHELLGATE_URL"
-echo "   Env configured: ~/.openclaw/.env"
-echo "   Skill installed: ~/.openclaw/skills/shellgate/SKILL.md"
+echo "🐚 Shellgate → OpenClaw connected"
 echo ""
-echo "Ask your OpenClaw agent to tell you what Shellgate endpoints are available."
+echo "Try it out:"
+echo "╭\${BORDER}╮"
+echo "│ \${PROMPT} │"
+echo "╰\${BORDER}╯"
 `;
 }
