@@ -34,6 +34,7 @@ type Target = {
 	slug: string;
 	type: string;
 	baseUrl: string | null;
+	config: { host: string; port: number; username: string } | null;
 	enabled: boolean;
 	authMethodCount: number;
 	createdAt: string | Date;
@@ -584,7 +585,7 @@ async function copyToClipboard(text: string) {
 					<Table.Row>
 						<Table.Head>Name</Table.Head>
 						<Table.Head>Type</Table.Head>
-						<Table.Head>Endpoint</Table.Head>
+						<Table.Head>Connection</Table.Head>
 						<Table.Head>Auth Methods</Table.Head>
 						<Table.Head>Status</Table.Head>
 						<Table.Head class="w-12"><span class="sr-only">Actions</span></Table.Head>
@@ -634,7 +635,9 @@ async function copyToClipboard(text: string) {
 									<Badge variant="outline">{target.type}</Badge>
 								</Table.Cell>
 								<Table.Cell>
-									{#if target.baseUrl}
+									{#if target.type === 'ssh' && target.config}
+										<code class="text-muted-foreground text-xs font-mono">{target.config.host}:{target.config.port}</code>
+									{:else if target.baseUrl}
 										<code class="text-muted-foreground text-xs font-mono">{target.baseUrl}</code>
 									{:else}
 										<span class="text-muted-foreground">&mdash;</span>
