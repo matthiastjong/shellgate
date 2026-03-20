@@ -30,7 +30,8 @@ let {
 // Local target list (updated inline when step 3 creates one)
 let localTargets = $state<Target[]>([...targets]);
 
-// Steps: 1=select agent, 2=name key, 3=select targets, 4=install
+// Onboarding: 1=select agent, 2=name key, 4=install (skip step 3)
+// Modal: 1=select agent, 2=name key, 3=select targets, 4=install
 let step = $state(1);
 let selectedAgent = $state<AgentType | null>(null);
 let newKeyName = $state("");
@@ -38,7 +39,7 @@ let selectedTargetIds = $state<Set<string>>(new Set());
 let createdToken = $state<string | null>(null);
 let submitting = $state(false);
 
-// Inline target creation state (step 3)
+// Inline target creation state (step 3, modal only)
 let targetSubmitting = $state(false);
 let showInlineTargetCreate = $state(false);
 
@@ -49,22 +50,23 @@ let agentDisplayName = $derived(
 	: ""
 );
 
-// Step indicator: 4 steps (1-4)
-let totalSteps = 4;
-let displayStep = $derived(step);
+// Onboarding skips target selection: 3 steps shown
+// Modal keeps all 4 steps
+let totalSteps = $derived(mode === "onboarding" ? 3 : 4);
+let displayStep = $derived(mode === "onboarding" && step === 4 ? 3 : step);
 
 let hasTargetsOnKey = $derived(selectedTargetIds.size > 0);
 
 function getCtaLabel(): string {
 	if (mode === "onboarding") {
-		return hasTargetsOnKey ? "Go to Dashboard" : "Create your first target";
+		return "Create your first target";
 	}
 	return hasTargetsOnKey ? "Done" : "Create a target";
 }
 
 function getCtaAction(): string | undefined {
 	if (mode === "onboarding") {
-		return hasTargetsOnKey ? "/" : "/targets";
+		return "/targets";
 	}
 	return undefined;
 }
@@ -77,6 +79,25 @@ function handleCtaClick() {
 			onComplete?.();
 		}
 	}
+}
+
+function handleCreateKey() {
+	submitting = true;
+	return async ({ result, update }: any) => {
+		submitting = false;
+		if (result.type === "success" && result.data?.created) {
+			const created = result.data.created as { plainToken: string };
+			createdToken = created.plainToken;
+			if (result.data.warning) {
+				toast.warning(result.data.warning as string);
+			}
+			step = 4;
+			toast.success("API key created");
+		} else if (result.type === "failure") {
+			toast.error((result.data?.error as string) ?? "Failed to create key");
+		}
+		await update({ reset: false, invalidateAll: false });
+	};
 }
 
 async function copyToClipboard(text: string | null) {
@@ -163,14 +184,32 @@ async function copyToClipboard(text: string | null) {
 
 				<div class="flex justify-between pt-2">
 					<Button variant="outline" onclick={() => (step = 1)}>Back</Button>
-					<Button disabled={!newKeyName.trim()} onclick={() => (step = 3)}>
-						Next
-					</Button>
+					{#if mode === "onboarding"}
+						<form
+							method="POST"
+							action="{actionUrl}?/createKey"
+							use:enhance={handleCreateKey}
+						>
+							<input type="hidden" name="name" value={newKeyName} />
+							<input type="hidden" name="targetIds" value="" />
+							<input type="hidden" name="agent" value={selectedAgent} />
+							<Button type="submit" disabled={!newKeyName.trim() || submitting}>
+								{#if submitting}
+									<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
+								{/if}
+								Next
+							</Button>
+						</form>
+					{:else}
+						<Button disabled={!newKeyName.trim()} onclick={() => (step = 3)}>
+							Next
+						</Button>
+					{/if}
 				</div>
 			</div>
 		</div>
 
-	<!-- Step 3: Select targets -->
+	<!-- Step 3: Select targets (modal only) -->
 	{:else if step === 3}
 		<div class="space-y-6">
 			<h2 class="text-center font-semibold">Select targets</h2>
@@ -254,8 +293,23 @@ async function copyToClipboard(text: string | null) {
 						</form>
 					{/if}
 
-					<div class="flex justify-start pt-2">
+					<div class="flex justify-between pt-2">
 						<Button variant="outline" onclick={() => (step = 2)}>Back</Button>
+						<form
+							method="POST"
+							action="{actionUrl}?/createKey"
+							use:enhance={handleCreateKey}
+						>
+							<input type="hidden" name="name" value={newKeyName} />
+							<input type="hidden" name="targetIds" value="" />
+							<input type="hidden" name="agent" value={selectedAgent} />
+							<Button type="submit" variant="ghost" disabled={submitting}>
+								{#if submitting}
+									<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
+								{/if}
+								Skip
+							</Button>
+						</form>
 					</div>
 				{/if}
 
@@ -265,24 +319,7 @@ async function copyToClipboard(text: string | null) {
 					<form
 						method="POST"
 						action="{actionUrl}?/createKey"
-						use:enhance={() => {
-							submitting = true;
-							return async ({ result, update }) => {
-								submitting = false;
-								if (result.type === "success" && result.data?.created) {
-									const created = result.data.created as { plainToken: string };
-									createdToken = created.plainToken;
-									if (result.data.warning) {
-										toast.warning(result.data.warning as string);
-									}
-									step = 4;
-									toast.success("API key created");
-								} else if (result.type === "failure") {
-									toast.error((result.data?.error as string) ?? "Failed to create key");
-								}
-								await update({ reset: false, invalidateAll: false });
-							};
-						}}
+						use:enhance={handleCreateKey}
 					>
 						<input type="hidden" name="name" value={newKeyName} />
 						<input type="hidden" name="targetIds" value={[...selectedTargetIds].join(",")} />
@@ -393,7 +430,7 @@ async function copyToClipboard(text: string | null) {
 			{/if}
 
 			<div class="flex justify-between pt-2">
-				<Button variant="outline" onclick={() => (step = 3)}>Back</Button>
+				<Button variant="outline" onclick={() => (step = mode === "onboarding" ? 2 : 3)}>Back</Button>
 				{#if getCtaAction()}
 					<Button href={getCtaAction()}>{getCtaLabel()}</Button>
 				{:else}
