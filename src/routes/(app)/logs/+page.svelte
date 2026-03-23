@@ -131,16 +131,16 @@
 			</Dialog.Description>
 		</Dialog.Header>
 		{#if detailLog}
-			<div class="flex flex-col gap-4 text-sm">
+			<div class="flex max-h-[70vh] flex-col gap-4 overflow-y-auto pr-1 text-sm">
 				{#if detailLog.type === "ssh" && detailLog.path}
 					<div>
 						<span class="text-muted-foreground mb-1.5 block font-medium">Command</span>
-						<pre class="bg-muted rounded-md p-3 font-mono text-sm whitespace-pre-wrap break-all">{detailLog.path}</pre>
+						<pre class="bg-muted max-h-40 overflow-y-auto rounded-md p-3 font-mono text-sm whitespace-pre-wrap break-all">{detailLog.path}</pre>
 					</div>
 				{:else if detailLog.path}
 					<div>
 						<span class="text-muted-foreground mb-1.5 block font-medium">Request</span>
-						<pre class="bg-muted rounded-md p-3 font-mono text-sm whitespace-pre-wrap break-all">{detailLog.method ?? ""} /{detailLog.path}</pre>
+						<pre class="bg-muted max-h-40 overflow-y-auto rounded-md p-3 font-mono text-sm whitespace-pre-wrap break-all">{detailLog.method ?? ""} /{detailLog.path}</pre>
 					</div>
 				{/if}
 
