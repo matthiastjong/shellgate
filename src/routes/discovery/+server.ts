@@ -17,7 +17,10 @@ export const GET: RequestHandler = async ({ request, url }) => {
 				slug: target.slug,
 				name: target.name,
 				type: target.type,
-				...(target.type === "api" && { proxy: `/gateway/${target.slug}` }),
+				...(target.type === "api" && {
+					proxy: `/gateway/${target.slug}`,
+					baseUrl: target.baseUrl,
+				}),
 			};
 		})
 	);

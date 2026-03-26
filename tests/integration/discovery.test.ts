@@ -32,6 +32,34 @@ describe("discovery", () => {
 		expect(result[0]!.slug).toBe(target1.slug);
 	});
 
+	it("includes baseUrl in discovery response for api targets", async () => {
+		const { token } = await createTestToken();
+		const target = await createTestTarget("Semrush", "https://api.semrush.com");
+		await grantPermission(token.id, target.id);
+
+		const permissions = await listPermissions(token.id);
+		const targets = await Promise.all(
+			permissions.map(async (p) => {
+				const t = await getTargetById(p.targetId);
+				if (!t || !t.enabled) return null;
+				return {
+					slug: t.slug,
+					name: t.name,
+					type: t.type,
+					...(t.type === "api" && {
+						proxy: `/gateway/${t.slug}`,
+						baseUrl: t.baseUrl,
+					}),
+				};
+			})
+		);
+		const result = targets.filter(Boolean);
+
+		expect(result).toHaveLength(1);
+		expect(result[0]!.baseUrl).toBe("https://api.semrush.com");
+		expect(result[0]!.proxy).toBe(`/gateway/${target.slug}`);
+	});
+
 	it("excludes disabled targets", async () => {
 		const { token } = await createTestToken();
 		const target = await createTestTarget("Disabled API", "https://api.disabled.com");
