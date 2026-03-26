@@ -67,7 +67,7 @@ let copied = $state(false);
 // Sheet state
 let sheetOpen = $state(false);
 let sheetMode = $state<
-	"rename" | "baseUrl" | "connection" | "addAuth" | "renameAuth" | "updateCredential"
+	"rename" | "baseUrl" | "connection" | "addAuth" | "renameAuth" | "editAuth"
 >("rename");
 let sheetSubmitting = $state(false);
 
@@ -93,10 +93,10 @@ let isDefaultChecked = $state(true);
 let renameAuthId = $state("");
 let renameAuthLabel = $state("");
 
-// Update credential state
-let updateCredentialId = $state("");
-let updateCredentialValue = $state("");
-let showUpdateCredential = $state(false);
+// Edit auth state
+let editAuthId = $state("");
+let editAuthLabel = $state("");
+let editAuthType = $state("bearer");
 
 // Delete confirmation
 let confirmDeleteAuthId = $state<string | null>(null);
@@ -164,11 +164,14 @@ function openRenameAuthSheet(method: AuthMethod) {
 	sheetOpen = true;
 }
 
-function openUpdateCredentialSheet(method: AuthMethod) {
-	sheetMode = "updateCredential";
-	updateCredentialId = method.id;
-	updateCredentialValue = "";
-	showUpdateCredential = false;
+function openEditAuthSheet(method: AuthMethod) {
+	sheetMode = "editAuth";
+	editAuthId = method.id;
+	editAuthLabel = method.label;
+	editAuthType = method.type;
+	authCredential = "";
+	showCredential = false;
+	isDefaultChecked = method.isDefault;
 	sheetSubmitting = false;
 	sheetOpen = true;
 }
@@ -548,64 +551,133 @@ async function copyToClipboard(text: string) {
 					</Button>
 				</div>
 			</form>
-		{:else if sheetMode === 'updateCredential'}
+		{:else if sheetMode === 'editAuth'}
 			<Sheet.Header>
-				<Sheet.Title>Update Credential</Sheet.Title>
-				<Sheet.Description>Enter a new credential for this auth method.</Sheet.Description>
+				<Sheet.Title>Edit Auth Method</Sheet.Title>
+				<Sheet.Description>Update the label, type, or credential for this auth method.</Sheet.Description>
 			</Sheet.Header>
 			<form
 				method="POST"
-				action="?/updateCredential"
+				action="?/editAuthMethod"
 				use:enhance={() => {
 					sheetSubmitting = true;
 					return async ({ result, update }) => {
 						sheetSubmitting = false;
-						if (result.type === 'success' && result.data?.credentialUpdated) {
-							const { id, credentialHint } = result.data.credentialUpdated as { id: string; credentialHint: string };
-							updateAuthMethods((methods) => methods.map((m) => (m.id === id ? { ...m, credentialHint } : m)));
+						if (result.type === 'success' && result.data?.authMethodEdited) {
+							const edited = result.data.authMethodEdited as { id: string; label: string; type: string; credentialHint: string; isDefault: boolean };
+							if (edited.isDefault) {
+								updateAuthMethods((methods) => methods.map((m) => ({ ...m, isDefault: m.id === edited.id, ...(m.id === edited.id ? { label: edited.label, type: edited.type, credentialHint: edited.credentialHint } : {}) })));
+							} else {
+								updateAuthMethods((methods) => methods.map((m) => (m.id === edited.id ? { ...m, label: edited.label, type: edited.type, credentialHint: edited.credentialHint } : m)));
+							}
 							sheetOpen = false;
-							toast.success('Credential updated');
+							toast.success('Auth method updated');
 						} else if (result.type === 'failure') {
-							toast.error((result.data?.error as string) ?? 'Failed to update credential');
+							toast.error((result.data?.error as string) ?? 'Failed to update auth method');
 						}
 						await update({ reset: false, invalidateAll: false });
 					};
 				}}
 			>
 				<input type="hidden" name="slug" value={target.slug} />
-				<input type="hidden" name="id" value={updateCredentialId} />
+				<input type="hidden" name="id" value={editAuthId} />
 				<div class="grid gap-4 px-4">
 					<div class="grid gap-2">
-						<Label for="update-credential">New Credential</Label>
-						<div class="relative">
-							<Input
-								id="update-credential"
-								name="credential"
-								type={showUpdateCredential ? 'text' : 'password'}
-								bind:value={updateCredentialValue}
-								placeholder="Enter new credential"
-								required
-							/>
-							<Button
-								type="button"
-								variant="ghost"
-								size="icon"
-								class="absolute right-0 top-0 h-full px-3"
-								onclick={() => (showUpdateCredential = !showUpdateCredential)}
-							>
-								{#if showUpdateCredential}
-									<EyeOffIcon class="size-4" />
-								{:else}
-									<EyeIcon class="size-4" />
-								{/if}
-							</Button>
-						</div>
+						<Label for="edit-auth-label">Label</Label>
+						<Input id="edit-auth-label" name="label" bind:value={editAuthLabel} required />
 					</div>
-					<Button type="submit" disabled={sheetSubmitting || !updateCredentialValue}>
+					<div class="grid gap-2">
+						<Label for="edit-auth-type">Type</Label>
+						<select id="edit-auth-type" name="type" bind:value={editAuthType} class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+							{#if target.type === 'ssh'}
+								<option value="ssh_key">SSH Key</option>
+							{:else}
+								<option value="bearer">Bearer Token</option>
+								<option value="basic">Basic Auth</option>
+								<option value="custom_header">Custom Header</option>
+								<option value="query_param">Query Parameter</option>
+							{/if}
+						</select>
+					</div>
+					{#if editAuthType === 'ssh_key'}
+						<div class="grid gap-2">
+							<Label for="edit-auth-credential">Private Key (PEM) <span class="text-muted-foreground text-xs">(leave blank to keep existing)</span></Label>
+							<textarea
+								id="edit-auth-credential"
+								name="credential"
+								class="flex min-h-[120px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono"
+								bind:value={authCredential}
+								placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;...&#10;-----END OPENSSH PRIVATE KEY-----"
+							></textarea>
+						</div>
+					{:else if editAuthType === 'basic'}
+						<div class="grid gap-2">
+							<Label for="edit-auth-username">Username <span class="text-muted-foreground text-xs">(leave blank to keep existing)</span></Label>
+							<Input id="edit-auth-username" name="credential1" bind:value={authCredential} placeholder="username" />
+						</div>
+						<div class="grid gap-2">
+							<Label for="edit-auth-password">Password</Label>
+							<div class="relative">
+								<Input id="edit-auth-password" name="credential2" type={showCredential ? 'text' : 'password'} placeholder="password" />
+								<Button type="button" variant="ghost" size="icon" class="absolute right-0 top-0 h-full px-3" onclick={() => (showCredential = !showCredential)}>
+									{#if showCredential}<EyeOffIcon class="size-4" />{:else}<EyeIcon class="size-4" />{/if}
+								</Button>
+							</div>
+						</div>
+					{:else if editAuthType === 'custom_header'}
+						<div class="grid gap-2">
+							<Label for="edit-auth-header-name">Header Name <span class="text-muted-foreground text-xs">(leave blank to keep existing)</span></Label>
+							<Input id="edit-auth-header-name" name="credential1" bind:value={authCredential} placeholder="X-API-Key" />
+						</div>
+						<div class="grid gap-2">
+							<Label for="edit-auth-header-value">Header Value</Label>
+							<div class="relative">
+								<Input id="edit-auth-header-value" name="credential2" type={showCredential ? 'text' : 'password'} placeholder="your-key-here" />
+								<Button type="button" variant="ghost" size="icon" class="absolute right-0 top-0 h-full px-3" onclick={() => (showCredential = !showCredential)}>
+									{#if showCredential}<EyeOffIcon class="size-4" />{:else}<EyeIcon class="size-4" />{/if}
+								</Button>
+							</div>
+						</div>
+					{:else if editAuthType === 'query_param'}
+						<div class="grid gap-2">
+							<Label for="edit-auth-param-name">Parameter Name <span class="text-muted-foreground text-xs">(leave blank to keep existing)</span></Label>
+							<Input id="edit-auth-param-name" name="credential1" bind:value={authCredential} placeholder="key" />
+						</div>
+						<div class="grid gap-2">
+							<Label for="edit-auth-param-value">Parameter Value</Label>
+							<div class="relative">
+								<Input id="edit-auth-param-value" name="credential2" type={showCredential ? 'text' : 'password'} placeholder="your-api-key" />
+								<Button type="button" variant="ghost" size="icon" class="absolute right-0 top-0 h-full px-3" onclick={() => (showCredential = !showCredential)}>
+									{#if showCredential}<EyeOffIcon class="size-4" />{:else}<EyeIcon class="size-4" />{/if}
+								</Button>
+							</div>
+						</div>
+					{:else}
+						<div class="grid gap-2">
+							<Label for="edit-auth-credential">Credential <span class="text-muted-foreground text-xs">(leave blank to keep existing)</span></Label>
+							<div class="relative">
+								<Input
+									id="edit-auth-credential"
+									name="credential"
+									type={showCredential ? 'text' : 'password'}
+									bind:value={authCredential}
+									placeholder="e.g. sk-..."
+								/>
+								<Button type="button" variant="ghost" size="icon" class="absolute right-0 top-0 h-full px-3" onclick={() => (showCredential = !showCredential)}>
+									{#if showCredential}<EyeOffIcon class="size-4" />{:else}<EyeIcon class="size-4" />{/if}
+								</Button>
+							</div>
+						</div>
+					{/if}
+					<div class="flex items-center gap-2">
+						<Checkbox id="edit-auth-default" name="isDefault" checked={isDefaultChecked} onCheckedChange={(v) => (isDefaultChecked = v === true)} />
+						<Label for="edit-auth-default" class="text-sm font-normal">Set as default</Label>
+					</div>
+					<Button type="submit" disabled={sheetSubmitting || !editAuthLabel.trim()}>
 						{#if sheetSubmitting}
 							<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
 						{/if}
-						Update Credential
+						Save Changes
 					</Button>
 				</div>
 			</form>
@@ -851,7 +923,7 @@ async function copyToClipboard(text: string) {
 													<DropdownMenu.Content align="end">
 														<DropdownMenu.Item onclick={() => (document.getElementById(`reveal-credential-form-${method.id}`) as HTMLFormElement)?.requestSubmit()}>View Credential</DropdownMenu.Item>
 														<DropdownMenu.Item onclick={() => openRenameAuthSheet(method)}>Rename</DropdownMenu.Item>
-														<DropdownMenu.Item onclick={() => openUpdateCredentialSheet(method)}>Update Credential</DropdownMenu.Item>
+														<DropdownMenu.Item onclick={() => openEditAuthSheet(method)}>Edit Auth Method</DropdownMenu.Item>
 														{#if !method.isDefault}
 															<DropdownMenu.Item onclick={() => (document.getElementById(`set-default-form-${method.id}`) as HTMLFormElement)?.requestSubmit()}>Set as Default</DropdownMenu.Item>
 														{/if}

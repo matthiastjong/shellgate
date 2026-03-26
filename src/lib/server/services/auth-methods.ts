@@ -96,6 +96,7 @@ export async function updateAuthMethod(
 	id: string,
 	data: {
 		label?: string;
+		type?: string;
 		credential?: string;
 		isDefault?: boolean;
 	},
@@ -122,10 +123,15 @@ export async function updateAuthMethod(
 		updates.label = label;
 	}
 
+	if (data.type !== undefined) {
+		if (!VALID_TYPES.includes(data.type)) throw new Error(`type must be one of: ${VALID_TYPES.join(", ")}`);
+		updates.type = data.type;
+	}
+
 	if (data.credential !== undefined) {
 		if (!data.credential) throw new Error("credential is required");
 		updates.credential = data.credential;
-		updates.credentialHint = computeCredentialHint(data.credential);
+		updates.credentialHint = computeCredentialHint(data.credential, data.type);
 	}
 
 	if (data.isDefault !== undefined) {
