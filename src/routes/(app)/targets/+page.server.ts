@@ -68,6 +68,11 @@ export const actions = {
 			const headerValue = data.get("credential2")?.toString() ?? "";
 			if (!headerName || !headerValue) return fail(400, { error: "Header name and value are required" });
 			credential = `${headerName}: ${headerValue}`;
+		} else if (type === "query_param") {
+			const paramName = data.get("credential1")?.toString() ?? "";
+			const paramValue = data.get("credential2")?.toString() ?? "";
+			if (!paramName || !paramValue) return fail(400, { error: "Parameter name and value are required" });
+			credential = `${paramName}:${paramValue}`;
 		} else {
 			credential = data.get("credential")?.toString() ?? "";
 			if (!credential) return fail(400, { error: "Credential is required" });
