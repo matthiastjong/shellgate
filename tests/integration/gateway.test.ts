@@ -115,6 +115,49 @@ describe("gateway proxy", () => {
 		expect(url).toContain("?limit=10&offset=0");
 	});
 
+	it("proxies request with query_param credential injected", async () => {
+		const { token: tokenRow } = await createTestToken();
+		const target = await createTestTarget("SemrushAPI", "https://api.semrush.com");
+		await createTestAuthMethod(target.id, { type: "query_param", credential: "key:abc-semrush-key-1234" });
+		await grantPermission(tokenRow.id, target.id);
+
+		const fullToken = await getFullToken(tokenRow.id);
+
+		const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ ok: true }));
+
+		const request = new Request(`http://localhost/gateway/${target.slug}/analytics/ta/api/v3/summary`, {
+			method: "GET",
+		});
+
+		const response = await proxyRequest(fullToken, target.slug, "analytics/ta/api/v3/summary", request);
+
+		expect(response.status).toBe(200);
+		expect(fetchSpy).toHaveBeenCalledOnce();
+		const [url] = fetchSpy.mock.calls[0];
+		expect(url).toContain("key=abc-semrush-key-1234");
+		expect(url).not.toContain("Authorization");
+	});
+
+	it("query_param auth is appended alongside existing query params", async () => {
+		const { token: tokenRow } = await createTestToken();
+		const target = await createTestTarget("QueryParamAPI", "https://api.example.com");
+		await createTestAuthMethod(target.id, { type: "query_param", credential: "api_key:secret123" });
+		await grantPermission(tokenRow.id, target.id);
+
+		const fullToken = await getFullToken(tokenRow.id);
+
+		vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ ok: true }));
+
+		const request = new Request(`http://localhost/gateway/${target.slug}/v1/data?domain=example.com&export=json`);
+
+		await proxyRequest(fullToken, target.slug, "v1/data", request);
+
+		const [url] = vi.mocked(fetch).mock.calls[0];
+		expect(url).toContain("domain=example.com");
+		expect(url).toContain("export=json");
+		expect(url).toContain("api_key=secret123");
+	});
+
 	it("proxies without Authorization when no default auth method", async () => {
 		const { token: tokenRow } = await createTestToken();
 		const target = await createTestTarget("NoAuthAPI", "https://api.noauth.com");

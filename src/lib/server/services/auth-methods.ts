@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "../db";
 import { targetAuthMethods } from "../db/schema";
 
-const VALID_TYPES = ["bearer", "basic", "custom_header", "ssh_key"];
+const VALID_TYPES = ["bearer", "basic", "custom_header", "query_param", "ssh_key"];
 
 export function computeCredentialHint(credential: string, type?: string): string {
 	if (type === "ssh_key") {

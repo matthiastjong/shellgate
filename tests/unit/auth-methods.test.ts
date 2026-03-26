@@ -14,4 +14,9 @@ describe("computeCredentialHint", () => {
 		const hint = computeCredentialHint("1234567890");
 		expect(hint).toBe("123••••••••7890");
 	});
+
+	it("masks query_param credential (paramName:value format)", () => {
+		const hint = computeCredentialHint("key:abc-semrush-key-1234");
+		expect(hint).toBe("key••••••••1234");
+	});
 });
