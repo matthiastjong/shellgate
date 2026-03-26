@@ -60,7 +60,19 @@ export async function proxyRequest(
 	const headers = new Headers();
 	for (const [key, value] of request.headers.entries()) {
 		const lower = key.toLowerCase();
-		if (lower === "authorization" || lower === "host") continue;
+		// Strip our own auth and hop-by-hop/proxy headers before forwarding upstream.
+		// Forwarding x-forwarded-* and x-real-ip leaks that the request is proxied,
+		// which some APIs (e.g. Semrush) use to block or rate-limit requests.
+		if (
+			lower === "authorization" ||
+			lower === "host" ||
+			lower === "x-forwarded-for" ||
+			lower === "x-forwarded-host" ||
+			lower === "x-forwarded-port" ||
+			lower === "x-forwarded-proto" ||
+			lower === "x-forwarded-server" ||
+			lower === "x-real-ip"
+		) continue;
 		headers.set(key, value);
 	}
 	// Normalize Accept-Encoding to exclude Brotli — Node's fetch cannot decompress
