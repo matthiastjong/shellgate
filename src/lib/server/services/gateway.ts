@@ -92,6 +92,10 @@ export async function proxyRequest(
 		}
 	}
 
+	// [DEBUG] Log outgoing upstream request
+	console.log("[gateway] →", request.method, url.toString());
+	console.log("[gateway] → headers:", Object.fromEntries(headers.entries()));
+
 	let upstreamResponse: Response;
 	try {
 		upstreamResponse = await fetch(url.toString(), {
@@ -104,12 +108,17 @@ export async function proxyRequest(
 			// @ts-expect-error duplex needed for streaming body
 			duplex: "half",
 		});
-	} catch {
+	} catch (err) {
+		console.error("[gateway] ✗ upstream request failed:", err);
 		return Response.json(
 			{ error: "upstream request failed" },
 			{ status: 502 },
 		);
 	}
+
+	// [DEBUG] Log upstream response
+	console.log("[gateway] ←", upstreamResponse.status, url.toString());
+	console.log("[gateway] ← headers:", Object.fromEntries(upstreamResponse.headers.entries()));
 
 	const responseHeaders = new Headers();
 	for (const [key, value] of upstreamResponse.headers.entries()) {
