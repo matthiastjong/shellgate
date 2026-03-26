@@ -79,6 +79,13 @@ export async function proxyRequest(
 				const headerValue = authMethod.credential.slice(separatorIndex + 1).trim();
 				headers.set(headerName, headerValue);
 			}
+		} else if (authMethod.type === "query_param") {
+			const separatorIndex = authMethod.credential.indexOf(":");
+			if (separatorIndex > 0) {
+				const paramName = authMethod.credential.slice(0, separatorIndex).trim();
+				const paramValue = authMethod.credential.slice(separatorIndex + 1).trim();
+				url.searchParams.set(paramName, paramValue);
+			}
 		}
 	}
 

@@ -207,6 +207,7 @@ async function copyToClipboard(text: string) {
 							<option value="bearer">Bearer Token</option>
 							<option value="basic">Basic Auth</option>
 							<option value="custom_header">Custom Header</option>
+							<option value="query_param">Query Parameter</option>
 						</select>
 					</div>
 					{#if authType === 'basic'}
@@ -252,6 +253,36 @@ async function copyToClipboard(text: string) {
 									name="credential2"
 									type={showCredential ? 'text' : 'password'}
 									placeholder="your-key-here"
+									required
+								/>
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon"
+									class="absolute right-0 top-0 h-full px-3"
+									onclick={() => (showCredential = !showCredential)}
+								>
+									{#if showCredential}
+										<EyeOffIcon class="size-4" />
+									{:else}
+										<EyeIcon class="size-4" />
+									{/if}
+								</Button>
+							</div>
+						</div>
+					{:else if authType === 'query_param'}
+						<div class="grid gap-2">
+							<Label for="auth-param-name">Parameter Name</Label>
+							<Input id="auth-param-name" name="credential1" placeholder="key" required />
+						</div>
+						<div class="grid gap-2">
+							<Label for="auth-param-value">Parameter Value</Label>
+							<div class="relative">
+								<Input
+									id="auth-param-value"
+									name="credential2"
+									type={showCredential ? 'text' : 'password'}
+									placeholder="your-api-key"
 									required
 								/>
 								<Button

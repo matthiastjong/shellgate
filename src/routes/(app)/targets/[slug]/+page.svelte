@@ -363,6 +363,7 @@ async function copyToClipboard(text: string) {
 								<option value="bearer">Bearer Token</option>
 								<option value="basic">Basic Auth</option>
 								<option value="custom_header">Custom Header</option>
+								<option value="query_param">Query Parameter</option>
 							{/if}
 						</select>
 					</div>
@@ -421,6 +422,36 @@ async function copyToClipboard(text: string) {
 									name="credential2"
 									type={showCredential ? 'text' : 'password'}
 									placeholder="your-key-here"
+									required
+								/>
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon"
+									class="absolute right-0 top-0 h-full px-3"
+									onclick={() => (showCredential = !showCredential)}
+								>
+									{#if showCredential}
+										<EyeOffIcon class="size-4" />
+									{:else}
+										<EyeIcon class="size-4" />
+									{/if}
+								</Button>
+							</div>
+						</div>
+					{:else if authType === 'query_param'}
+						<div class="grid gap-2">
+							<Label for="add-auth-param-name">Parameter Name</Label>
+							<Input id="add-auth-param-name" name="credential1" bind:value={authCredential} placeholder="key" required />
+						</div>
+						<div class="grid gap-2">
+							<Label for="add-auth-param-value">Parameter Value</Label>
+							<div class="relative">
+								<Input
+									id="add-auth-param-value"
+									name="credential2"
+									type={showCredential ? 'text' : 'password'}
+									placeholder="your-api-key"
 									required
 								/>
 								<Button
@@ -752,7 +783,7 @@ async function copyToClipboard(text: string) {
 									{:else}
 										<Table.Row>
 											<Table.Cell class="font-medium">{method.label}</Table.Cell>
-											<Table.Cell><Badge variant="outline">{method.type === 'ssh_key' ? 'SSH Key' : method.type === 'custom_header' ? 'Custom Header' : method.type === 'basic' ? 'Basic Auth' : 'Bearer'}</Badge></Table.Cell>
+											<Table.Cell><Badge variant="outline">{method.type === 'ssh_key' ? 'SSH Key' : method.type === 'custom_header' ? 'Custom Header' : method.type === 'query_param' ? 'Query Param' : method.type === 'basic' ? 'Basic Auth' : 'Bearer'}</Badge></Table.Cell>
 											<Table.Cell>
 												{#if method.isDefault}
 													<StarIcon class="size-4 fill-amber-400 text-amber-400" />
