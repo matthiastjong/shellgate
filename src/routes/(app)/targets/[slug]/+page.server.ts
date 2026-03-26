@@ -190,19 +190,50 @@ export const actions = {
 		return { defaultSet: id };
 	},
 
-	updateCredential: async ({ request }) => {
+	editAuthMethod: async ({ request }) => {
 		const data = await request.formData();
 		const slug = data.get("slug")?.toString() ?? "";
 		const id = data.get("id")?.toString() ?? "";
-		const credential = data.get("credential")?.toString() ?? "";
-		if (!credential) return fail(400, { error: "Credential is required" });
+		const label = data.get("label")?.toString()?.trim() ?? "";
+		const type = data.get("type")?.toString() ?? "";
+		const isDefault = data.get("isDefault") === "on";
+
+		if (!label) return fail(400, { error: "Label is required" });
+		if (!type) return fail(400, { error: "Type is required" });
+
+		let credential: string | undefined;
+		if (type === "basic") {
+			const username = data.get("credential1")?.toString() ?? "";
+			const password = data.get("credential2")?.toString() ?? "";
+			if (username || password) {
+				if (!username || !password) return fail(400, { error: "Username and password are required" });
+				credential = `${username}:${password}`;
+			}
+		} else if (type === "custom_header") {
+			const headerName = data.get("credential1")?.toString() ?? "";
+			const headerValue = data.get("credential2")?.toString() ?? "";
+			if (headerName || headerValue) {
+				if (!headerName || !headerValue) return fail(400, { error: "Header name and value are required" });
+				credential = `${headerName}: ${headerValue}`;
+			}
+		} else if (type === "query_param") {
+			const paramName = data.get("credential1")?.toString() ?? "";
+			const paramValue = data.get("credential2")?.toString() ?? "";
+			if (paramName || paramValue) {
+				if (!paramName || !paramValue) return fail(400, { error: "Parameter name and value are required" });
+				credential = `${paramName}:${paramValue}`;
+			}
+		} else {
+			const raw = data.get("credential")?.toString() ?? "";
+			if (raw) credential = raw;
+		}
 
 		const target = await getTargetBySlug(slug);
 		if (!target) return fail(404, { error: "Target not found" });
 
-		const result = await updateAuthMethod(target.id, id, { credential });
+		const result = await updateAuthMethod(target.id, id, { label, type, credential, isDefault: isDefault || undefined });
 		if (!result) return fail(404, { error: "Auth method not found" });
-		return { credentialUpdated: { id, credentialHint: result.credentialHint } };
+		return { authMethodEdited: { id, label, type: result.type, credentialHint: result.credentialHint, isDefault: result.isDefault } };
 	},
 
 	deleteAuthMethod: async ({ request }) => {
