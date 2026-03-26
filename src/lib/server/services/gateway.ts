@@ -63,6 +63,9 @@ export async function proxyRequest(
 		if (lower === "authorization" || lower === "host") continue;
 		headers.set(key, value);
 	}
+	// Normalize Accept-Encoding to exclude Brotli — Node's fetch cannot decompress
+	// Brotli responses, which causes HTTP/2 stream errors with Cloudflare-proxied APIs.
+	headers.set("Accept-Encoding", "gzip, deflate");
 
 	// Inject default auth method credentials
 	const authMethod = await getDefaultAuthMethod(target.id);
