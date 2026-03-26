@@ -114,11 +114,19 @@ export async function proxyRequest(
 	const responseHeaders = new Headers();
 	for (const [key, value] of upstreamResponse.headers.entries()) {
 		const lower = key.toLowerCase();
-		if (lower === "transfer-encoding") continue;
+		// Strip hop-by-hop headers — the gateway rebuffers the body so these
+		// are no longer accurate and confuse HTTP/1.1 clients.
+		if (lower === "transfer-encoding" || lower === "content-encoding") continue;
 		responseHeaders.set(key, value);
 	}
 
-	return new Response(upstreamResponse.body, {
+	// Buffer the response body so that Node's fetch fully decodes chunked/compressed
+	// transfer encoding before we forward it to the client. Streaming the raw body
+	// causes curl and other HTTP/1.1 clients to receive undecoded chunked frames.
+	const body = await upstreamResponse.arrayBuffer();
+	responseHeaders.set("Content-Length", String(body.byteLength));
+
+	return new Response(body, {
 		status: upstreamResponse.status,
 		headers: responseHeaders,
 	});
