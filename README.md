@@ -1,8 +1,8 @@
-# 🐚 Shellgate
+# Shellgate
 
-**One token. Full control. Complete audit trail.**
+**Stop giving your AI agents your API keys.**
 
-Shellgate sits between your AI agents and your infrastructure. Instead of handing agents raw API keys and server credentials, you give them a single Shellgate token. Every request flows through Shellgate, where it's authenticated, authorized, and logged.
+Run all agent requests through a secure, auditable gateway with scoped tokens. Shellgate sits between your AI agents and your infrastructure — every request is authenticated, authorized, and logged. The agent never sees your real credentials.
 
 ```
 Agent → Shellgate → Your APIs / Servers / Tools
@@ -16,18 +16,18 @@ The agent never sees your real credentials.
 
 ---
 
-## ☁️ Shellgate Cloud
+## Shellgate Cloud
 
-Want a working instance connected to your agent in 20 seconds, without Docker, servers, or config?
+Shellgate Cloud gives you a secure agent gateway in under a minute -- no Docker, no setup.
 
-**[Shellgate Cloud](https://app.shellgate.cloud)** is the managed version. Sign up, get a dedicated instance, and connect your agent immediately. No setup required.
+**[Shellgate Cloud](https://app.shellgate.cloud)** is the managed version. Sign up, get a dedicated instance, and connect your agent immediately.
 
-- ✅ Fully managed, no Docker, no servers
-- ✅ Ready in under a minute
-- ✅ Daily backups included
-- ✅ 14-day free trial, no credit card needed
+- Fully managed -- no Docker, no servers
+- Ready in under a minute
+- Daily backups included
+- 14-day free trial, no credit card needed
 
-[**→ Try Shellgate Cloud for free**](https://app.shellgate.cloud)
+[**Try Shellgate Cloud for free**](https://app.shellgate.cloud)
 
 Prefer full control? Keep reading to self-host.
 
