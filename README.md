@@ -12,17 +12,17 @@ The agent never sees your real credentials.
 
 ---
 
-> **🔒 Security note:** Run Shellgate on a separate machine from your AI agent. Agents like OpenClaw have access to the host filesystem — if Shellgate runs on the same machine, the agent could access the database directly, bypassing all access controls. A cheap VPS (Hetzner, Railway, etc.) is all you need, or use [Shellgate Cloud](https://shellgate.cloud) for a fully managed setup.
+> **🔒 Security note:** Run Shellgate on a separate machine from your AI agent. Agents like OpenClaw have access to the host filesystem. If Shellgate runs on the same machine, the agent could access the database directly, bypassing all access controls. A cheap VPS (Hetzner, Railway, etc.) is all you need, or use [Shellgate Cloud](https://shellgate.cloud) for a fully managed setup.
 
 ---
 
 ## ☁️ Shellgate Cloud
 
-Want a working instance connected to your agent in 20 seconds — without Docker, servers, or config?
+Want a working instance connected to your agent in 20 seconds, without Docker, servers, or config?
 
 **[Shellgate Cloud](https://app.shellgate.cloud)** is the managed version. Sign up, get a dedicated instance, and connect your agent immediately. No setup required.
 
-- ✅ Fully managed — no Docker, no servers
+- ✅ Fully managed, no Docker, no servers
 - ✅ Ready in under a minute
 - ✅ Daily backups included
 - ✅ 14-day free trial, no credit card needed
@@ -37,7 +37,7 @@ Prefer full control? Keep reading to self-host.
 
 ### 1. Run Shellgate
 
-**Docker (recommended):**
+**Docker image:**
 
 ```bash
 docker run -d \
@@ -46,6 +46,8 @@ docker run -d \
   -e SESSION_SECRET=$(openssl rand -hex 32) \
   ghcr.io/matthiastjong/shellgate:latest
 ```
+
+This assumes you already have a PostgreSQL database running. Point `DATABASE_URL` at your existing instance.
 
 **Docker Compose:**
 
@@ -151,7 +153,7 @@ Route agent requests to any upstream API. Shellgate injects the real credentials
 Create, revoke, and rotate `sg_` tokens from the dashboard. Each token can be scoped to specific targets.
 
 ### Per-Token Permissions
-Control exactly which APIs each agent can access. Agent A gets OpenAI, Agent B gets Anthropic — you decide.
+Control exactly which APIs each agent can access. Agent A gets OpenAI, Agent B gets Anthropic. You decide.
 
 ### IP Whitelisting
 Lock tokens to specific IP ranges (CIDR notation). Extra security for production agents.
@@ -160,7 +162,7 @@ Lock tokens to specific IP ranges (CIDR notation). Extra security for production
 Web UI for managing targets, tokens, and permissions. No CLI required.
 
 ### Agent Integration
-Built-in install scripts for **OpenClaw** and **Claude Code** — connect your agent in one click from the dashboard.
+Built-in install scripts for **OpenClaw** and **Claude Code**. Connect your agent in one click from the dashboard.
 
 ### SSH Execution *(coming soon)*
 Run commands on remote servers through Shellgate. Same token, same audit trail.
@@ -232,7 +234,7 @@ GET /health   # Returns { status: "ok" }
 **Without Shellgate:**
 - Agents hold your real API keys
 - Revoking access means rotating keys everywhere
-- No visibility into what agents are doing
+- No visibility into what your agents are doing
 - One compromised agent exposes everything
 
 **With Shellgate:**
