@@ -12,7 +12,7 @@ The agent never sees your real credentials.
 
 ---
 
-> **🔒 Security note:** Run Shellgate on a separate machine from your AI agent. Agents like OpenClaw have access to the host filesystem — if Shellgate runs on the same machine, the agent could access the database directly, bypassing all access controls. A cheap VPS (Hetzner, Railway, etc.) is all you need.
+> **🔒 Security note:** Run Shellgate on a separate machine from your AI agent. Agents like OpenClaw have access to the host filesystem — if Shellgate runs on the same machine, the agent could access the database directly, bypassing all access controls. A cheap VPS (Hetzner, Railway, etc.) is all you need, or use [Shellgate Cloud](https://shellgate.cloud) for a fully managed setup.
 
 ---
 
