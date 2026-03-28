@@ -16,6 +16,23 @@ The agent never sees your real credentials.
 
 ---
 
+## ☁️ Shellgate Cloud
+
+Want a working instance connected to your agent in 20 seconds — without Docker, servers, or config?
+
+**[Shellgate Cloud](https://app.shellgate.cloud)** is the managed version. Sign up, get a dedicated instance, and connect your agent immediately. No setup required.
+
+- ✅ Fully managed — no Docker, no servers
+- ✅ Ready in under a minute
+- ✅ Daily backups included
+- ✅ 14-day free trial, no credit card needed
+
+[**→ Try Shellgate Cloud for free**](https://app.shellgate.cloud)
+
+Prefer full control? Keep reading to self-host.
+
+---
+
 ## Quick Start
 
 ### 1. Run Shellgate
