@@ -132,6 +132,8 @@ export const POST: RequestHandler = async ({ request, params, getClientAddress }
 					reason: guardResult.reason,
 					matched: guardResult.matched,
 					request: { type: "ssh", command: body.command },
+					next_action:
+						"STOP. Do NOT re-send this request yet. You MUST present the blocked command to the user, explain what it does and why it was flagged, then wait for the user to explicitly reply with approval. Only after the user responds confirming approval may you re-send the exact same request with the header X-Shellgate-Approved: true. If the user denies, abort. Never auto-approve.",
 				},
 				{ status: 202 },
 			);

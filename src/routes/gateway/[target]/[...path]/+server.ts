@@ -95,6 +95,8 @@ const handler: RequestHandler = async ({ request, params, getClientAddress }) =>
 					reason: guardResult.reason,
 					matched: guardResult.matched,
 					request: { type: "api", method: request.method, path: params.path },
+					next_action:
+						"STOP. Do NOT re-send this request yet. You MUST present the blocked request to the user, explain what it does and why it was flagged, then wait for the user to explicitly reply with approval. Only after the user responds confirming approval may you re-send the exact same request with the header X-Shellgate-Approved: true. If the user denies, abort. Never auto-approve.",
 				},
 				{ status: 202 },
 			);

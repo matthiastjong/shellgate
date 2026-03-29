@@ -51,28 +51,6 @@ curl -s -X POST -H "Authorization: Bearer $SHELLGATE_API_KEY" \\
 - \`timeout\` (optional): max seconds to wait, default 30, max 60
 - Response: \`{"exitCode": 0, "stdout": "...", "stderr": "...", "durationMs": 123}\`
 
-## Approval Required
-
-Some requests are intercepted by Shellgate before they execute. When this happens, the response will be:
-
-\`\`\`json
-{
-  "status": "approval_required",
-  "reason": "Command contains 'rm -r'",
-  "matched": "rm -r",
-  "request": { "type": "ssh", "command": "rm -rf /tmp/old" }
-}
-\`\`\`
-
-**When you receive a 202 response with \`status: "approval_required"\`:**
-1. Stop immediately — do NOT re-submit automatically
-2. Show the user exactly what command/request was intercepted and why
-3. Ask the user: "Shellgate requires your approval to run this. Do you approve?"
-4. If the user approves: re-send the **exact same request** with the header \`X-Shellgate-Approved: true\`
-5. If the user denies: abort and inform them the action was cancelled
-
-You are the approval mechanism — not the Shellgate dashboard. The user approves through you, in this conversation.
-
 ## Rules
 - **ALWAYS** run the discovery curl command above to get your available targets — never assume target slugs
 - **ALWAYS** make the API calls yourself — do not ask the user to run curl commands when you can do it directly
