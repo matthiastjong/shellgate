@@ -12,6 +12,8 @@ type AuditLogData = {
 	statusCode: number | null;
 	clientIp: string;
 	durationMs: number | null;
+	guardAction?: "allow" | "block" | "approval_required" | "approved";
+	guardReason?: string;
 };
 
 export function logRequest(data: AuditLogData): void {

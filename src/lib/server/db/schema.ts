@@ -120,6 +120,8 @@ export const auditLogs = pgTable(
 		statusCode: integer("status_code"),
 		clientIp: text("client_ip").notNull(),
 		durationMs: integer("duration_ms"),
+		guardAction: text("guard_action").$type<"allow" | "block" | "approval_required" | "approved">(),
+		guardReason: text("guard_reason"),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.notNull()
 			.defaultNow(),

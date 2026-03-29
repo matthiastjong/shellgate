@@ -25,6 +25,7 @@ import EyeOffIcon from "@lucide/svelte/icons/eye-off";
 import KeyIcon from "@lucide/svelte/icons/key";
 import type { PageData } from "./$types";
 
+
 type Target = {
 	id: string;
 	name: string;
@@ -115,6 +116,7 @@ let localTokenAccess = $state<TokenAccess[] | null>(null);
 let tokenAccessList = $derived<TokenAccess[]>(localTokenAccess ?? (data.tokenAccess as TokenAccess[]));
 let localAvailableTokens = $state<{ id: string; name: string }[] | null>(null);
 let availableTokensList = $derived<{ id: string; name: string }[]>(localAvailableTokens ?? (data.availableTokens as { id: string; name: string }[]));
+
 
 function openGrantAccessDialog() {
 	selectedTokenIds = new Set();
