@@ -6,8 +6,10 @@ Shellgate sits between your AI agents and your infrastructure. Agents get a scop
 
 ```
 Agent → sg_token → Shellgate → Your APIs / SSH Servers / Tools
-                       ↓
-                   audit log
+                       │
+                       ├─ credentials injected (agent never sees them)
+                       ├─ dangerous commands intercepted → approval required
+                       └─ every request logged
 ```
 
 ## Why Shellgate?
