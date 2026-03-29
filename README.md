@@ -2,13 +2,27 @@
 
 **Stop giving your AI agents your API keys.**
 
-Run all agent requests through a secure, auditable gateway with scoped tokens. Shellgate sits between your AI agents and your infrastructure — every request is authenticated, authorized, and logged. The agent never sees your real credentials.
+Shellgate sits between your AI agents and your infrastructure. Agents get a scoped token — they never see real credentials, SSH keys, or passwords. You control what runs, everything is logged, and dangerous commands ask for your approval before executing.
 
 ```
-Agent → Shellgate → Your APIs / Servers / Tools
+Agent → sg_token → Shellgate → Your APIs / SSH Servers / Tools
+                       ↓
+                   audit log
 ```
 
-The agent never sees your real credentials.
+## Why Shellgate?
+
+**Without Shellgate:**
+- Agents hold your real API keys and SSH credentials
+- Revoking access means rotating keys everywhere
+- No visibility into what your agents are doing
+- One prompt injection = your production server is compromised
+
+**With Shellgate:**
+- Agents only hold scoped, revocable `sg_` tokens
+- Revoke one token without affecting anything else
+- Every request is logged and auditable
+- Dangerous commands are intercepted before they execute
 
 ---
 
@@ -155,9 +169,6 @@ Create, revoke, and rotate `sg_` tokens from the dashboard. Each token can be sc
 ### Per-Token Permissions
 Control exactly which APIs each agent can access. Agent A gets OpenAI, Agent B gets Anthropic. You decide.
 
-### IP Whitelisting
-Lock tokens to specific IP ranges (CIDR notation). Extra security for production agents.
-
 ### Dashboard
 Web UI for managing targets, tokens, and permissions. No CLI required.
 
@@ -251,22 +262,6 @@ DELETE /api/tokens/:id/permissions/:targetId # Revoke target access
 ```
 GET /health   # Returns { status: "ok" }
 ```
-
----
-
-## Why Shellgate?
-
-**Without Shellgate:**
-- Agents hold your real API keys
-- Revoking access means rotating keys everywhere
-- No visibility into what your agents are doing
-- One compromised agent exposes everything
-
-**With Shellgate:**
-- Agents only hold scoped, revocable tokens
-- Revoke one token without affecting others
-- Every request is logged and auditable
-- Credentials stay on your server, never leave
 
 ---
 
