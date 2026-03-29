@@ -6,7 +6,6 @@ import { getTargetBySlug, updateTarget } from "$lib/server/services/targets";
 import { listAuthMethods, createAuthMethod, updateAuthMethod, deleteAuthMethod, getAuthMethodCredential } from "$lib/server/services/auth-methods";
 import { listTokens } from "$lib/server/services/tokens";
 import { addPermission } from "$lib/server/services/permissions";
-import { getBuiltinRules } from "$lib/server/guard";
 import type { Actions, PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async ({ params }) => {
@@ -47,14 +46,11 @@ export const load: PageServerLoad = async ({ params }) => {
 		// fallback to empty array
 	}
 
-	const builtinRules = getBuiltinRules(target.type as "api" | "ssh");
-
 	return {
 		target: { ...target, enabled: target.enabled !== false },
 		authMethods,
 		tokenAccess,
 		availableTokens,
-		builtinRules,
 	};
 };
 
