@@ -167,6 +167,31 @@ Built-in install scripts for **OpenClaw** and **Claude Code**. Connect your agen
 ### SSH Execution *(coming soon)*
 Run commands on remote servers through Shellgate. Same token, same audit trail.
 
+### Human-in-the-Loop Guard *(coming soon)*
+Shellgate intercepts dangerous commands before they execute and asks for your approval. Built-in protection out of the box — no configuration needed.
+
+**How it works:**
+1. Agent sends a command (e.g. `rm -rf /var/backups/2024`)
+2. Shellgate matches it against the built-in ruleset
+3. Instead of executing, it returns `approval_required`
+4. Your agent surfaces this to you — you approve or deny
+5. Agent re-sends with `X-Shellgate-Approved: true` → executes
+
+```json
+{
+  "status": "approval_required",
+  "reason": "Command contains 'rm -r'",
+  "matched": "rm -r",
+  "request": { "type": "ssh", "command": "rm -rf /var/backups/2024" }
+}
+```
+
+Works for both SSH commands and API calls (e.g. `DELETE` requests). Destructive patterns like `rm -r`, `DROP TABLE`, `systemctl stop`, and `DELETE FROM` trigger approval by default. Blocked patterns like `/etc/shadow` and `curl | bash` are always rejected, regardless of approval.
+
+This also acts as a **prompt injection defense** — even if a malicious prompt tricks your agent into sending a dangerous command, Shellgate catches it before it reaches your infrastructure.
+
+You can add custom rules per target from the dashboard.
+
 ---
 
 ## Run from Source
