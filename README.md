@@ -6,8 +6,10 @@ Shellgate sits between your AI agents and your infrastructure. Agents get a scop
 
 ```
 Agent → sg_token → Shellgate → Your APIs / SSH Servers / Tools
-                       ↓
-                   audit log
+                       │
+                       ├─ credentials injected (agent never sees them)
+                       ├─ dangerous commands intercepted → approval required
+                       └─ every request logged
 ```
 
 ## Why Shellgate?
@@ -131,6 +133,17 @@ curl http://localhost:3000/gateway/openai/v1/chat/completions \
 
 Same request, same response. But now you control access, can revoke tokens instantly, and have a full audit trail.
 
+**SSH targets** work the same way — add a server as a target, give your agent a token, and it can run commands without ever seeing your SSH key:
+
+```bash
+curl -X POST http://localhost:3000/ssh/prod-server/exec \
+  -H "Authorization: Bearer sg_your-shellgate-token" \
+  -H "Content-Type: application/json" \
+  -d '{"command": "docker ps", "timeout": 30}'
+```
+
+If the command is flagged as dangerous (e.g. `rm -rf`, `systemctl stop`), Shellgate returns a `202 approval_required` response instead of executing — your agent asks you first.
+
 ---
 
 ## Deploy
@@ -175,10 +188,10 @@ Web UI for managing targets, tokens, and permissions. No CLI required.
 ### Agent Integration
 Built-in install scripts for **OpenClaw** and **Claude Code**. Connect your agent in one click from the dashboard.
 
-### SSH Execution *(coming soon)*
+### SSH Execution
 Run commands on remote servers through Shellgate. Same token, same audit trail.
 
-### Human-in-the-Loop Guard *(coming soon)*
+### Human-in-the-Loop Guard
 Shellgate intercepts dangerous commands before they execute and asks for your approval. Built-in protection out of the box — no configuration needed.
 
 **How it works:**
@@ -200,8 +213,6 @@ Shellgate intercepts dangerous commands before they execute and asks for your ap
 Works for both SSH commands and API calls (e.g. `DELETE` requests). Destructive patterns like `rm -r`, `DROP TABLE`, `systemctl stop`, and `DELETE FROM` trigger approval by default. Blocked patterns like `/etc/shadow` and `curl | bash` are always rejected, regardless of approval.
 
 This also acts as a **prompt injection defense** — even if a malicious prompt tricks your agent into sending a dangerous command, Shellgate catches it before it reaches your infrastructure.
-
-You can add custom rules per target from the dashboard.
 
 ---
 
@@ -256,6 +267,20 @@ DELETE /api/targets/:id         # Delete target
 POST   /api/tokens/:id/permissions          # Grant target access
 DELETE /api/tokens/:id/permissions/:targetId # Revoke target access
 ```
+
+### SSH
+
+```
+POST /ssh/:target/exec   # Execute a command on an SSH target
+```
+
+Body: `{ "command": "string", "timeout": 30 }` (timeout optional, max 60s)
+
+Response: `{ "exitCode": 0, "stdout": "...", "stderr": "...", "durationMs": 123 }`
+
+If the command is intercepted by the guard: `{ "status": "approval_required", "reason": "...", "matched": "...", "request": {...} }` (HTTP 202)
+
+Re-submit with `X-Shellgate-Approved: true` header to execute after human approval.
 
 ### Health
 
