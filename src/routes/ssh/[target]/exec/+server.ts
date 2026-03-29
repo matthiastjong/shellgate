@@ -7,6 +7,7 @@ import { hasPermission } from "$lib/server/services/permissions";
 import { getDefaultAuthMethod } from "$lib/server/services/auth-methods";
 import { executeCommand } from "$lib/server/services/ssh";
 import { logRequest } from "$lib/server/services/audit";
+import { normalizeSshRequest, checkRequest } from "$lib/server/guard";
 import type { SshConfig } from "$lib/server/db/schema";
 
 export const POST: RequestHandler = async ({ request, params, getClientAddress }) => {
@@ -85,6 +86,58 @@ export const POST: RequestHandler = async ({ request, params, getClientAddress }
 		throw error(400, "command is required");
 	}
 
+	// Guard check
+	const isApproved = request.headers.get("X-Shellgate-Approved") === "true";
+
+	if (!isApproved) {
+		const normalized = normalizeSshRequest(body.command);
+		const guardResult = await checkRequest(normalized, target.id);
+
+		if (guardResult.action === "block") {
+			logRequest({
+				tokenId: token.id,
+				tokenName: token.name,
+				targetId: target.id,
+				targetSlug: target.slug,
+				type: "ssh",
+				method: null,
+				path: body.command,
+				statusCode: 403,
+				clientIp,
+				durationMs: null,
+				guardAction: "block",
+				guardReason: guardResult.reason,
+			});
+			throw error(403, guardResult.reason);
+		}
+
+		if (guardResult.action === "approval_required") {
+			logRequest({
+				tokenId: token.id,
+				tokenName: token.name,
+				targetId: target.id,
+				targetSlug: target.slug,
+				type: "ssh",
+				method: null,
+				path: body.command,
+				statusCode: 202,
+				clientIp,
+				durationMs: null,
+				guardAction: "approval_required",
+				guardReason: guardResult.reason,
+			});
+			return Response.json(
+				{
+					status: "approval_required",
+					reason: guardResult.reason,
+					matched: guardResult.matched,
+					request: { type: "ssh", command: body.command },
+				},
+				{ status: 202 },
+			);
+		}
+	}
+
 	const timeoutMs = typeof body.timeout === "number" ? body.timeout * 1000 : undefined;
 
 	try {
@@ -101,6 +154,7 @@ export const POST: RequestHandler = async ({ request, params, getClientAddress }
 			statusCode: result.exitCode,
 			clientIp,
 			durationMs: result.durationMs,
+			guardAction: isApproved ? "approved" : "allow",
 		});
 
 		return Response.json(result);
@@ -119,6 +173,7 @@ export const POST: RequestHandler = async ({ request, params, getClientAddress }
 			statusCode,
 			clientIp,
 			durationMs: null,
+			guardAction: isApproved ? "approved" : "allow",
 		});
 
 		return Response.json({ error: message }, { status: statusCode });

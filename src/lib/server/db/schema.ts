@@ -120,6 +120,8 @@ export const auditLogs = pgTable(
 		statusCode: integer("status_code"),
 		clientIp: text("client_ip").notNull(),
 		durationMs: integer("duration_ms"),
+		guardAction: text("guard_action").$type<"allow" | "block" | "approval_required" | "approved">(),
+		guardReason: text("guard_reason"),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.notNull()
 			.defaultNow(),
@@ -132,3 +134,20 @@ export const auditLogs = pgTable(
 );
 
 export type AuditLog = typeof auditLogs.$inferSelect;
+
+export const guardRules = pgTable("guard_rules", {
+	id: uuid("id").primaryKey().defaultRandom(),
+	targetId: uuid("target_id")
+		.notNull()
+		.references(() => targets.id, { onDelete: "cascade" }),
+	field: text("field").notNull().$type<"command" | "method" | "path" | "query">(),
+	operator: text("operator").notNull().$type<"contains" | "equals" | "starts_with">(),
+	value: text("value").notNull(),
+	action: text("action").notNull().$type<"allow" | "block" | "approval_required">(),
+	reason: text("reason").notNull(),
+	priority: integer("priority").notNull().default(0),
+	enabled: boolean("enabled").notNull().default(true),
+	createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type GuardRule = typeof guardRules.$inferSelect;

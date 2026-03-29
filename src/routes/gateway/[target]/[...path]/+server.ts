@@ -1,9 +1,10 @@
 import { error } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
 import { requireBearer } from "$lib/server/api-auth";
-import { proxyRequest } from "$lib/server/services/gateway";
+import { resolveGatewayTarget, proxyToTarget } from "$lib/server/services/gateway";
 import { ipMatchesAny } from "$lib/server/utils/cidr";
 import { logRequest } from "$lib/server/services/audit";
+import { normalizeApiRequest, checkRequest } from "$lib/server/guard";
 
 const handler: RequestHandler = async ({ request, params, getClientAddress }) => {
 	const token = await requireBearer(request);
@@ -28,21 +29,94 @@ const handler: RequestHandler = async ({ request, params, getClientAddress }) =>
 		}
 	}
 
+	// Resolve target before guard check so we have target.id
+	const resolved = await resolveGatewayTarget(token, params.target);
+	if ("error" in resolved) {
+		logRequest({
+			tokenId: token.id,
+			tokenName: token.name,
+			targetId: null,
+			targetSlug: params.target,
+			type: "gateway",
+			method: request.method,
+			path: params.path ?? "",
+			statusCode: resolved.error.status,
+			clientIp: getClientAddress(),
+			durationMs: null,
+		});
+		return resolved.error;
+	}
+
+	const { target } = resolved;
+
+	// Guard check
+	const isApproved = request.headers.get("X-Shellgate-Approved") === "true";
+
+	if (!isApproved) {
+		const normalized = normalizeApiRequest(request.method, params.path ?? "");
+		const guardResult = await checkRequest(normalized, target.id);
+
+		if (guardResult.action === "block") {
+			logRequest({
+				tokenId: token.id,
+				tokenName: token.name,
+				targetId: target.id,
+				targetSlug: target.slug,
+				type: "gateway",
+				method: request.method,
+				path: params.path ?? "",
+				statusCode: 403,
+				clientIp: getClientAddress(),
+				durationMs: null,
+				guardAction: "block",
+				guardReason: guardResult.reason,
+			});
+			throw error(403, guardResult.reason);
+		}
+
+		if (guardResult.action === "approval_required") {
+			logRequest({
+				tokenId: token.id,
+				tokenName: token.name,
+				targetId: target.id,
+				targetSlug: target.slug,
+				type: "gateway",
+				method: request.method,
+				path: params.path ?? "",
+				statusCode: 202,
+				clientIp: getClientAddress(),
+				durationMs: null,
+				guardAction: "approval_required",
+				guardReason: guardResult.reason,
+			});
+			return Response.json(
+				{
+					status: "approval_required",
+					reason: guardResult.reason,
+					matched: guardResult.matched,
+					request: { type: "api", method: request.method, path: params.path },
+				},
+				{ status: 202 },
+			);
+		}
+	}
+
 	const start = Date.now();
-	const response = await proxyRequest(token, params.target, params.path ?? "", request);
+	const response = await proxyToTarget(target, params.path ?? "", request);
 	const durationMs = Date.now() - start;
 
 	logRequest({
 		tokenId: token.id,
 		tokenName: token.name,
-		targetId: null,
-		targetSlug: params.target,
+		targetId: target.id,
+		targetSlug: target.slug,
 		type: "gateway",
 		method: request.method,
 		path: params.path ?? "",
 		statusCode: response.status,
 		clientIp: getClientAddress(),
 		durationMs,
+		guardAction: isApproved ? "approved" : "allow",
 	});
 
 	return response;

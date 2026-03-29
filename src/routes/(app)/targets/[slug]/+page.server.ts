@@ -6,6 +6,8 @@ import { getTargetBySlug, updateTarget } from "$lib/server/services/targets";
 import { listAuthMethods, createAuthMethod, updateAuthMethod, deleteAuthMethod, getAuthMethodCredential } from "$lib/server/services/auth-methods";
 import { listTokens } from "$lib/server/services/tokens";
 import { addPermission } from "$lib/server/services/permissions";
+import { listGuardRules, createGuardRule, updateGuardRule, deleteGuardRule } from "$lib/server/services/guard-rules";
+import { getBuiltinRules } from "$lib/server/guard";
 import type { Actions, PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async ({ params }) => {
@@ -46,11 +48,22 @@ export const load: PageServerLoad = async ({ params }) => {
 		// fallback to empty array
 	}
 
+	let guardRulesList: Awaited<ReturnType<typeof listGuardRules>> = [];
+	try {
+		guardRulesList = await listGuardRules(target.id);
+	} catch {
+		// fallback to empty array
+	}
+
+	const builtinRules = getBuiltinRules(target.type as "api" | "ssh");
+
 	return {
 		target: { ...target, enabled: target.enabled !== false },
 		authMethods,
 		tokenAccess,
 		availableTokens,
+		guardRules: guardRulesList,
+		builtinRules,
 	};
 };
 
@@ -266,6 +279,65 @@ export const actions = {
 		} catch (err) {
 			return fail(400, { error: err instanceof Error ? err.message : "Failed to grant access" });
 		}
+	},
+
+	addGuardRule: async ({ request }) => {
+		const data = await request.formData();
+		const slug = data.get("slug")?.toString() ?? "";
+		const field = data.get("field")?.toString() ?? "";
+		const operator = data.get("operator")?.toString() ?? "";
+		const value = data.get("value")?.toString()?.trim() ?? "";
+		const action = data.get("action")?.toString() ?? "";
+		const reason = data.get("reason")?.toString()?.trim() ?? "";
+		const priority = parseInt(data.get("priority")?.toString() ?? "0", 10) || 0;
+
+		if (!field || !operator || !value || !action || !reason) {
+			return fail(400, { error: "All fields are required" });
+		}
+
+		const target = await getTargetBySlug(slug);
+		if (!target) return fail(404, { error: "Target not found" });
+
+		try {
+			const rule = await createGuardRule(target.id, {
+				field: field as "command" | "method" | "path" | "query",
+				operator: operator as "contains" | "equals" | "starts_with",
+				value,
+				action: action as "allow" | "block" | "approval_required",
+				reason,
+				priority,
+			});
+			return { guardRuleAdded: rule };
+		} catch (err) {
+			return fail(400, { error: err instanceof Error ? err.message : "Failed to add guard rule" });
+		}
+	},
+
+	toggleGuardRule: async ({ request }) => {
+		const data = await request.formData();
+		const slug = data.get("slug")?.toString() ?? "";
+		const id = data.get("id")?.toString() ?? "";
+		const enabled = data.get("enabled") === "true";
+
+		const target = await getTargetBySlug(slug);
+		if (!target) return fail(404, { error: "Target not found" });
+
+		const result = await updateGuardRule(target.id, id, { enabled });
+		if (!result) return fail(404, { error: "Guard rule not found" });
+		return { guardRuleToggled: { id, enabled } };
+	},
+
+	deleteGuardRule: async ({ request }) => {
+		const data = await request.formData();
+		const slug = data.get("slug")?.toString() ?? "";
+		const id = data.get("id")?.toString() ?? "";
+
+		const target = await getTargetBySlug(slug);
+		if (!target) return fail(404, { error: "Target not found" });
+
+		const result = await deleteGuardRule(target.id, id);
+		if (!result) return fail(404, { error: "Guard rule not found" });
+		return { guardRuleDeleted: id };
 	},
 
 	revealCredential: async ({ request }) => {
