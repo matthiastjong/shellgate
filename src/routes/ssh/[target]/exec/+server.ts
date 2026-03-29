@@ -91,7 +91,7 @@ export const POST: RequestHandler = async ({ request, params, getClientAddress }
 
 	if (!isApproved) {
 		const normalized = normalizeSshRequest(body.command);
-		const guardResult = await checkRequest(normalized, target.id);
+		const guardResult = await checkRequest(normalized);
 
 		if (guardResult.action === "block") {
 			logRequest({

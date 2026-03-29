@@ -54,7 +54,7 @@ const handler: RequestHandler = async ({ request, params, getClientAddress }) =>
 
 	if (!isApproved) {
 		const normalized = normalizeApiRequest(request.method, params.path ?? "");
-		const guardResult = await checkRequest(normalized, target.id);
+		const guardResult = await checkRequest(normalized);
 
 		if (guardResult.action === "block") {
 			logRequest({

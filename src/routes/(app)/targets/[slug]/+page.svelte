@@ -23,21 +23,7 @@ import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
 import EyeIcon from "@lucide/svelte/icons/eye";
 import EyeOffIcon from "@lucide/svelte/icons/eye-off";
 import KeyIcon from "@lucide/svelte/icons/key";
-import ShieldIcon from "@lucide/svelte/icons/shield";
-import TrashIcon from "@lucide/svelte/icons/trash-2";
 import type { PageData } from "./$types";
-
-type GuardRuleItem = {
-	id: string;
-	field: string;
-	operator: string;
-	value: string;
-	action: string;
-	reason: string;
-	priority: number;
-	enabled: boolean;
-	createdAt: string | Date;
-};
 
 type BuiltinRule = {
 	field: string;
@@ -138,30 +124,8 @@ let tokenAccessList = $derived<TokenAccess[]>(localTokenAccess ?? (data.tokenAcc
 let localAvailableTokens = $state<{ id: string; name: string }[] | null>(null);
 let availableTokensList = $derived<{ id: string; name: string }[]>(localAvailableTokens ?? (data.availableTokens as { id: string; name: string }[]));
 
-// Guard rules state
-let localGuardRules = $state<GuardRuleItem[] | null>(null);
-let guardRulesList = $derived<GuardRuleItem[]>(localGuardRules ?? (data.guardRules as GuardRuleItem[]));
+// Guard rules state (built-in only)
 let builtinRules = $derived<BuiltinRule[]>(data.builtinRules as BuiltinRule[]);
-let addGuardRuleOpen = $state(false);
-let addGuardRuleSubmitting = $state(false);
-let guardRuleField = $state("command");
-let guardRuleOperator = $state("contains");
-let guardRuleValue = $state("");
-let guardRuleAction = $state("approval_required");
-let guardRuleReason = $state("");
-let guardRulePriority = $state("0");
-let confirmDeleteGuardRuleId = $state<string | null>(null);
-
-function openAddGuardRuleDialog() {
-	guardRuleField = target.type === "ssh" ? "command" : "method";
-	guardRuleOperator = "contains";
-	guardRuleValue = "";
-	guardRuleAction = "approval_required";
-	guardRuleReason = "";
-	guardRulePriority = "0";
-	addGuardRuleSubmitting = false;
-	addGuardRuleOpen = true;
-}
 
 function openGrantAccessDialog() {
 	selectedTokenIds = new Set();
@@ -997,16 +961,11 @@ async function copyToClipboard(text: string) {
 			<div>
 				<div class="mb-4 flex items-center justify-between">
 					<h2 class="text-lg font-semibold">Guard Rules</h2>
-					<Button size="sm" onclick={openAddGuardRuleDialog}>
-						<PlusIcon class="mr-2 size-4" />
-						Add Rule
-					</Button>
 				</div>
 
-				<!-- Built-in rules -->
 				{#if builtinRules.length > 0}
-					<div class="mb-4">
-						<p class="text-muted-foreground mb-2 text-sm">Built-in rules (cannot be removed)</p>
+					<div>
+						<p class="text-muted-foreground mb-2 text-sm">Built-in rules that protect this target</p>
 						<div class="rounded-lg border">
 							<Table.Root>
 								<Table.Header>
@@ -1037,119 +996,6 @@ async function copyToClipboard(text: string) {
 								</Table.Body>
 							</Table.Root>
 						</div>
-					</div>
-				{/if}
-
-				<!-- User-defined rules -->
-				{#if guardRulesList.length === 0}
-					<div class="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed py-12">
-						<ShieldIcon class="size-8 text-muted-foreground" />
-						<p class="text-muted-foreground text-sm">No custom guard rules. Built-in rules still apply.</p>
-						<Button size="sm" variant="outline" onclick={openAddGuardRuleDialog}>
-							<PlusIcon class="mr-2 size-4" />
-							Add Rule
-						</Button>
-					</div>
-				{:else}
-					<div class="rounded-lg border">
-						<Table.Root>
-							<Table.Header>
-								<Table.Row>
-									<Table.Head>Field</Table.Head>
-									<Table.Head>Operator</Table.Head>
-									<Table.Head>Value</Table.Head>
-									<Table.Head>Action</Table.Head>
-									<Table.Head>Reason</Table.Head>
-									<Table.Head>Priority</Table.Head>
-									<Table.Head>Enabled</Table.Head>
-									<Table.Head class="w-12"><span class="sr-only">Actions</span></Table.Head>
-								</Table.Row>
-							</Table.Header>
-							<Table.Body>
-								{#each guardRulesList as rule (rule.id)}
-									{#if confirmDeleteGuardRuleId === rule.id}
-										<Table.Row class="bg-red-50 dark:bg-red-950/30">
-											<Table.Cell colspan={8}>
-												<div class="flex items-center justify-between gap-4 py-1">
-													<p class="text-sm">Delete this guard rule? This cannot be undone.</p>
-													<div class="flex shrink-0 gap-2">
-														<Button variant="outline" size="sm" onclick={() => (confirmDeleteGuardRuleId = null)}>Cancel</Button>
-														<form
-															method="POST"
-															action="?/deleteGuardRule"
-															use:enhance={() => {
-																return async ({ result, update }) => {
-																	if (result.type === 'success' && result.data?.guardRuleDeleted) {
-																		const deletedId = result.data.guardRuleDeleted as string;
-																		localGuardRules = guardRulesList.filter((r) => r.id !== deletedId);
-																		confirmDeleteGuardRuleId = null;
-																		toast.success('Guard rule deleted');
-																	} else if (result.type === 'failure') {
-																		toast.error((result.data?.error as string) ?? 'Failed to delete');
-																	}
-																	await update({ reset: false, invalidateAll: false });
-																};
-															}}
-														>
-															<input type="hidden" name="slug" value={target.slug} />
-															<input type="hidden" name="id" value={rule.id} />
-															<Button type="submit" variant="destructive" size="sm">Yes, delete</Button>
-														</form>
-													</div>
-												</div>
-											</Table.Cell>
-										</Table.Row>
-									{:else}
-										<Table.Row>
-											<Table.Cell><Badge variant="outline">{rule.field}</Badge></Table.Cell>
-											<Table.Cell class="text-sm">{rule.operator}</Table.Cell>
-											<Table.Cell><code class="text-xs">{rule.value}</code></Table.Cell>
-											<Table.Cell>
-												{#if rule.action === 'block'}
-													<Badge variant="destructive">block</Badge>
-												{:else if rule.action === 'approval_required'}
-													<Badge class="border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">approval required</Badge>
-												{:else}
-													<Badge class="border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300">allow</Badge>
-												{/if}
-											</Table.Cell>
-											<Table.Cell class="text-muted-foreground text-sm max-w-32 truncate">{rule.reason}</Table.Cell>
-											<Table.Cell class="text-sm">{rule.priority}</Table.Cell>
-											<Table.Cell>
-												<form
-													method="POST"
-													action="?/toggleGuardRule"
-													use:enhance={() => {
-														return async ({ result, update }) => {
-															if (result.type === 'success' && result.data?.guardRuleToggled) {
-																const { id, enabled } = result.data.guardRuleToggled as { id: string; enabled: boolean };
-																localGuardRules = guardRulesList.map((r) => (r.id === id ? { ...r, enabled } : r));
-																toast.success(enabled ? 'Rule enabled' : 'Rule disabled');
-															} else if (result.type === 'failure') {
-																toast.error((result.data?.error as string) ?? 'Failed to toggle');
-															}
-															await update({ reset: false, invalidateAll: false });
-														};
-													}}
-												>
-													<input type="hidden" name="slug" value={target.slug} />
-													<input type="hidden" name="id" value={rule.id} />
-													<input type="hidden" name="enabled" value={rule.enabled ? 'false' : 'true'} />
-													<Button type="submit" variant="ghost" size="sm" class="h-6 text-xs">
-														{rule.enabled ? 'On' : 'Off'}
-													</Button>
-												</form>
-											</Table.Cell>
-											<Table.Cell>
-												<Button variant="ghost" size="icon" class="size-8 text-destructive" onclick={() => (confirmDeleteGuardRuleId = rule.id)}>
-													<TrashIcon class="size-4" />
-												</Button>
-											</Table.Cell>
-										</Table.Row>
-									{/if}
-								{/each}
-							</Table.Body>
-						</Table.Root>
 					</div>
 				{/if}
 			</div>
@@ -1289,89 +1135,6 @@ async function copyToClipboard(text: string) {
 			</Button>
 			<Button size="sm" onclick={() => (viewCredentialOpen = false)}>Close</Button>
 		</div>
-	</Dialog.Content>
-</Dialog.Root>
-
-<!-- Add Guard Rule Dialog -->
-<Dialog.Root bind:open={addGuardRuleOpen}>
-	<Dialog.Content class="sm:max-w-lg">
-		<Dialog.Header>
-			<Dialog.Title>Add Guard Rule</Dialog.Title>
-			<Dialog.Description>Create a custom rule that applies to requests for this target.</Dialog.Description>
-		</Dialog.Header>
-		<form
-			method="POST"
-			action="?/addGuardRule"
-			use:enhance={() => {
-				addGuardRuleSubmitting = true;
-				return async ({ result, update }) => {
-					addGuardRuleSubmitting = false;
-					if (result.type === 'success' && result.data?.guardRuleAdded) {
-						const added = result.data.guardRuleAdded as GuardRuleItem;
-						localGuardRules = [...guardRulesList, added];
-						addGuardRuleOpen = false;
-						toast.success('Guard rule added');
-					} else if (result.type === 'failure') {
-						toast.error((result.data?.error as string) ?? 'Failed to add guard rule');
-					}
-					await update({ reset: true, invalidateAll: false });
-				};
-			}}
-		>
-			<input type="hidden" name="slug" value={target.slug} />
-			<div class="grid gap-4 py-4">
-				<div class="grid gap-2">
-					<Label for="guard-field">Field</Label>
-					<select id="guard-field" name="field" bind:value={guardRuleField} class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-						{#if target.type === 'ssh'}
-							<option value="command">command</option>
-						{:else}
-							<option value="method">method</option>
-							<option value="path">path</option>
-							<option value="query">query</option>
-						{/if}
-					</select>
-				</div>
-				<div class="grid gap-2">
-					<Label for="guard-operator">Operator</Label>
-					<select id="guard-operator" name="operator" bind:value={guardRuleOperator} class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-						<option value="contains">contains</option>
-						<option value="equals">equals</option>
-						<option value="starts_with">starts_with</option>
-					</select>
-				</div>
-				<div class="grid gap-2">
-					<Label for="guard-value">Value</Label>
-					<Input id="guard-value" name="value" bind:value={guardRuleValue} placeholder="e.g. rm -rf, DELETE, /deploy" required />
-				</div>
-				<div class="grid gap-2">
-					<Label for="guard-action">Action</Label>
-					<select id="guard-action" name="action" bind:value={guardRuleAction} class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-						<option value="approval_required">Approval Required</option>
-						<option value="block">Block</option>
-						<option value="allow">Allow (override built-in)</option>
-					</select>
-				</div>
-				<div class="grid gap-2">
-					<Label for="guard-reason">Reason</Label>
-					<Input id="guard-reason" name="reason" bind:value={guardRuleReason} placeholder="Why this rule exists" required />
-				</div>
-				<div class="grid gap-2">
-					<Label for="guard-priority">Priority</Label>
-					<Input id="guard-priority" name="priority" type="number" bind:value={guardRulePriority} placeholder="0" />
-					<p class="text-muted-foreground text-xs">Higher priority rules are evaluated first.</p>
-				</div>
-				<div class="flex gap-2 justify-end">
-					<Button variant="outline" type="button" onclick={() => (addGuardRuleOpen = false)}>Cancel</Button>
-					<Button type="submit" disabled={addGuardRuleSubmitting || !guardRuleValue.trim() || !guardRuleReason.trim()}>
-						{#if addGuardRuleSubmitting}
-							<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
-						{/if}
-						Add Rule
-					</Button>
-				</div>
-			</div>
-		</form>
 	</Dialog.Content>
 </Dialog.Root>
 
