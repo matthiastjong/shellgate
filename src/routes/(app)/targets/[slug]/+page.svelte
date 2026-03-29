@@ -25,13 +25,6 @@ import EyeOffIcon from "@lucide/svelte/icons/eye-off";
 import KeyIcon from "@lucide/svelte/icons/key";
 import type { PageData } from "./$types";
 
-type BuiltinRule = {
-	field: string;
-	operator: string;
-	value: string;
-	action: string;
-	reason: string;
-};
 
 type Target = {
 	id: string;
@@ -124,8 +117,6 @@ let tokenAccessList = $derived<TokenAccess[]>(localTokenAccess ?? (data.tokenAcc
 let localAvailableTokens = $state<{ id: string; name: string }[] | null>(null);
 let availableTokensList = $derived<{ id: string; name: string }[]>(localAvailableTokens ?? (data.availableTokens as { id: string; name: string }[]));
 
-// Guard rules state (built-in only)
-let builtinRules = $derived<BuiltinRule[]>(data.builtinRules as BuiltinRule[]);
 
 function openGrantAccessDialog() {
 	selectedTokenIds = new Set();
@@ -953,49 +944,6 @@ async function copyToClipboard(text: string) {
 								{/each}
 							</Table.Body>
 						</Table.Root>
-					</div>
-				{/if}
-			</div>
-
-			<!-- Guard Rules -->
-			<div>
-				<div class="mb-4 flex items-center justify-between">
-					<h2 class="text-lg font-semibold">Guard Rules</h2>
-				</div>
-
-				{#if builtinRules.length > 0}
-					<div>
-						<p class="text-muted-foreground mb-2 text-sm">Built-in rules that protect this target</p>
-						<div class="rounded-lg border">
-							<Table.Root>
-								<Table.Header>
-									<Table.Row>
-										<Table.Head>Field</Table.Head>
-										<Table.Head>Operator</Table.Head>
-										<Table.Head>Value</Table.Head>
-										<Table.Head>Action</Table.Head>
-									</Table.Row>
-								</Table.Header>
-								<Table.Body>
-									{#each builtinRules as rule}
-										<Table.Row class="text-muted-foreground">
-											<Table.Cell><Badge variant="outline">{rule.field}</Badge></Table.Cell>
-											<Table.Cell class="text-sm">{rule.operator}</Table.Cell>
-											<Table.Cell><code class="text-xs">{rule.value}</code></Table.Cell>
-											<Table.Cell>
-												{#if rule.action === 'block'}
-													<Badge variant="destructive">block</Badge>
-												{:else if rule.action === 'approval_required'}
-													<Badge class="border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">approval required</Badge>
-												{:else}
-													<Badge class="border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300">allow</Badge>
-												{/if}
-											</Table.Cell>
-										</Table.Row>
-									{/each}
-								</Table.Body>
-							</Table.Root>
-						</div>
 					</div>
 				{/if}
 			</div>
