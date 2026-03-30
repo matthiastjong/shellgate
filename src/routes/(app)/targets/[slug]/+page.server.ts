@@ -146,13 +146,24 @@ export const actions = {
 			const keyId = data.get("jwtKeyId")?.toString()?.trim() ?? "";
 			const issuerId = data.get("jwtIssuerId")?.toString()?.trim() ?? "";
 			if (!privateKey || !keyId || !issuerId) return fail(400, { error: "Private key, Key ID, and Issuer ID are required" });
-			
+
 			const config: Record<string, unknown> = { privateKey, keyId, issuerId };
 			const audience = data.get("jwtAudience")?.toString()?.trim();
 			if (audience) config.audience = audience;
 			const expiresIn = data.get("jwtExpiresIn")?.toString()?.trim();
 			if (expiresIn) config.expiresInSeconds = parseInt(expiresIn, 10);
-			
+
+			credential = JSON.stringify(config);
+		} else if (type === "oauth2_refresh_token") {
+			const clientId = data.get("oauth2ClientId")?.toString()?.trim() ?? "";
+			const clientSecret = data.get("oauth2ClientSecret")?.toString()?.trim() ?? "";
+			const refreshToken = data.get("oauth2RefreshToken")?.toString()?.trim() ?? "";
+			if (!clientId || !clientSecret || !refreshToken) return fail(400, { error: "Client ID, Client Secret, and Refresh Token are required" });
+
+			const config: Record<string, unknown> = { clientId, clientSecret, refreshToken };
+			const tokenUrl = data.get("oauth2TokenUrl")?.toString()?.trim();
+			if (tokenUrl) config.tokenUrl = tokenUrl;
+
 			credential = JSON.stringify(config);
 		} else {
 			credential = data.get("credential")?.toString() ?? "";
@@ -247,6 +258,17 @@ export const actions = {
 				if (audience) config.audience = audience;
 				const expiresIn = data.get("jwtExpiresIn")?.toString()?.trim();
 				if (expiresIn) config.expiresInSeconds = parseInt(expiresIn, 10);
+				credential = JSON.stringify(config);
+			}
+		} else if (type === "oauth2_refresh_token") {
+			const clientId = data.get("oauth2ClientId")?.toString()?.trim() ?? "";
+			const clientSecret = data.get("oauth2ClientSecret")?.toString()?.trim() ?? "";
+			const refreshToken = data.get("oauth2RefreshToken")?.toString()?.trim() ?? "";
+			if (clientId || clientSecret || refreshToken) {
+				if (!clientId || !clientSecret || !refreshToken) return fail(400, { error: "All OAuth2 fields are required when updating" });
+				const config: Record<string, unknown> = { clientId, clientSecret, refreshToken };
+				const tokenUrl = data.get("oauth2TokenUrl")?.toString()?.trim();
+				if (tokenUrl) config.tokenUrl = tokenUrl;
 				credential = JSON.stringify(config);
 			}
 		} else {

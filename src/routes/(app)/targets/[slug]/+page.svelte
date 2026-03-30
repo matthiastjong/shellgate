@@ -98,6 +98,7 @@ const authTypeLabels: Record<string, string> = {
 	query_param: "Query Param",
 	ssh_key: "SSH Key",
 	jwt_es256: "JWT ES256",
+	oauth2_refresh_token: "OAuth2 Refresh Token",
 };
 
 // JWT ES256 state
@@ -106,6 +107,12 @@ let jwtKeyId = $state("");
 let jwtIssuerId = $state("");
 let jwtAudience = $state("");
 let jwtExpiresIn = $state("");
+
+// OAuth2 Refresh Token state
+let oauth2ClientId = $state("");
+let oauth2ClientSecret = $state("");
+let oauth2RefreshToken = $state("");
+let oauth2TokenUrl = $state("");
 
 // Rename auth state
 let renameAuthId = $state("");
@@ -397,6 +404,7 @@ async function copyToClipboard(text: string) {
 								<option value="custom_header">Custom Header</option>
 								<option value="query_param">Query Parameter</option>
 								<option value="jwt_es256">JWT ES256 (Apple, etc.)</option>
+								<option value="oauth2_refresh_token">OAuth2 Refresh Token (Google, etc.)</option>
 							{/if}
 						</select>
 					</div>
@@ -530,6 +538,67 @@ async function copyToClipboard(text: string) {
 							<Label for="add-jwt-expires-in">Expires In (seconds) <span class="text-muted-foreground text-xs">(optional)</span></Label>
 							<Input id="add-jwt-expires-in" name="jwtExpiresIn" type="number" bind:value={jwtExpiresIn} placeholder="1200 (default)" />
 						</div>
+					{:else if authType === 'oauth2_refresh_token'}
+						<div class="grid gap-2">
+							<Label for="add-oauth2-client-id">Client ID</Label>
+							<Input id="add-oauth2-client-id" name="oauth2ClientId" bind:value={oauth2ClientId} placeholder="e.g. 123456789.apps.googleusercontent.com" required />
+						</div>
+						<div class="grid gap-2">
+							<Label for="add-oauth2-client-secret">Client Secret</Label>
+							<div class="relative">
+								<Input
+									id="add-oauth2-client-secret"
+									name="oauth2ClientSecret"
+									type={showCredential ? 'text' : 'password'}
+									bind:value={oauth2ClientSecret}
+									placeholder="GOCSPX-..."
+									required
+								/>
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon"
+									class="absolute right-0 top-0 h-full px-3"
+									onclick={() => (showCredential = !showCredential)}
+								>
+									{#if showCredential}
+										<EyeOffIcon class="size-4" />
+									{:else}
+										<EyeIcon class="size-4" />
+									{/if}
+								</Button>
+							</div>
+						</div>
+						<div class="grid gap-2">
+							<Label for="add-oauth2-refresh-token">Refresh Token</Label>
+							<div class="relative">
+								<Input
+									id="add-oauth2-refresh-token"
+									name="oauth2RefreshToken"
+									type={showCredential ? 'text' : 'password'}
+									bind:value={oauth2RefreshToken}
+									placeholder="1//0..."
+									required
+								/>
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon"
+									class="absolute right-0 top-0 h-full px-3"
+									onclick={() => (showCredential = !showCredential)}
+								>
+									{#if showCredential}
+										<EyeOffIcon class="size-4" />
+									{:else}
+										<EyeIcon class="size-4" />
+									{/if}
+								</Button>
+							</div>
+						</div>
+						<div class="grid gap-2">
+							<Label for="add-oauth2-token-url">Token URL <span class="text-muted-foreground text-xs">(optional, defaults to Google)</span></Label>
+							<Input id="add-oauth2-token-url" name="oauth2TokenUrl" bind:value={oauth2TokenUrl} placeholder="https://oauth2.googleapis.com/token" />
+						</div>
 					{:else}
 						<div class="grid gap-2">
 							<Label for="add-auth-credential">Credential</Label>
@@ -562,7 +631,7 @@ async function copyToClipboard(text: string) {
 						<Checkbox id="add-auth-default" name="isDefault" checked={isDefaultChecked} onCheckedChange={(v) => (isDefaultChecked = v === true)} />
 						<Label for="add-auth-default" class="text-sm font-normal">Set as default</Label>
 					</div>
-					<Button type="submit" disabled={sheetSubmitting || !authLabel.trim() || (authType === 'jwt_es256' ? (!jwtPrivateKey || !jwtKeyId || !jwtIssuerId) : !authCredential)}>
+					<Button type="submit" disabled={sheetSubmitting || !authLabel.trim() || (authType === 'jwt_es256' ? (!jwtPrivateKey || !jwtKeyId || !jwtIssuerId) : authType === 'oauth2_refresh_token' ? (!oauth2ClientId || !oauth2ClientSecret || !oauth2RefreshToken) : !authCredential)}>
 						{#if sheetSubmitting}
 							<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
 						{/if}
@@ -655,6 +724,7 @@ async function copyToClipboard(text: string) {
 								<option value="custom_header">Custom Header</option>
 								<option value="query_param">Query Parameter</option>
 								<option value="jwt_es256">JWT ES256 (Apple, etc.)</option>
+								<option value="oauth2_refresh_token">OAuth2 Refresh Token (Google, etc.)</option>
 							{/if}
 						</select>
 					</div>
@@ -737,6 +807,33 @@ async function copyToClipboard(text: string) {
 						<div class="grid gap-2">
 							<Label for="edit-jwt-expires-in">Expires In (seconds) <span class="text-muted-foreground text-xs">(optional)</span></Label>
 							<Input id="edit-jwt-expires-in" name="jwtExpiresIn" type="number" bind:value={jwtExpiresIn} placeholder="1200 (default)" />
+						</div>
+					{:else if editAuthType === 'oauth2_refresh_token'}
+						<div class="grid gap-2">
+							<Label for="edit-oauth2-client-id">Client ID <span class="text-muted-foreground text-xs">(leave blank to keep existing)</span></Label>
+							<Input id="edit-oauth2-client-id" name="oauth2ClientId" bind:value={oauth2ClientId} placeholder="e.g. 123456789.apps.googleusercontent.com" />
+						</div>
+						<div class="grid gap-2">
+							<Label for="edit-oauth2-client-secret">Client Secret <span class="text-muted-foreground text-xs">(leave blank to keep existing)</span></Label>
+							<div class="relative">
+								<Input id="edit-oauth2-client-secret" name="oauth2ClientSecret" type={showCredential ? 'text' : 'password'} bind:value={oauth2ClientSecret} placeholder="GOCSPX-..." />
+								<Button type="button" variant="ghost" size="icon" class="absolute right-0 top-0 h-full px-3" onclick={() => (showCredential = !showCredential)}>
+									{#if showCredential}<EyeOffIcon class="size-4" />{:else}<EyeIcon class="size-4" />{/if}
+								</Button>
+							</div>
+						</div>
+						<div class="grid gap-2">
+							<Label for="edit-oauth2-refresh-token">Refresh Token <span class="text-muted-foreground text-xs">(leave blank to keep existing)</span></Label>
+							<div class="relative">
+								<Input id="edit-oauth2-refresh-token" name="oauth2RefreshToken" type={showCredential ? 'text' : 'password'} bind:value={oauth2RefreshToken} placeholder="1//0..." />
+								<Button type="button" variant="ghost" size="icon" class="absolute right-0 top-0 h-full px-3" onclick={() => (showCredential = !showCredential)}>
+									{#if showCredential}<EyeOffIcon class="size-4" />{:else}<EyeIcon class="size-4" />{/if}
+								</Button>
+							</div>
+						</div>
+						<div class="grid gap-2">
+							<Label for="edit-oauth2-token-url">Token URL <span class="text-muted-foreground text-xs">(optional, defaults to Google)</span></Label>
+							<Input id="edit-oauth2-token-url" name="oauth2TokenUrl" bind:value={oauth2TokenUrl} placeholder="https://oauth2.googleapis.com/token" />
 						</div>
 					{:else}
 						<div class="grid gap-2">
