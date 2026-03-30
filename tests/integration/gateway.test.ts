@@ -291,4 +291,76 @@ describe("gateway proxy", () => {
 		expect(payload.iat).toBeGreaterThan(0);
 		expect(payload.exp).toBeGreaterThan(payload.iat);
 	});
+
+	it("proxies request with oauth2_service_account credential - exchanges for access_token", async () => {
+		// Generate a test RSA key pair
+		const keyPair = await crypto.subtle.generateKey(
+			{
+				name: "RSASSA-PKCS1-v1_5",
+				modulusLength: 2048,
+				publicExponent: new Uint8Array([1, 0, 1]),
+				hash: "SHA-256",
+			},
+			true,
+			["sign", "verify"],
+		);
+
+		const privateKeyBuffer = await crypto.subtle.exportKey("pkcs8", keyPair.privateKey);
+		const privateKeyBase64 = btoa(
+			String.fromCharCode(...new Uint8Array(privateKeyBuffer)),
+		);
+		const privateKeyPEM = `-----BEGIN PRIVATE KEY-----\n${privateKeyBase64}\n-----END PRIVATE KEY-----`;
+
+		const saCredential = JSON.stringify({
+			type: "service_account",
+			client_email: "test@test-project.iam.gserviceaccount.com",
+			private_key: privateKeyPEM,
+			token_uri: "https://oauth2.googleapis.com/token",
+			scopes: "https://www.googleapis.com/auth/devstorage.read_only",
+		});
+
+		const { token: tokenRow } = await createTestToken();
+		const target = await createTestTarget("GoogleAPI", "https://storage.googleapis.com");
+		await createTestAuthMethod(target.id, {
+			type: "oauth2_service_account",
+			credential: saCredential,
+		});
+		await grantPermission(tokenRow.id, target.id);
+
+		const fullToken = await getFullToken(tokenRow.id);
+
+		// Clear token cache so the test always hits the token endpoint
+		const { clearTokenCache } = await import("$lib/server/utils/oauth2");
+		clearTokenCache();
+
+		let fetchCallCount = 0;
+		const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+			fetchCallCount++;
+			const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+
+			if (url === "https://oauth2.googleapis.com/token") {
+				return Response.json({ access_token: "ya29.mock-gcs-token", expires_in: 3600 });
+			}
+
+			return Response.json({ kind: "storage#objects", items: [] });
+		});
+
+		const request = new Request(`http://localhost/gateway/${target.slug}/storage/v1/b/my-bucket/o`, {
+			method: "GET",
+		});
+
+		const response = await proxyRequest(fullToken, target.slug, "storage/v1/b/my-bucket/o", request);
+
+		expect(response.status).toBe(200);
+		expect(fetchCallCount).toBe(2);
+
+		// First call should be token exchange
+		const [tokenUrl] = fetchSpy.mock.calls[0];
+		expect(tokenUrl).toBe("https://oauth2.googleapis.com/token");
+
+		// Second call should be upstream with Bearer token
+		const [upstreamUrl, upstreamInit] = fetchSpy.mock.calls[1];
+		expect(upstreamUrl).toBe("https://storage.googleapis.com/storage/v1/b/my-bucket/o");
+		expect((upstreamInit!.headers as Headers).get("Authorization")).toBe("Bearer ya29.mock-gcs-token");
+	});
 });

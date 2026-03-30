@@ -98,6 +98,7 @@ const authTypeLabels: Record<string, string> = {
 	query_param: "Query Param",
 	ssh_key: "SSH Key",
 	jwt_es256: "JWT ES256",
+	oauth2_service_account: "Service Account",
 };
 
 // JWT ES256 state
@@ -106,6 +107,10 @@ let jwtKeyId = $state("");
 let jwtIssuerId = $state("");
 let jwtAudience = $state("");
 let jwtExpiresIn = $state("");
+
+// OAuth2 Service Account state
+let saJsonCredential = $state("");
+let saScopes = $state("https://www.googleapis.com/auth/devstorage.read_only");
 
 // Rename auth state
 let renameAuthId = $state("");
@@ -176,6 +181,8 @@ function openAddAuthSheet() {
 	jwtIssuerId = "";
 	jwtAudience = "";
 	jwtExpiresIn = "";
+	saJsonCredential = "";
+	saScopes = "https://www.googleapis.com/auth/devstorage.read_only";
 	sheetSubmitting = false;
 	sheetOpen = true;
 }
@@ -201,6 +208,8 @@ function openEditAuthSheet(method: AuthMethod) {
 	jwtIssuerId = "";
 	jwtAudience = "";
 	jwtExpiresIn = "";
+	saJsonCredential = "";
+	saScopes = "https://www.googleapis.com/auth/devstorage.read_only";
 	sheetSubmitting = false;
 	sheetOpen = true;
 }
@@ -397,6 +406,7 @@ async function copyToClipboard(text: string) {
 								<option value="custom_header">Custom Header</option>
 								<option value="query_param">Query Parameter</option>
 								<option value="jwt_es256">JWT ES256 (Apple, etc.)</option>
+								<option value="oauth2_service_account">Service Account (Google, etc.)</option>
 							{/if}
 						</select>
 					</div>
@@ -530,6 +540,22 @@ async function copyToClipboard(text: string) {
 							<Label for="add-jwt-expires-in">Expires In (seconds) <span class="text-muted-foreground text-xs">(optional)</span></Label>
 							<Input id="add-jwt-expires-in" name="jwtExpiresIn" type="number" bind:value={jwtExpiresIn} placeholder="1200 (default)" />
 						</div>
+					{:else if authType === 'oauth2_service_account'}
+						<div class="grid gap-2">
+							<Label for="add-sa-json">Service Account JSON</Label>
+							<textarea
+								id="add-sa-json"
+								name="saJsonCredential"
+								class="flex min-h-[160px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono"
+								bind:value={saJsonCredential}
+								placeholder='Paste the entire service account JSON file...'
+								required
+							></textarea>
+						</div>
+						<div class="grid gap-2">
+							<Label for="add-sa-scopes">Scopes</Label>
+							<Input id="add-sa-scopes" name="saScopes" bind:value={saScopes} placeholder="https://www.googleapis.com/auth/devstorage.read_only" />
+						</div>
 					{:else}
 						<div class="grid gap-2">
 							<Label for="add-auth-credential">Credential</Label>
@@ -562,7 +588,7 @@ async function copyToClipboard(text: string) {
 						<Checkbox id="add-auth-default" name="isDefault" checked={isDefaultChecked} onCheckedChange={(v) => (isDefaultChecked = v === true)} />
 						<Label for="add-auth-default" class="text-sm font-normal">Set as default</Label>
 					</div>
-					<Button type="submit" disabled={sheetSubmitting || !authLabel.trim() || (authType === 'jwt_es256' ? (!jwtPrivateKey || !jwtKeyId || !jwtIssuerId) : !authCredential)}>
+					<Button type="submit" disabled={sheetSubmitting || !authLabel.trim() || (authType === 'jwt_es256' ? (!jwtPrivateKey || !jwtKeyId || !jwtIssuerId) : authType === 'oauth2_service_account' ? !saJsonCredential : !authCredential)}>
 						{#if sheetSubmitting}
 							<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
 						{/if}
@@ -655,6 +681,7 @@ async function copyToClipboard(text: string) {
 								<option value="custom_header">Custom Header</option>
 								<option value="query_param">Query Parameter</option>
 								<option value="jwt_es256">JWT ES256 (Apple, etc.)</option>
+								<option value="oauth2_service_account">Service Account (Google, etc.)</option>
 							{/if}
 						</select>
 					</div>
@@ -737,6 +764,21 @@ async function copyToClipboard(text: string) {
 						<div class="grid gap-2">
 							<Label for="edit-jwt-expires-in">Expires In (seconds) <span class="text-muted-foreground text-xs">(optional)</span></Label>
 							<Input id="edit-jwt-expires-in" name="jwtExpiresIn" type="number" bind:value={jwtExpiresIn} placeholder="1200 (default)" />
+						</div>
+					{:else if editAuthType === 'oauth2_service_account'}
+						<div class="grid gap-2">
+							<Label for="edit-sa-json">Service Account JSON <span class="text-muted-foreground text-xs">(leave blank to keep existing)</span></Label>
+							<textarea
+								id="edit-sa-json"
+								name="saJsonCredential"
+								class="flex min-h-[160px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono"
+								bind:value={saJsonCredential}
+								placeholder='Paste the entire service account JSON file...'
+							></textarea>
+						</div>
+						<div class="grid gap-2">
+							<Label for="edit-sa-scopes">Scopes <span class="text-muted-foreground text-xs">(leave blank to keep existing)</span></Label>
+							<Input id="edit-sa-scopes" name="saScopes" bind:value={saScopes} placeholder="https://www.googleapis.com/auth/devstorage.read_only" />
 						</div>
 					{:else}
 						<div class="grid gap-2">

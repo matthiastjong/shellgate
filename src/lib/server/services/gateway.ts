@@ -5,6 +5,7 @@ import type { Target, Token } from "../db/schema";
 import { getDefaultAuthMethod } from "./auth-methods";
 import { hasPermission } from "./permissions";
 import { signES256JWT } from "../utils/jwt";
+import { getServiceAccountToken } from "../utils/oauth2";
 
 /**
  * Resolve and validate a target for gateway proxying.
@@ -128,6 +129,23 @@ export async function proxyToTarget(
 				console.error("[gateway] ✗ JWT signing failed:", err);
 				return Response.json(
 					{ error: "JWT signing failed" },
+					{ status: 500 },
+				);
+			}
+		} else if (authMethod.type === "oauth2_service_account") {
+			try {
+				const config = JSON.parse(authMethod.credential);
+				const accessToken = await getServiceAccountToken({
+					privateKey: config.private_key,
+					clientEmail: config.client_email,
+					scopes: config.scopes ?? "https://www.googleapis.com/auth/devstorage.read_only",
+					tokenUri: config.token_uri,
+				});
+				headers.set("Authorization", `Bearer ${accessToken}`);
+			} catch (err) {
+				console.error("[gateway] ✗ OAuth2 token exchange failed:", err);
+				return Response.json(
+					{ error: "OAuth2 token exchange failed" },
 					{ status: 500 },
 				);
 			}
