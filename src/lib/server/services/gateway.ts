@@ -4,6 +4,7 @@ import { targets } from "../db/schema";
 import type { Target, Token } from "../db/schema";
 import { getDefaultAuthMethod } from "./auth-methods";
 import { hasPermission } from "./permissions";
+import { signES256JWT } from "../utils/jwt";
 
 /**
  * Resolve and validate a target for gateway proxying.
@@ -112,6 +113,16 @@ export async function proxyToTarget(
 				const paramValue = authMethod.credential.slice(separatorIndex + 1).trim();
 				url.searchParams.set(paramName, paramValue);
 			}
+		} else if (authMethod.type === "jwt_es256") {
+			const config = JSON.parse(authMethod.credential);
+			const jwt = await signES256JWT({
+				privateKey: config.privateKey,
+				keyId: config.keyId,
+				issuerId: config.issuerId,
+				audience: config.audience,
+				expiresInSeconds: config.expiresInSeconds,
+			});
+			headers.set("Authorization", `Bearer ${jwt}`);
 		}
 	}
 

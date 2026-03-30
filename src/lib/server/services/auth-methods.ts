@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "../db";
 import { targetAuthMethods } from "../db/schema";
 
-const VALID_TYPES = ["bearer", "basic", "custom_header", "query_param", "ssh_key"];
+const VALID_TYPES = ["bearer", "basic", "custom_header", "query_param", "ssh_key", "jwt_es256"];
 
 export function computeCredentialHint(credential: string, type?: string): string {
 	if (type === "ssh_key") {
@@ -10,6 +10,15 @@ export function computeCredentialHint(credential: string, type?: string): string
 		if (credential.includes("ED25519")) return "SSH Key (Ed25519)";
 		if (credential.includes("ECDSA")) return "SSH Key (ECDSA)";
 		return "SSH Private Key";
+	}
+	if (type === "jwt_es256") {
+		try {
+			const config = JSON.parse(credential);
+			if (config.keyId) return `ES256 JWT ••• ${config.keyId}`;
+			return "ES256 JWT";
+		} catch {
+			return "ES256 JWT (invalid config)";
+		}
 	}
 	if (credential.length < 10) return "••••••••";
 	return `${credential.slice(0, 3)}••••••••${credential.slice(-4)}`;
