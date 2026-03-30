@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "../db";
 import { targetAuthMethods } from "../db/schema";
 
-const VALID_TYPES = ["bearer", "basic", "custom_header", "query_param", "ssh_key", "jwt_es256"];
+const VALID_TYPES = ["bearer", "basic", "custom_header", "query_param", "ssh_key", "jwt_es256", "oauth2_refresh_token"];
 
 export function computeCredentialHint(credential: string, type?: string): string {
 	if (type === "ssh_key") {
@@ -18,6 +18,15 @@ export function computeCredentialHint(credential: string, type?: string): string
 			return "ES256 JWT";
 		} catch {
 			return "ES256 JWT (invalid config)";
+		}
+	}
+	if (type === "oauth2_refresh_token") {
+		try {
+			const config = JSON.parse(credential);
+			if (config.clientId) return `OAuth2 ••• ${config.clientId.slice(0, 8)}`;
+			return "OAuth2 Refresh Token";
+		} catch {
+			return "OAuth2 (invalid config)";
 		}
 	}
 	if (credential.length < 10) return "••••••••";

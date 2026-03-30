@@ -5,6 +5,7 @@ import type { Target, Token } from "../db/schema";
 import { getDefaultAuthMethod } from "./auth-methods";
 import { hasPermission } from "./permissions";
 import { signES256JWT } from "../utils/jwt";
+import { getOAuth2AccessToken } from "../utils/oauth2";
 
 /**
  * Resolve and validate a target for gateway proxying.
@@ -128,6 +129,23 @@ export async function proxyToTarget(
 				console.error("[gateway] ✗ JWT signing failed:", err);
 				return Response.json(
 					{ error: "JWT signing failed" },
+					{ status: 500 },
+				);
+			}
+		} else if (authMethod.type === "oauth2_refresh_token") {
+			try {
+				const config = JSON.parse(authMethod.credential);
+				const accessToken = await getOAuth2AccessToken({
+					clientId: config.clientId,
+					clientSecret: config.clientSecret,
+					refreshToken: config.refreshToken,
+					tokenUrl: config.tokenUrl,
+				});
+				headers.set("Authorization", `Bearer ${accessToken}`);
+			} catch (err) {
+				console.error("[gateway] ✗ OAuth2 token refresh failed:", err);
+				return Response.json(
+					{ error: "OAuth2 token refresh failed" },
 					{ status: 500 },
 				);
 			}
