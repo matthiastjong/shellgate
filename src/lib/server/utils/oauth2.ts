@@ -31,7 +31,7 @@ export async function getServiceAccountToken(config: {
 	const response = await fetch(tokenUri, {
 		method: "POST",
 		headers: { "Content-Type": "application/x-www-form-urlencoded" },
-		body: `grant_type=${encodeURIComponent("urn:ietf:params:oauth:grant_type:jwt-bearer")}&assertion=${encodeURIComponent(assertion)}`,
+		body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${assertion}`,
 	});
 
 	if (!response.ok) {

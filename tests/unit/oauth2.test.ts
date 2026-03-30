@@ -54,7 +54,7 @@ describe("OAuth2 Service Account Token Exchange", () => {
 		expect((init!.headers as Record<string, string>)["Content-Type"]).toBe(
 			"application/x-www-form-urlencoded",
 		);
-		expect((init!.body as string)).toContain("grant_type=");
+		expect((init!.body as string)).toContain("grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer");
 		expect((init!.body as string)).toContain("assertion=");
 	});
 
