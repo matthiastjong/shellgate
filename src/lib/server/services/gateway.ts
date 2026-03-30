@@ -114,15 +114,23 @@ export async function proxyToTarget(
 				url.searchParams.set(paramName, paramValue);
 			}
 		} else if (authMethod.type === "jwt_es256") {
-			const config = JSON.parse(authMethod.credential);
-			const jwt = await signES256JWT({
-				privateKey: config.privateKey,
-				keyId: config.keyId,
-				issuerId: config.issuerId,
-				audience: config.audience,
-				expiresInSeconds: config.expiresInSeconds,
-			});
-			headers.set("Authorization", `Bearer ${jwt}`);
+			try {
+				const config = JSON.parse(authMethod.credential);
+				const jwt = await signES256JWT({
+					privateKey: config.privateKey,
+					keyId: config.keyId,
+					issuerId: config.issuerId,
+					audience: config.audience,
+					expiresInSeconds: config.expiresInSeconds,
+				});
+				headers.set("Authorization", `Bearer ${jwt}`);
+			} catch (err) {
+				console.error("[gateway] ✗ JWT signing failed:", err);
+				return Response.json(
+					{ error: "JWT signing failed", detail: err instanceof Error ? err.message : String(err) },
+					{ status: 500 },
+				);
+			}
 		}
 	}
 

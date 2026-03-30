@@ -22,19 +22,19 @@ function base64url(buffer: ArrayBuffer | Uint8Array): string {
  * Parse PEM-encoded PKCS#8 private key and return raw key bytes.
  */
 function parsePEM(pem: string): ArrayBuffer {
-	// Remove header, footer, and newlines
-	const stripped = pem
-		.replace(/-----BEGIN PRIVATE KEY-----/g, "")
-		.replace(/-----END PRIVATE KEY-----/g, "")
+	// Normalize escaped newlines (e.g. from DB/env var storage) to real newlines
+	const normalized = pem.replace(/\\n/g, "\n");
+
+	// Remove PEM header/footer (tolerant of varying dash counts) and whitespace
+	const stripped = normalized
+		.replace(/-+BEGIN\s+PRIVATE\s+KEY-+/g, "")
+		.replace(/-+END\s+PRIVATE\s+KEY-+/g, "")
 		.replace(/\s/g, "");
 
-	// Base64 decode to ArrayBuffer
-	const binary = atob(stripped);
-	const bytes = new Uint8Array(binary.length);
-	for (let i = 0; i < binary.length; i++) {
-		bytes[i] = binary.charCodeAt(i);
-	}
-	return bytes.buffer;
+	// Use Buffer for base64 decode (more tolerant than atob)
+	// Must slice the underlying ArrayBuffer — Buffer pools share a larger ArrayBuffer
+	const buf = Buffer.from(stripped, "base64");
+	return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 }
 
 /**
