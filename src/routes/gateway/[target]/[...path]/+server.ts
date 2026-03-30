@@ -6,6 +6,15 @@ import { ipMatchesAny } from "$lib/server/utils/cidr";
 import { logRequest } from "$lib/server/services/audit";
 import { normalizeApiRequest, checkRequest } from "$lib/server/guard";
 
+function extractRawSubPath(requestUrl: string, targetSlug: string): string {
+	const marker = `/gateway/${targetSlug}/`;
+	const idx = requestUrl.indexOf(marker);
+	if (idx === -1) return "";
+	const afterMarker = requestUrl.substring(idx + marker.length);
+	const queryIdx = afterMarker.indexOf("?");
+	return queryIdx === -1 ? afterMarker : afterMarker.substring(0, queryIdx);
+}
+
 const handler: RequestHandler = async ({ request, params, getClientAddress }) => {
 	const token = await requireBearer(request);
 
@@ -103,8 +112,9 @@ const handler: RequestHandler = async ({ request, params, getClientAddress }) =>
 		}
 	}
 
+	const rawSubPath = extractRawSubPath(request.url, params.target);
 	const start = Date.now();
-	const response = await proxyToTarget(target, params.path ?? "", request);
+	const response = await proxyToTarget(target, rawSubPath, request);
 	const durationMs = Date.now() - start;
 
 	logRequest({

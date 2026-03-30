@@ -69,7 +69,10 @@ export async function proxyToTarget(
 		return Response.json({ error: "invalid path" }, { status: 400 });
 	}
 
-	const url = new URL(subPath || "/", target.baseUrl!);
+	// Build URL preserving percent-encoded characters in the path
+	const base = target.baseUrl!.replace(/\/$/, "");
+	const path = subPath ? `/${subPath}` : "/";
+	const url = new URL(`${base}${path}`);
 	url.search = new URL(request.url).search;
 
 	// Build upstream headers, stripping our auth and proxy headers
