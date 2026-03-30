@@ -90,6 +90,23 @@ let authCredential = $state("");
 let showCredential = $state(false);
 let isDefaultChecked = $state(true);
 
+// Auth type display labels
+const authTypeLabels: Record<string, string> = {
+	bearer: "Bearer",
+	basic: "Basic Auth",
+	custom_header: "Custom Header",
+	query_param: "Query Param",
+	ssh_key: "SSH Key",
+	jwt_es256: "JWT ES256",
+};
+
+// JWT ES256 state
+let jwtPrivateKey = $state("");
+let jwtKeyId = $state("");
+let jwtIssuerId = $state("");
+let jwtAudience = $state("");
+let jwtExpiresIn = $state("");
+
 // Rename auth state
 let renameAuthId = $state("");
 let renameAuthLabel = $state("");
@@ -154,6 +171,11 @@ function openAddAuthSheet() {
 	authCredential = "";
 	showCredential = false;
 	isDefaultChecked = true;
+	jwtPrivateKey = "";
+	jwtKeyId = "";
+	jwtIssuerId = "";
+	jwtAudience = "";
+	jwtExpiresIn = "";
 	sheetSubmitting = false;
 	sheetOpen = true;
 }
@@ -174,6 +196,11 @@ function openEditAuthSheet(method: AuthMethod) {
 	authCredential = "";
 	showCredential = false;
 	isDefaultChecked = method.isDefault;
+	jwtPrivateKey = "";
+	jwtKeyId = "";
+	jwtIssuerId = "";
+	jwtAudience = "";
+	jwtExpiresIn = "";
 	sheetSubmitting = false;
 	sheetOpen = true;
 }
@@ -369,6 +396,7 @@ async function copyToClipboard(text: string) {
 								<option value="basic">Basic Auth</option>
 								<option value="custom_header">Custom Header</option>
 								<option value="query_param">Query Parameter</option>
+								<option value="jwt_es256">JWT ES256 (Apple, etc.)</option>
 							{/if}
 						</select>
 					</div>
@@ -474,6 +502,34 @@ async function copyToClipboard(text: string) {
 								</Button>
 							</div>
 						</div>
+					{:else if authType === 'jwt_es256'}
+						<div class="grid gap-2">
+							<Label for="add-jwt-private-key">Private Key (PEM)</Label>
+							<textarea
+								id="add-jwt-private-key"
+								name="jwtPrivateKey"
+								class="flex min-h-[120px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono"
+								bind:value={jwtPrivateKey}
+								placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"
+								required
+							></textarea>
+						</div>
+						<div class="grid gap-2">
+							<Label for="add-jwt-key-id">Key ID</Label>
+							<Input id="add-jwt-key-id" name="jwtKeyId" bind:value={jwtKeyId} placeholder="e.g. ABC123XYZ" required />
+						</div>
+						<div class="grid gap-2">
+							<Label for="add-jwt-issuer-id">Issuer ID</Label>
+							<Input id="add-jwt-issuer-id" name="jwtIssuerId" bind:value={jwtIssuerId} placeholder="e.g. 69a6de12-..." required />
+						</div>
+						<div class="grid gap-2">
+							<Label for="add-jwt-audience">Audience <span class="text-muted-foreground text-xs">(optional)</span></Label>
+							<Input id="add-jwt-audience" name="jwtAudience" bind:value={jwtAudience} placeholder="appstoreconnect-v1 (default)" />
+						</div>
+						<div class="grid gap-2">
+							<Label for="add-jwt-expires-in">Expires In (seconds) <span class="text-muted-foreground text-xs">(optional)</span></Label>
+							<Input id="add-jwt-expires-in" name="jwtExpiresIn" type="number" bind:value={jwtExpiresIn} placeholder="1200 (default)" />
+						</div>
 					{:else}
 						<div class="grid gap-2">
 							<Label for="add-auth-credential">Credential</Label>
@@ -506,7 +562,7 @@ async function copyToClipboard(text: string) {
 						<Checkbox id="add-auth-default" name="isDefault" checked={isDefaultChecked} onCheckedChange={(v) => (isDefaultChecked = v === true)} />
 						<Label for="add-auth-default" class="text-sm font-normal">Set as default</Label>
 					</div>
-					<Button type="submit" disabled={sheetSubmitting || !authLabel.trim() || !authCredential}>
+					<Button type="submit" disabled={sheetSubmitting || !authLabel.trim() || (authType === 'jwt_es256' ? (!jwtPrivateKey || !jwtKeyId || !jwtIssuerId) : !authCredential)}>
 						{#if sheetSubmitting}
 							<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
 						{/if}
@@ -598,6 +654,7 @@ async function copyToClipboard(text: string) {
 								<option value="basic">Basic Auth</option>
 								<option value="custom_header">Custom Header</option>
 								<option value="query_param">Query Parameter</option>
+								<option value="jwt_es256">JWT ES256 (Apple, etc.)</option>
 							{/if}
 						</select>
 					</div>
@@ -653,6 +710,33 @@ async function copyToClipboard(text: string) {
 									{#if showCredential}<EyeOffIcon class="size-4" />{:else}<EyeIcon class="size-4" />{/if}
 								</Button>
 							</div>
+						</div>
+					{:else if editAuthType === 'jwt_es256'}
+						<div class="grid gap-2">
+							<Label for="edit-jwt-private-key">Private Key (PEM) <span class="text-muted-foreground text-xs">(leave blank to keep existing)</span></Label>
+							<textarea
+								id="edit-jwt-private-key"
+								name="jwtPrivateKey"
+								class="flex min-h-[120px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono"
+								bind:value={jwtPrivateKey}
+								placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"
+							></textarea>
+						</div>
+						<div class="grid gap-2">
+							<Label for="edit-jwt-key-id">Key ID <span class="text-muted-foreground text-xs">(leave blank to keep existing)</span></Label>
+							<Input id="edit-jwt-key-id" name="jwtKeyId" bind:value={jwtKeyId} placeholder="e.g. ABC123XYZ" />
+						</div>
+						<div class="grid gap-2">
+							<Label for="edit-jwt-issuer-id">Issuer ID <span class="text-muted-foreground text-xs">(leave blank to keep existing)</span></Label>
+							<Input id="edit-jwt-issuer-id" name="jwtIssuerId" bind:value={jwtIssuerId} placeholder="e.g. 69a6de12-..." />
+						</div>
+						<div class="grid gap-2">
+							<Label for="edit-jwt-audience">Audience <span class="text-muted-foreground text-xs">(optional)</span></Label>
+							<Input id="edit-jwt-audience" name="jwtAudience" bind:value={jwtAudience} placeholder="appstoreconnect-v1 (default)" />
+						</div>
+						<div class="grid gap-2">
+							<Label for="edit-jwt-expires-in">Expires In (seconds) <span class="text-muted-foreground text-xs">(optional)</span></Label>
+							<Input id="edit-jwt-expires-in" name="jwtExpiresIn" type="number" bind:value={jwtExpiresIn} placeholder="1200 (default)" />
 						</div>
 					{:else}
 						<div class="grid gap-2">
@@ -857,7 +941,7 @@ async function copyToClipboard(text: string) {
 									{:else}
 										<Table.Row>
 											<Table.Cell class="font-medium">{method.label}</Table.Cell>
-											<Table.Cell><Badge variant="outline">{method.type === 'ssh_key' ? 'SSH Key' : method.type === 'custom_header' ? 'Custom Header' : method.type === 'query_param' ? 'Query Param' : method.type === 'basic' ? 'Basic Auth' : 'Bearer'}</Badge></Table.Cell>
+											<Table.Cell><Badge variant="outline">{authTypeLabels[method.type] ?? method.type}</Badge></Table.Cell>
 											<Table.Cell>
 												{#if method.isDefault}
 													<StarIcon class="size-4 fill-amber-400 text-amber-400" />

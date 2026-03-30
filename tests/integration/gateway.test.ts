@@ -224,4 +224,71 @@ describe("gateway proxy", () => {
 
 		expect(response.status).toBe(400);
 	});
+
+	it("proxies request with jwt_es256 credential - generates fresh JWT", async () => {
+		// Generate a test P-256 key pair
+		const keyPair = await crypto.subtle.generateKey(
+			{ name: "ECDSA", namedCurve: "P-256" },
+			true,
+			["sign", "verify"],
+		);
+
+		// Export private key as PKCS#8 PEM
+		const privateKeyBuffer = await crypto.subtle.exportKey("pkcs8", keyPair.privateKey);
+		const privateKeyBase64 = btoa(
+			String.fromCharCode(...new Uint8Array(privateKeyBuffer)),
+		);
+		const privateKeyPEM = `-----BEGIN PRIVATE KEY-----\n${privateKeyBase64}\n-----END PRIVATE KEY-----`;
+
+		const testConfig = {
+			privateKey: privateKeyPEM,
+			keyId: "TESTKEY123",
+			issuerId: "test-issuer-uuid",
+		};
+
+		const { token: tokenRow } = await createTestToken();
+		const target = await createTestTarget("AppleAPI", "https://api.appstoreconnect.apple.com");
+		await createTestAuthMethod(target.id, {
+			type: "jwt_es256",
+			credential: JSON.stringify(testConfig),
+		});
+		await grantPermission(tokenRow.id, target.id);
+
+		const fullToken = await getFullToken(tokenRow.id);
+
+		const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ ok: true }));
+
+		const request = new Request(`http://localhost/gateway/${target.slug}/v1/apps`, {
+			method: "GET",
+		});
+
+		const response = await proxyRequest(fullToken, target.slug, "v1/apps", request);
+
+		expect(response.status).toBe(200);
+		expect(fetchSpy).toHaveBeenCalledOnce();
+		const [, init] = fetchSpy.mock.calls[0];
+		const authHeader = (init!.headers as Headers).get("Authorization");
+
+		// Verify Authorization header starts with "Bearer ey" (JWT marker)
+		expect(authHeader).toMatch(/^Bearer ey/);
+
+		// Decode and verify JWT structure
+		const jwt = authHeader!.replace("Bearer ", "");
+		const [headerB64, payloadB64] = jwt.split(".");
+
+		// Decode header
+		const headerJson = atob(headerB64.replace(/-/g, "+").replace(/_/g, "/"));
+		const header = JSON.parse(headerJson);
+		expect(header.alg).toBe("ES256");
+		expect(header.kid).toBe("TESTKEY123");
+		expect(header.typ).toBe("JWT");
+
+		// Decode payload
+		const payloadJson = atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/"));
+		const payload = JSON.parse(payloadJson);
+		expect(payload.iss).toBe("test-issuer-uuid");
+		expect(payload.aud).toBe("appstoreconnect-v1");
+		expect(payload.iat).toBeGreaterThan(0);
+		expect(payload.exp).toBeGreaterThan(payload.iat);
+	});
 });
