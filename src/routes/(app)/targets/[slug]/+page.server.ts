@@ -141,6 +141,19 @@ export const actions = {
 			const paramValue = data.get("credential2")?.toString() ?? "";
 			if (!paramName || !paramValue) return fail(400, { error: "Parameter name and value are required" });
 			credential = `${paramName}:${paramValue}`;
+		} else if (type === "jwt_es256") {
+			const privateKey = data.get("jwtPrivateKey")?.toString() ?? "";
+			const keyId = data.get("jwtKeyId")?.toString()?.trim() ?? "";
+			const issuerId = data.get("jwtIssuerId")?.toString()?.trim() ?? "";
+			if (!privateKey || !keyId || !issuerId) return fail(400, { error: "Private key, Key ID, and Issuer ID are required" });
+			
+			const config: Record<string, unknown> = { privateKey, keyId, issuerId };
+			const audience = data.get("jwtAudience")?.toString()?.trim();
+			if (audience) config.audience = audience;
+			const expiresIn = data.get("jwtExpiresIn")?.toString()?.trim();
+			if (expiresIn) config.expiresInSeconds = parseInt(expiresIn, 10);
+			
+			credential = JSON.stringify(config);
 		} else {
 			credential = data.get("credential")?.toString() ?? "";
 			if (!credential) return fail(400, { error: "Credential is required" });
@@ -222,6 +235,19 @@ export const actions = {
 			if (paramName || paramValue) {
 				if (!paramName || !paramValue) return fail(400, { error: "Parameter name and value are required" });
 				credential = `${paramName}:${paramValue}`;
+			}
+		} else if (type === "jwt_es256") {
+			const privateKey = data.get("jwtPrivateKey")?.toString() ?? "";
+			const keyId = data.get("jwtKeyId")?.toString()?.trim() ?? "";
+			const issuerId = data.get("jwtIssuerId")?.toString()?.trim() ?? "";
+			if (privateKey || keyId || issuerId) {
+				if (!privateKey || !keyId || !issuerId) return fail(400, { error: "All JWT fields are required when updating" });
+				const config: Record<string, unknown> = { privateKey, keyId, issuerId };
+				const audience = data.get("jwtAudience")?.toString()?.trim();
+				if (audience) config.audience = audience;
+				const expiresIn = data.get("jwtExpiresIn")?.toString()?.trim();
+				if (expiresIn) config.expiresInSeconds = parseInt(expiresIn, 10);
+				credential = JSON.stringify(config);
 			}
 		} else {
 			const raw = data.get("credential")?.toString() ?? "";
