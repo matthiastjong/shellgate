@@ -90,6 +90,16 @@ let authCredential = $state("");
 let showCredential = $state(false);
 let isDefaultChecked = $state(true);
 
+// Auth type display labels
+const authTypeLabels: Record<string, string> = {
+	bearer: "Bearer",
+	basic: "Basic Auth",
+	custom_header: "Custom Header",
+	query_param: "Query Param",
+	ssh_key: "SSH Key",
+	jwt_es256: "JWT ES256",
+};
+
 // JWT ES256 state
 let jwtPrivateKey = $state("");
 let jwtKeyId = $state("");
@@ -931,7 +941,7 @@ async function copyToClipboard(text: string) {
 									{:else}
 										<Table.Row>
 											<Table.Cell class="font-medium">{method.label}</Table.Cell>
-											<Table.Cell><Badge variant="outline">{method.type === 'ssh_key' ? 'SSH Key' : method.type === 'custom_header' ? 'Custom Header' : method.type === 'query_param' ? 'Query Param' : method.type === 'basic' ? 'Basic Auth' : method.type === 'jwt_es256' ? 'JWT ES256' : 'Bearer'}</Badge></Table.Cell>
+											<Table.Cell><Badge variant="outline">{authTypeLabels[method.type] ?? method.type}</Badge></Table.Cell>
 											<Table.Cell>
 												{#if method.isDefault}
 													<StarIcon class="size-4 fill-amber-400 text-amber-400" />

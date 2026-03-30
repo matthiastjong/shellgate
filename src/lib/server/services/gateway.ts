@@ -127,7 +127,7 @@ export async function proxyToTarget(
 			} catch (err) {
 				console.error("[gateway] ✗ JWT signing failed:", err);
 				return Response.json(
-					{ error: "JWT signing failed", detail: err instanceof Error ? err.message : String(err) },
+					{ error: "JWT signing failed" },
 					{ status: 500 },
 				);
 			}
