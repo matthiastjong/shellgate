@@ -2,6 +2,7 @@ import { error, fail } from "@sveltejs/kit";
 import { getTokenById, renameToken } from "$lib/server/services/tokens";
 import { listTargets } from "$lib/server/services/targets";
 import { listPermissions, addPermission, removePermission } from "$lib/server/services/permissions";
+import { enableWebhook, disableWebhook, setWebhookSecret } from "$lib/server/services/inbound";
 import type { Actions, PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async ({ params }) => {
@@ -55,5 +56,26 @@ export const actions = {
 		const result = await renameToken(params.id, name);
 		if (!result) return fail(404, { error: "API key not found" });
 		return { renamed: { id: params.id, name } };
+	},
+
+	enableWebhook: async ({ params }) => {
+		const result = await enableWebhook(params.id);
+		if (!result) return fail(404, { error: "API key not found" });
+		return { webhookEnabled: true, webhookKey: result.webhookKey };
+	},
+
+	disableWebhook: async ({ params }) => {
+		const result = await disableWebhook(params.id);
+		if (!result) return fail(404, { error: "API key not found" });
+		return { webhookDisabled: true };
+	},
+
+	setWebhookSecret: async ({ request, params }) => {
+		const data = await request.formData();
+		const secret = data.get("secret")?.toString()?.trim() || null;
+
+		const result = await setWebhookSecret(params.id, secret);
+		if (!result) return fail(404, { error: "API key not found" });
+		return { webhookSecretSaved: true };
 	},
 } satisfies Actions;
