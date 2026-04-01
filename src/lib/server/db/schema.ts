@@ -16,6 +16,8 @@ export const tokens = pgTable("tokens", {
 	name: varchar("name", { length: 255 }).notNull(),
 	tokenHash: text("token_hash").notNull().unique(),
 	allowedIps: jsonb("allowed_ips").$type<string[]>(),
+	webhookKey: text("webhook_key").unique(),
+	webhookSecret: text("webhook_secret"),
 	createdAt: timestamp("created_at", { withTimezone: true })
 		.notNull()
 		.defaultNow(),
@@ -134,3 +136,32 @@ export const auditLogs = pgTable(
 );
 
 export type AuditLog = typeof auditLogs.$inferSelect;
+
+export const inboundEvents = pgTable(
+	"inbound_events",
+	{
+		id: varchar("id", { length: 50 }).primaryKey(),
+		tokenId: uuid("token_id")
+			.notNull()
+			.references(() => tokens.id, { onDelete: "cascade" }),
+		channel: varchar("channel", { length: 255 }).notNull(),
+		payload: jsonb("payload").notNull(),
+		headers: jsonb("headers").notNull().$type<Record<string, string>>(),
+		sourceIp: text("source_ip"),
+		eventType: text("event_type"),
+		status: text("status")
+			.notNull()
+			.$type<"pending" | "acked" | "expired">()
+			.default("pending"),
+		receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+		ackedAt: timestamp("acked_at", { withTimezone: true }),
+		expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+	},
+	(t) => [
+		index("inbound_events_token_id_idx").on(t.tokenId),
+		index("inbound_events_status_idx").on(t.status),
+		index("inbound_events_expires_at_idx").on(t.expiresAt),
+	],
+);
+
+export type InboundEvent = typeof inboundEvents.$inferSelect;

@@ -122,6 +122,8 @@ export async function getTokenById(id: string) {
 			id: tokens.id,
 			name: tokens.name,
 			allowedIps: tokens.allowedIps,
+			webhookKey: tokens.webhookKey,
+			webhookSecret: tokens.webhookSecret,
 			createdAt: tokens.createdAt,
 			revokedAt: tokens.revokedAt,
 			lastUsedAt: tokens.lastUsedAt,
