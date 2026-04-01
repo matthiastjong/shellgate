@@ -11,7 +11,7 @@ import PlusIcon from "@lucide/svelte/icons/plus";
 import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
 
 type Target = { id: string; name: string; slug: string; type: string; baseUrl: string | null; enabled: boolean };
-type AgentType = "openclaw" | "claude-code" | "custom";
+type AgentType = "openclaw" | "hermes" | "claude-code" | "custom";
 
 let {
 	mode,
@@ -45,6 +45,7 @@ let showInlineTargetCreate = $state(false);
 
 let agentDisplayName = $derived(
 	selectedAgent === "openclaw" ? "OpenClaw"
+	: selectedAgent === "hermes" ? "Hermes"
 	: selectedAgent === "claude-code" ? "Claude Code"
 	: selectedAgent === "custom" ? "Custom"
 	: ""
@@ -125,7 +126,7 @@ async function copyToClipboard(text: string | null) {
 	{#if step === 1}
 		<div class="space-y-6">
 			<h2 class="text-center font-semibold">What agent are you connecting?</h2>
-			<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+			<div class="grid grid-cols-2 gap-3">
 				<button
 					class="flex flex-col items-center gap-3 rounded-lg border-2 p-6 transition-colors
 						{selectedAgent === 'openclaw' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'}"
@@ -135,6 +136,19 @@ async function copyToClipboard(text: string | null) {
 					<div class="text-center">
 						<div class="font-semibold">OpenClaw</div>
 						<div class="text-muted-foreground text-xs">AI assistant platform</div>
+					</div>
+				</button>
+
+				<button
+					class="flex flex-col items-center gap-3 rounded-lg border-2 p-6 transition-colors
+						{selectedAgent === 'hermes' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'}"
+					onclick={() => (selectedAgent = "hermes")}
+				>
+					<img src="/hermes.svg" alt="Hermes" class="size-10" onerror={(e) => { const el = e.currentTarget as HTMLElement; el.style.display = 'none'; (el.nextElementSibling as HTMLElement).style.display = 'flex'; }} />
+					<div class="size-10 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-900 text-violet-600 dark:text-violet-300 font-bold text-lg hidden">H</div>
+					<div class="text-center">
+						<div class="font-semibold">Hermes</div>
+						<div class="text-muted-foreground text-xs">Nous Research agent</div>
 					</div>
 				</button>
 				<button
@@ -362,6 +376,29 @@ async function copyToClipboard(text: string | null) {
 							<li>Verify your API key works</li>
 							<li>Configure Claude Code environment variables</li>
 							<li>Install the Shellgate skill</li>
+						</ul>
+					</div>
+				{:else if selectedAgent === "hermes"}
+					{@const installCmd = `curl -sX POST ${gatewayUrl}/api/install/hermes -H "Content-Type: application/json" -d '{"token":"${createdToken}"}' | bash`}
+					<div class="space-y-2">
+						<p class="text-sm font-medium">Run this in your terminal:</p>
+						<div class="rounded-lg bg-muted p-4 font-mono text-sm">
+							<div class="flex items-start justify-between gap-2">
+								<pre class="break-all whitespace-pre-wrap">{installCmd}</pre>
+								<Button variant="ghost" size="sm" class="shrink-0" onclick={() => copyToClipboard(installCmd)}>
+									<CopyIcon class="size-3.5" />
+								</Button>
+							</div>
+						</div>
+					</div>
+
+					<div class="rounded-lg border bg-muted/30 p-4 text-sm space-y-1">
+						<p class="text-muted-foreground">This will:</p>
+						<ul class="text-muted-foreground list-disc list-inside space-y-0.5">
+							<li>Verify your API key works</li>
+							<li>Configure Hermes environment variables</li>
+							<li>Install the Shellgate skill</li>
+							<li>Restart the Hermes gateway</li>
 						</ul>
 					</div>
 				{:else if selectedAgent === "openclaw"}
