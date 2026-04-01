@@ -37,6 +37,56 @@ claude "Confirm the shellgate skill is loaded, then run: curl -s -H \\"Authoriza
 `;
 }
 
+export function generateHermesScript(baseUrl: string, token: string): string {
+	return `#!/bin/bash
+set -e
+
+SHELLGATE_URL="${baseUrl}"
+SHELLGATE_API_KEY="${token}"
+
+echo "Verifying connection..."
+VERIFY=$(curl -sf -H "Authorization: Bearer $SHELLGATE_API_KEY" "$SHELLGATE_URL/verify-connection" 2>&1) || {
+  echo "❌ Invalid token or Shellgate unreachable"
+  exit 1
+}
+
+# Add environment variables to Hermes .env
+mkdir -p ~/.hermes
+touch ~/.hermes/.env
+
+if [ -f ~/.hermes/.env ]; then
+  sed -i.bak '/^SHELLGATE_URL=/d;/^SHELLGATE_API_KEY=/d' ~/.hermes/.env
+  rm -f ~/.hermes/.env.bak
+fi
+
+echo "SHELLGATE_URL=$SHELLGATE_URL" >> ~/.hermes/.env
+echo "SHELLGATE_API_KEY=$SHELLGATE_API_KEY" >> ~/.hermes/.env
+
+# Install skill
+mkdir -p ~/.hermes/skills/shellgate
+curl -sf -H "Authorization: Bearer $SHELLGATE_API_KEY" \\
+  "$SHELLGATE_URL/api/skill" > ~/.hermes/skills/shellgate/SKILL.md
+
+# Restart gateway so the new skill is picked up
+if command -v hermes &> /dev/null; then
+  echo "Restarting Hermes gateway..."
+  hermes gateway restart 2>/dev/null || true
+fi
+
+PROMPT="Use the Shellgate skill to find out which targets you have access to"
+WIDTH=\$(( \${#PROMPT} + 4 ))
+BORDER=\$(printf '─%.0s' \$(seq 1 \$(( WIDTH - 2 ))))
+
+echo ""
+echo "🐚 Shellgate → Hermes connected"
+echo ""
+echo "Try it out, ask your agent:"
+echo "╭\${BORDER}╮"
+echo "│ \${PROMPT} │"
+echo "╰\${BORDER}╯"
+`;
+}
+
 export function generateOpenClawScript(baseUrl: string, token: string): string {
 	return `#!/bin/bash
 set -e
