@@ -126,7 +126,7 @@ async function copyToClipboard(text: string | null) {
 	{#if step === 1}
 		<div class="space-y-6">
 			<h2 class="text-center font-semibold">What agent are you connecting?</h2>
-			<div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+			<div class="grid grid-cols-2 gap-3">
 				<button
 					class="flex flex-col items-center gap-3 rounded-lg border-2 p-6 transition-colors
 						{selectedAgent === 'openclaw' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'}"
@@ -144,7 +144,7 @@ async function copyToClipboard(text: string | null) {
 						{selectedAgent === 'hermes' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'}"
 					onclick={() => (selectedAgent = "hermes")}
 				>
-					<img src="/hermes.svg" alt="Hermes" class="size-10" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
+					<img src="/hermes.svg" alt="Hermes" class="size-10" onerror={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling.style.display = 'flex'; }} />
 					<div class="size-10 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-900 text-violet-600 dark:text-violet-300 font-bold text-lg hidden">H</div>
 					<div class="text-center">
 						<div class="font-semibold">Hermes</div>
