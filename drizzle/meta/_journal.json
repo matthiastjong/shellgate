@@ -36,6 +36,13 @@
       "when": 1774778914462,
       "tag": "0004_guard_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1743490800000,
+      "tag": "0005_inbound_webhook_buffer",
+      "breakpoints": true
     }
   ]
 }
