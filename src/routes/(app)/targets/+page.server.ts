@@ -64,15 +64,42 @@ export const actions = {
 			if (!username || !password) return fail(400, { error: "Username and password are required" });
 			credential = `${username}:${password}`;
 		} else if (type === "custom_header") {
-			const headerName = data.get("credential1")?.toString() ?? "";
-			const headerValue = data.get("credential2")?.toString() ?? "";
-			if (!headerName || !headerValue) return fail(400, { error: "Header name and value are required" });
-			credential = `${headerName}: ${headerValue}`;
+			const headerNames = data.getAll("headerName").map((v) => v.toString().trim());
+			const headerValues = data.getAll("headerValue").map((v) => v.toString());
+			const headers = headerNames
+				.map((name, i) => ({ name, value: headerValues[i] ?? "" }))
+				.filter((h) => h.name && h.value);
+			if (headers.length === 0) return fail(400, { error: "At least one header name and value is required" });
+			credential = JSON.stringify(headers);
 		} else if (type === "query_param") {
 			const paramName = data.get("credential1")?.toString() ?? "";
 			const paramValue = data.get("credential2")?.toString() ?? "";
 			if (!paramName || !paramValue) return fail(400, { error: "Parameter name and value are required" });
 			credential = `${paramName}:${paramValue}`;
+		} else if (type === "jwt_es256") {
+			const privateKey = data.get("jwtPrivateKey")?.toString() ?? "";
+			const keyId = data.get("jwtKeyId")?.toString()?.trim() ?? "";
+			const issuerId = data.get("jwtIssuerId")?.toString()?.trim() ?? "";
+			if (!privateKey || !keyId || !issuerId) return fail(400, { error: "Private key, Key ID, and Issuer ID are required" });
+
+			const config: Record<string, unknown> = { privateKey, keyId, issuerId };
+			const audience = data.get("jwtAudience")?.toString()?.trim();
+			if (audience) config.audience = audience;
+			const expiresIn = data.get("jwtExpiresIn")?.toString()?.trim();
+			if (expiresIn) config.expiresInSeconds = parseInt(expiresIn, 10);
+
+			credential = JSON.stringify(config);
+		} else if (type === "oauth2_refresh_token") {
+			const clientId = data.get("oauth2ClientId")?.toString()?.trim() ?? "";
+			const clientSecret = data.get("oauth2ClientSecret")?.toString()?.trim() ?? "";
+			const refreshToken = data.get("oauth2RefreshToken")?.toString()?.trim() ?? "";
+			if (!clientId || !clientSecret || !refreshToken) return fail(400, { error: "Client ID, Client Secret, and Refresh Token are required" });
+
+			const config: Record<string, unknown> = { clientId, clientSecret, refreshToken };
+			const tokenUrl = data.get("oauth2TokenUrl")?.toString()?.trim();
+			if (tokenUrl) config.tokenUrl = tokenUrl;
+
+			credential = JSON.stringify(config);
 		} else {
 			credential = data.get("credential")?.toString() ?? "";
 			if (!credential) return fail(400, { error: "Credential is required" });
