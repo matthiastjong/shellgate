@@ -20,10 +20,8 @@ import CopyIcon from "@lucide/svelte/icons/copy";
 import CheckIcon from "@lucide/svelte/icons/check";
 import EllipsisIcon from "@lucide/svelte/icons/ellipsis";
 import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
-import EyeIcon from "@lucide/svelte/icons/eye";
-import EyeOffIcon from "@lucide/svelte/icons/eye-off";
 import KeyIcon from "@lucide/svelte/icons/key";
-import TrashIcon from "@lucide/svelte/icons/trash-2";
+import AuthMethodFields from "$lib/components/auth-method-fields.svelte";
 import type { PageData } from "./$types";
 
 
@@ -87,12 +85,7 @@ let editUsername = $state("");
 // Add auth state
 let authLabel = $state("");
 let authType = $state("bearer");
-let authCredential = $state("");
-let showCredential = $state(false);
 let isDefaultChecked = $state(true);
-
-// Multi-header state for custom_header
-let customHeaders = $state<{ name: string; value: string }[]>([{ name: "", value: "" }]);
 
 // Auth type display labels
 const authTypeLabels: Record<string, string> = {
@@ -104,19 +97,6 @@ const authTypeLabels: Record<string, string> = {
 	jwt_es256: "JWT ES256",
 	oauth2_refresh_token: "OAuth2 Refresh Token",
 };
-
-// JWT ES256 state
-let jwtPrivateKey = $state("");
-let jwtKeyId = $state("");
-let jwtIssuerId = $state("");
-let jwtAudience = $state("");
-let jwtExpiresIn = $state("");
-
-// OAuth2 Refresh Token state
-let oauth2ClientId = $state("");
-let oauth2ClientSecret = $state("");
-let oauth2RefreshToken = $state("");
-let oauth2TokenUrl = $state("");
 
 // Rename auth state
 let renameAuthId = $state("");
@@ -179,15 +159,7 @@ function openAddAuthSheet() {
 	sheetMode = "addAuth";
 	authLabel = "";
 	authType = target.type === "ssh" ? "ssh_key" : "bearer";
-	authCredential = "";
-	showCredential = false;
 	isDefaultChecked = true;
-	customHeaders = [{ name: "", value: "" }];
-	jwtPrivateKey = "";
-	jwtKeyId = "";
-	jwtIssuerId = "";
-	jwtAudience = "";
-	jwtExpiresIn = "";
 	sheetSubmitting = false;
 	sheetOpen = true;
 }
@@ -205,15 +177,7 @@ function openEditAuthSheet(method: AuthMethod) {
 	editAuthId = method.id;
 	editAuthLabel = method.label;
 	editAuthType = method.type;
-	authCredential = "";
-	showCredential = false;
 	isDefaultChecked = method.isDefault;
-	customHeaders = [{ name: "", value: "" }];
-	jwtPrivateKey = "";
-	jwtKeyId = "";
-	jwtIssuerId = "";
-	jwtAudience = "";
-	jwtExpiresIn = "";
 	sheetSubmitting = false;
 	sheetOpen = true;
 }
@@ -399,250 +363,12 @@ async function copyToClipboard(text: string) {
 						<Label for="add-auth-label">Label</Label>
 						<Input id="add-auth-label" name="label" bind:value={authLabel} placeholder="e.g. Production Key" required />
 					</div>
-					<div class="grid gap-2">
-						<Label for="add-auth-type">Type</Label>
-						<select id="add-auth-type" name="type" bind:value={authType} class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-							{#if target.type === 'ssh'}
-								<option value="ssh_key">SSH Key</option>
-							{:else}
-								<option value="bearer">Bearer Token</option>
-								<option value="basic">Basic Auth</option>
-								<option value="custom_header">Custom Header</option>
-								<option value="query_param">Query Parameter</option>
-								<option value="jwt_es256">JWT ES256 (Apple, etc.)</option>
-								<option value="oauth2_refresh_token">OAuth2 Refresh Token (Google, etc.)</option>
-							{/if}
-						</select>
-					</div>
-					{#if authType === 'ssh_key'}
-						<div class="grid gap-2">
-							<Label for="add-auth-credential">Private Key (PEM)</Label>
-							<textarea
-								id="add-auth-credential"
-								name="credential"
-								class="flex min-h-[120px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono"
-								bind:value={authCredential}
-								placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;...&#10;-----END OPENSSH PRIVATE KEY-----"
-								required
-							></textarea>
-						</div>
-					{:else if authType === 'basic'}
-						<div class="grid gap-2">
-							<Label for="add-auth-username">Username</Label>
-							<Input id="add-auth-username" name="credential1" bind:value={authCredential} placeholder="username" required />
-						</div>
-						<div class="grid gap-2">
-							<Label for="add-auth-password">Password</Label>
-							<div class="relative">
-								<Input
-									id="add-auth-password"
-									name="credential2"
-									type={showCredential ? 'text' : 'password'}
-									placeholder="password"
-									required
-								/>
-								<Button
-									type="button"
-									variant="ghost"
-									size="icon"
-									class="absolute right-0 top-0 h-full px-3"
-									onclick={() => (showCredential = !showCredential)}
-								>
-									{#if showCredential}
-										<EyeOffIcon class="size-4" />
-									{:else}
-										<EyeIcon class="size-4" />
-									{/if}
-								</Button>
-							</div>
-						</div>
-					{:else if authType === 'custom_header'}
-						<div class="grid gap-2">
-							<div class="flex items-center justify-between">
-								<Label>Headers</Label>
-								<Button
-									type="button"
-									variant="ghost"
-									size="sm"
-									class="h-7 text-xs"
-									onclick={() => (showCredential = !showCredential)}
-								>
-									{#if showCredential}
-										<EyeOffIcon class="mr-1 size-3" /> Hide values
-									{:else}
-										<EyeIcon class="mr-1 size-3" /> Show values
-									{/if}
-								</Button>
-							</div>
-							{#each customHeaders as header, i}
-								<div class="flex gap-2 items-start">
-									<Input name="headerName" bind:value={header.name} placeholder="X-API-Key" required class="flex-1" />
-									<div class="relative flex-1">
-										<Input name="headerValue" type={showCredential ? 'text' : 'password'} bind:value={header.value} placeholder="value" required />
-									</div>
-									{#if customHeaders.length > 1}
-										<Button type="button" variant="ghost" size="icon" class="h-9 w-9 shrink-0" onclick={() => { customHeaders = customHeaders.filter((_, j) => j !== i); }}>
-											<TrashIcon class="size-4" />
-										</Button>
-									{/if}
-								</div>
-							{/each}
-							<Button type="button" variant="outline" size="sm" class="w-full" onclick={() => { customHeaders = [...customHeaders, { name: "", value: "" }]; }}>
-								<PlusIcon class="mr-2 size-4" /> Add Header
-							</Button>
-						</div>
-					{:else if authType === 'query_param'}
-						<div class="grid gap-2">
-							<Label for="add-auth-param-name">Parameter Name</Label>
-							<Input id="add-auth-param-name" name="credential1" bind:value={authCredential} placeholder="key" required />
-						</div>
-						<div class="grid gap-2">
-							<Label for="add-auth-param-value">Parameter Value</Label>
-							<div class="relative">
-								<Input
-									id="add-auth-param-value"
-									name="credential2"
-									type={showCredential ? 'text' : 'password'}
-									placeholder="your-api-key"
-									required
-								/>
-								<Button
-									type="button"
-									variant="ghost"
-									size="icon"
-									class="absolute right-0 top-0 h-full px-3"
-									onclick={() => (showCredential = !showCredential)}
-								>
-									{#if showCredential}
-										<EyeOffIcon class="size-4" />
-									{:else}
-										<EyeIcon class="size-4" />
-									{/if}
-								</Button>
-							</div>
-						</div>
-					{:else if authType === 'jwt_es256'}
-						<div class="grid gap-2">
-							<Label for="add-jwt-private-key">Private Key (PEM)</Label>
-							<textarea
-								id="add-jwt-private-key"
-								name="jwtPrivateKey"
-								class="flex min-h-[120px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono"
-								bind:value={jwtPrivateKey}
-								placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"
-								required
-							></textarea>
-						</div>
-						<div class="grid gap-2">
-							<Label for="add-jwt-key-id">Key ID</Label>
-							<Input id="add-jwt-key-id" name="jwtKeyId" bind:value={jwtKeyId} placeholder="e.g. ABC123XYZ" required />
-						</div>
-						<div class="grid gap-2">
-							<Label for="add-jwt-issuer-id">Issuer ID</Label>
-							<Input id="add-jwt-issuer-id" name="jwtIssuerId" bind:value={jwtIssuerId} placeholder="e.g. 69a6de12-..." required />
-						</div>
-						<div class="grid gap-2">
-							<Label for="add-jwt-audience">Audience <span class="text-muted-foreground text-xs">(optional)</span></Label>
-							<Input id="add-jwt-audience" name="jwtAudience" bind:value={jwtAudience} placeholder="appstoreconnect-v1 (default)" />
-						</div>
-						<div class="grid gap-2">
-							<Label for="add-jwt-expires-in">Expires In (seconds) <span class="text-muted-foreground text-xs">(optional)</span></Label>
-							<Input id="add-jwt-expires-in" name="jwtExpiresIn" type="number" bind:value={jwtExpiresIn} placeholder="1200 (default)" />
-						</div>
-					{:else if authType === 'oauth2_refresh_token'}
-						<div class="grid gap-2">
-							<Label for="add-oauth2-client-id">Client ID</Label>
-							<Input id="add-oauth2-client-id" name="oauth2ClientId" bind:value={oauth2ClientId} placeholder="e.g. 123456789.apps.googleusercontent.com" required />
-						</div>
-						<div class="grid gap-2">
-							<Label for="add-oauth2-client-secret">Client Secret</Label>
-							<div class="relative">
-								<Input
-									id="add-oauth2-client-secret"
-									name="oauth2ClientSecret"
-									type={showCredential ? 'text' : 'password'}
-									bind:value={oauth2ClientSecret}
-									placeholder="GOCSPX-..."
-									required
-								/>
-								<Button
-									type="button"
-									variant="ghost"
-									size="icon"
-									class="absolute right-0 top-0 h-full px-3"
-									onclick={() => (showCredential = !showCredential)}
-								>
-									{#if showCredential}
-										<EyeOffIcon class="size-4" />
-									{:else}
-										<EyeIcon class="size-4" />
-									{/if}
-								</Button>
-							</div>
-						</div>
-						<div class="grid gap-2">
-							<Label for="add-oauth2-refresh-token">Refresh Token</Label>
-							<div class="relative">
-								<Input
-									id="add-oauth2-refresh-token"
-									name="oauth2RefreshToken"
-									type={showCredential ? 'text' : 'password'}
-									bind:value={oauth2RefreshToken}
-									placeholder="1//0..."
-									required
-								/>
-								<Button
-									type="button"
-									variant="ghost"
-									size="icon"
-									class="absolute right-0 top-0 h-full px-3"
-									onclick={() => (showCredential = !showCredential)}
-								>
-									{#if showCredential}
-										<EyeOffIcon class="size-4" />
-									{:else}
-										<EyeIcon class="size-4" />
-									{/if}
-								</Button>
-							</div>
-						</div>
-						<div class="grid gap-2">
-							<Label for="add-oauth2-token-url">Token URL <span class="text-muted-foreground text-xs">(optional, defaults to Google)</span></Label>
-							<Input id="add-oauth2-token-url" name="oauth2TokenUrl" bind:value={oauth2TokenUrl} placeholder="https://oauth2.googleapis.com/token" />
-						</div>
-					{:else}
-						<div class="grid gap-2">
-							<Label for="add-auth-credential">Credential</Label>
-							<div class="relative">
-								<Input
-									id="add-auth-credential"
-									name="credential"
-									type={showCredential ? 'text' : 'password'}
-									bind:value={authCredential}
-									placeholder="e.g. sk-..."
-									required
-								/>
-								<Button
-									type="button"
-									variant="ghost"
-									size="icon"
-									class="absolute right-0 top-0 h-full px-3"
-									onclick={() => (showCredential = !showCredential)}
-								>
-									{#if showCredential}
-										<EyeOffIcon class="size-4" />
-									{:else}
-										<EyeIcon class="size-4" />
-									{/if}
-								</Button>
-							</div>
-						</div>
-					{/if}
+					<AuthMethodFields targetType={target.type} mode="add" bind:authType idPrefix="add-auth" />
 					<div class="flex items-center gap-2">
 						<Checkbox id="add-auth-default" name="isDefault" checked={isDefaultChecked} onCheckedChange={(v) => (isDefaultChecked = v === true)} />
 						<Label for="add-auth-default" class="text-sm font-normal">Set as default</Label>
 					</div>
-					<Button type="submit" disabled={sheetSubmitting || !authLabel.trim() || (authType === 'jwt_es256' ? (!jwtPrivateKey || !jwtKeyId || !jwtIssuerId) : authType === 'oauth2_refresh_token' ? (!oauth2ClientId || !oauth2ClientSecret || !oauth2RefreshToken) : authType === 'custom_header' ? !customHeaders.some((header) => header.name.trim() && header.value) : !authCredential)}>
+					<Button type="submit" disabled={sheetSubmitting || !authLabel.trim()}>
 						{#if sheetSubmitting}
 							<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
 						{/if}
@@ -724,166 +450,7 @@ async function copyToClipboard(text: string) {
 						<Label for="edit-auth-label">Label</Label>
 						<Input id="edit-auth-label" name="label" bind:value={editAuthLabel} required />
 					</div>
-					<div class="grid gap-2">
-						<Label for="edit-auth-type">Type</Label>
-						<select id="edit-auth-type" name="type" bind:value={editAuthType} class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-							{#if target.type === 'ssh'}
-								<option value="ssh_key">SSH Key</option>
-							{:else}
-								<option value="bearer">Bearer Token</option>
-								<option value="basic">Basic Auth</option>
-								<option value="custom_header">Custom Header</option>
-								<option value="query_param">Query Parameter</option>
-								<option value="jwt_es256">JWT ES256 (Apple, etc.)</option>
-								<option value="oauth2_refresh_token">OAuth2 Refresh Token (Google, etc.)</option>
-							{/if}
-						</select>
-					</div>
-					{#if editAuthType === 'ssh_key'}
-						<div class="grid gap-2">
-							<Label for="edit-auth-credential">Private Key (PEM) <span class="text-muted-foreground text-xs">(leave blank to keep existing)</span></Label>
-							<textarea
-								id="edit-auth-credential"
-								name="credential"
-								class="flex min-h-[120px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono"
-								bind:value={authCredential}
-								placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;...&#10;-----END OPENSSH PRIVATE KEY-----"
-							></textarea>
-						</div>
-					{:else if editAuthType === 'basic'}
-						<div class="grid gap-2">
-							<Label for="edit-auth-username">Username <span class="text-muted-foreground text-xs">(leave blank to keep existing)</span></Label>
-							<Input id="edit-auth-username" name="credential1" bind:value={authCredential} placeholder="username" />
-						</div>
-						<div class="grid gap-2">
-							<Label for="edit-auth-password">Password</Label>
-							<div class="relative">
-								<Input id="edit-auth-password" name="credential2" type={showCredential ? 'text' : 'password'} placeholder="password" />
-								<Button type="button" variant="ghost" size="icon" class="absolute right-0 top-0 h-full px-3" onclick={() => (showCredential = !showCredential)}>
-									{#if showCredential}<EyeOffIcon class="size-4" />{:else}<EyeIcon class="size-4" />{/if}
-								</Button>
-							</div>
-						</div>
-					{:else if editAuthType === 'custom_header'}
-						<div class="grid gap-2">
-							<div class="flex items-center justify-between">
-								<Label>Headers <span class="text-muted-foreground text-xs">(leave blank to keep existing)</span></Label>
-								<Button
-									type="button"
-									variant="ghost"
-									size="sm"
-									class="h-7 text-xs"
-									onclick={() => (showCredential = !showCredential)}
-								>
-									{#if showCredential}
-										<EyeOffIcon class="mr-1 size-3" /> Hide values
-									{:else}
-										<EyeIcon class="mr-1 size-3" /> Show values
-									{/if}
-								</Button>
-							</div>
-							{#each customHeaders as header, i}
-								<div class="flex gap-2 items-start">
-									<Input name="headerName" bind:value={header.name} placeholder="X-API-Key" class="flex-1" />
-									<div class="relative flex-1">
-										<Input name="headerValue" type={showCredential ? 'text' : 'password'} bind:value={header.value} placeholder="value" />
-									</div>
-									{#if customHeaders.length > 1}
-										<Button type="button" variant="ghost" size="icon" class="h-9 w-9 shrink-0" onclick={() => { customHeaders = customHeaders.filter((_, j) => j !== i); }}>
-											<TrashIcon class="size-4" />
-										</Button>
-									{/if}
-								</div>
-							{/each}
-							<Button type="button" variant="outline" size="sm" class="w-full" onclick={() => { customHeaders = [...customHeaders, { name: "", value: "" }]; }}>
-								<PlusIcon class="mr-2 size-4" /> Add Header
-							</Button>
-						</div>
-					{:else if editAuthType === 'query_param'}
-						<div class="grid gap-2">
-							<Label for="edit-auth-param-name">Parameter Name <span class="text-muted-foreground text-xs">(leave blank to keep existing)</span></Label>
-							<Input id="edit-auth-param-name" name="credential1" bind:value={authCredential} placeholder="key" />
-						</div>
-						<div class="grid gap-2">
-							<Label for="edit-auth-param-value">Parameter Value</Label>
-							<div class="relative">
-								<Input id="edit-auth-param-value" name="credential2" type={showCredential ? 'text' : 'password'} placeholder="your-api-key" />
-								<Button type="button" variant="ghost" size="icon" class="absolute right-0 top-0 h-full px-3" onclick={() => (showCredential = !showCredential)}>
-									{#if showCredential}<EyeOffIcon class="size-4" />{:else}<EyeIcon class="size-4" />{/if}
-								</Button>
-							</div>
-						</div>
-					{:else if editAuthType === 'jwt_es256'}
-						<div class="grid gap-2">
-							<Label for="edit-jwt-private-key">Private Key (PEM) <span class="text-muted-foreground text-xs">(leave blank to keep existing)</span></Label>
-							<textarea
-								id="edit-jwt-private-key"
-								name="jwtPrivateKey"
-								class="flex min-h-[120px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono"
-								bind:value={jwtPrivateKey}
-								placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"
-							></textarea>
-						</div>
-						<div class="grid gap-2">
-							<Label for="edit-jwt-key-id">Key ID <span class="text-muted-foreground text-xs">(leave blank to keep existing)</span></Label>
-							<Input id="edit-jwt-key-id" name="jwtKeyId" bind:value={jwtKeyId} placeholder="e.g. ABC123XYZ" />
-						</div>
-						<div class="grid gap-2">
-							<Label for="edit-jwt-issuer-id">Issuer ID <span class="text-muted-foreground text-xs">(leave blank to keep existing)</span></Label>
-							<Input id="edit-jwt-issuer-id" name="jwtIssuerId" bind:value={jwtIssuerId} placeholder="e.g. 69a6de12-..." />
-						</div>
-						<div class="grid gap-2">
-							<Label for="edit-jwt-audience">Audience <span class="text-muted-foreground text-xs">(optional)</span></Label>
-							<Input id="edit-jwt-audience" name="jwtAudience" bind:value={jwtAudience} placeholder="appstoreconnect-v1 (default)" />
-						</div>
-						<div class="grid gap-2">
-							<Label for="edit-jwt-expires-in">Expires In (seconds) <span class="text-muted-foreground text-xs">(optional)</span></Label>
-							<Input id="edit-jwt-expires-in" name="jwtExpiresIn" type="number" bind:value={jwtExpiresIn} placeholder="1200 (default)" />
-						</div>
-					{:else if editAuthType === 'oauth2_refresh_token'}
-						<div class="grid gap-2">
-							<Label for="edit-oauth2-client-id">Client ID <span class="text-muted-foreground text-xs">(leave blank to keep existing)</span></Label>
-							<Input id="edit-oauth2-client-id" name="oauth2ClientId" bind:value={oauth2ClientId} placeholder="e.g. 123456789.apps.googleusercontent.com" />
-						</div>
-						<div class="grid gap-2">
-							<Label for="edit-oauth2-client-secret">Client Secret <span class="text-muted-foreground text-xs">(leave blank to keep existing)</span></Label>
-							<div class="relative">
-								<Input id="edit-oauth2-client-secret" name="oauth2ClientSecret" type={showCredential ? 'text' : 'password'} bind:value={oauth2ClientSecret} placeholder="GOCSPX-..." />
-								<Button type="button" variant="ghost" size="icon" class="absolute right-0 top-0 h-full px-3" onclick={() => (showCredential = !showCredential)}>
-									{#if showCredential}<EyeOffIcon class="size-4" />{:else}<EyeIcon class="size-4" />{/if}
-								</Button>
-							</div>
-						</div>
-						<div class="grid gap-2">
-							<Label for="edit-oauth2-refresh-token">Refresh Token <span class="text-muted-foreground text-xs">(leave blank to keep existing)</span></Label>
-							<div class="relative">
-								<Input id="edit-oauth2-refresh-token" name="oauth2RefreshToken" type={showCredential ? 'text' : 'password'} bind:value={oauth2RefreshToken} placeholder="1//0..." />
-								<Button type="button" variant="ghost" size="icon" class="absolute right-0 top-0 h-full px-3" onclick={() => (showCredential = !showCredential)}>
-									{#if showCredential}<EyeOffIcon class="size-4" />{:else}<EyeIcon class="size-4" />{/if}
-								</Button>
-							</div>
-						</div>
-						<div class="grid gap-2">
-							<Label for="edit-oauth2-token-url">Token URL <span class="text-muted-foreground text-xs">(optional, defaults to Google)</span></Label>
-							<Input id="edit-oauth2-token-url" name="oauth2TokenUrl" bind:value={oauth2TokenUrl} placeholder="https://oauth2.googleapis.com/token" />
-						</div>
-					{:else}
-						<div class="grid gap-2">
-							<Label for="edit-auth-credential">Credential <span class="text-muted-foreground text-xs">(leave blank to keep existing)</span></Label>
-							<div class="relative">
-								<Input
-									id="edit-auth-credential"
-									name="credential"
-									type={showCredential ? 'text' : 'password'}
-									bind:value={authCredential}
-									placeholder="e.g. sk-..."
-								/>
-								<Button type="button" variant="ghost" size="icon" class="absolute right-0 top-0 h-full px-3" onclick={() => (showCredential = !showCredential)}>
-									{#if showCredential}<EyeOffIcon class="size-4" />{:else}<EyeIcon class="size-4" />{/if}
-								</Button>
-							</div>
-						</div>
-					{/if}
+					<AuthMethodFields targetType={target.type} mode="edit" bind:authType={editAuthType} idPrefix="edit-auth" />
 					<div class="flex items-center gap-2">
 						<Checkbox id="edit-auth-default" name="isDefault" checked={isDefaultChecked} onCheckedChange={(v) => (isDefaultChecked = v === true)} />
 						<Label for="edit-auth-default" class="text-sm font-normal">Set as default</Label>
