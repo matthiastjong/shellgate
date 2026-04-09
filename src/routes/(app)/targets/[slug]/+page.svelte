@@ -23,6 +23,7 @@ import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
 import EyeIcon from "@lucide/svelte/icons/eye";
 import EyeOffIcon from "@lucide/svelte/icons/eye-off";
 import KeyIcon from "@lucide/svelte/icons/key";
+import TrashIcon from "@lucide/svelte/icons/trash-2";
 import type { PageData } from "./$types";
 
 
@@ -89,6 +90,9 @@ let authType = $state("bearer");
 let authCredential = $state("");
 let showCredential = $state(false);
 let isDefaultChecked = $state(true);
+
+// Multi-header state for custom_header
+let customHeaders = $state<{ name: string; value: string }[]>([{ name: "", value: "" }]);
 
 // Auth type display labels
 const authTypeLabels: Record<string, string> = {
@@ -178,6 +182,7 @@ function openAddAuthSheet() {
 	authCredential = "";
 	showCredential = false;
 	isDefaultChecked = true;
+	customHeaders = [{ name: "", value: "" }];
 	jwtPrivateKey = "";
 	jwtKeyId = "";
 	jwtIssuerId = "";
@@ -203,6 +208,7 @@ function openEditAuthSheet(method: AuthMethod) {
 	authCredential = "";
 	showCredential = false;
 	isDefaultChecked = method.isDefault;
+	customHeaders = [{ name: "", value: "" }];
 	jwtPrivateKey = "";
 	jwtKeyId = "";
 	jwtIssuerId = "";
@@ -452,33 +458,38 @@ async function copyToClipboard(text: string) {
 						</div>
 					{:else if authType === 'custom_header'}
 						<div class="grid gap-2">
-							<Label for="add-auth-header-name">Header Name</Label>
-							<Input id="add-auth-header-name" name="credential1" bind:value={authCredential} placeholder="X-API-Key" required />
-						</div>
-						<div class="grid gap-2">
-							<Label for="add-auth-header-value">Header Value</Label>
-							<div class="relative">
-								<Input
-									id="add-auth-header-value"
-									name="credential2"
-									type={showCredential ? 'text' : 'password'}
-									placeholder="your-key-here"
-									required
-								/>
+							<div class="flex items-center justify-between">
+								<Label>Headers</Label>
 								<Button
 									type="button"
 									variant="ghost"
-									size="icon"
-									class="absolute right-0 top-0 h-full px-3"
+									size="sm"
+									class="h-7 text-xs"
 									onclick={() => (showCredential = !showCredential)}
 								>
 									{#if showCredential}
-										<EyeOffIcon class="size-4" />
+										<EyeOffIcon class="mr-1 size-3" /> Hide values
 									{:else}
-										<EyeIcon class="size-4" />
+										<EyeIcon class="mr-1 size-3" /> Show values
 									{/if}
 								</Button>
 							</div>
+							{#each customHeaders as header, i}
+								<div class="flex gap-2 items-start">
+									<Input name="headerName" bind:value={header.name} placeholder="X-API-Key" required class="flex-1" />
+									<div class="relative flex-1">
+										<Input name="headerValue" type={showCredential ? 'text' : 'password'} bind:value={header.value} placeholder="value" required />
+									</div>
+									{#if customHeaders.length > 1}
+										<Button type="button" variant="ghost" size="icon" class="h-9 w-9 shrink-0" onclick={() => { customHeaders = customHeaders.filter((_, j) => j !== i); }}>
+											<TrashIcon class="size-4" />
+										</Button>
+									{/if}
+								</div>
+							{/each}
+							<Button type="button" variant="outline" size="sm" class="w-full" onclick={() => { customHeaders = [...customHeaders, { name: "", value: "" }]; }}>
+								<PlusIcon class="mr-2 size-4" /> Add Header
+							</Button>
 						</div>
 					{:else if authType === 'query_param'}
 						<div class="grid gap-2">
@@ -631,7 +642,7 @@ async function copyToClipboard(text: string) {
 						<Checkbox id="add-auth-default" name="isDefault" checked={isDefaultChecked} onCheckedChange={(v) => (isDefaultChecked = v === true)} />
 						<Label for="add-auth-default" class="text-sm font-normal">Set as default</Label>
 					</div>
-					<Button type="submit" disabled={sheetSubmitting || !authLabel.trim() || (authType === 'jwt_es256' ? (!jwtPrivateKey || !jwtKeyId || !jwtIssuerId) : authType === 'oauth2_refresh_token' ? (!oauth2ClientId || !oauth2ClientSecret || !oauth2RefreshToken) : !authCredential)}>
+					<Button type="submit" disabled={sheetSubmitting || !authLabel.trim() || (authType === 'jwt_es256' ? (!jwtPrivateKey || !jwtKeyId || !jwtIssuerId) : authType === 'oauth2_refresh_token' ? (!oauth2ClientId || !oauth2ClientSecret || !oauth2RefreshToken) : authType === 'custom_header' ? !customHeaders.some((header) => header.name.trim() && header.value) : !authCredential)}>
 						{#if sheetSubmitting}
 							<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
 						{/if}
@@ -755,17 +766,38 @@ async function copyToClipboard(text: string) {
 						</div>
 					{:else if editAuthType === 'custom_header'}
 						<div class="grid gap-2">
-							<Label for="edit-auth-header-name">Header Name <span class="text-muted-foreground text-xs">(leave blank to keep existing)</span></Label>
-							<Input id="edit-auth-header-name" name="credential1" bind:value={authCredential} placeholder="X-API-Key" />
-						</div>
-						<div class="grid gap-2">
-							<Label for="edit-auth-header-value">Header Value</Label>
-							<div class="relative">
-								<Input id="edit-auth-header-value" name="credential2" type={showCredential ? 'text' : 'password'} placeholder="your-key-here" />
-								<Button type="button" variant="ghost" size="icon" class="absolute right-0 top-0 h-full px-3" onclick={() => (showCredential = !showCredential)}>
-									{#if showCredential}<EyeOffIcon class="size-4" />{:else}<EyeIcon class="size-4" />{/if}
+							<div class="flex items-center justify-between">
+								<Label>Headers <span class="text-muted-foreground text-xs">(leave blank to keep existing)</span></Label>
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									class="h-7 text-xs"
+									onclick={() => (showCredential = !showCredential)}
+								>
+									{#if showCredential}
+										<EyeOffIcon class="mr-1 size-3" /> Hide values
+									{:else}
+										<EyeIcon class="mr-1 size-3" /> Show values
+									{/if}
 								</Button>
 							</div>
+							{#each customHeaders as header, i}
+								<div class="flex gap-2 items-start">
+									<Input name="headerName" bind:value={header.name} placeholder="X-API-Key" class="flex-1" />
+									<div class="relative flex-1">
+										<Input name="headerValue" type={showCredential ? 'text' : 'password'} bind:value={header.value} placeholder="value" />
+									</div>
+									{#if customHeaders.length > 1}
+										<Button type="button" variant="ghost" size="icon" class="h-9 w-9 shrink-0" onclick={() => { customHeaders = customHeaders.filter((_, j) => j !== i); }}>
+											<TrashIcon class="size-4" />
+										</Button>
+									{/if}
+								</div>
+							{/each}
+							<Button type="button" variant="outline" size="sm" class="w-full" onclick={() => { customHeaders = [...customHeaders, { name: "", value: "" }]; }}>
+								<PlusIcon class="mr-2 size-4" /> Add Header
+							</Button>
 						</div>
 					{:else if editAuthType === 'query_param'}
 						<div class="grid gap-2">

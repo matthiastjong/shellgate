@@ -5,6 +5,19 @@ import { targetAuthMethods } from "../db/schema";
 const VALID_TYPES = ["bearer", "basic", "custom_header", "query_param", "ssh_key", "jwt_es256", "oauth2_refresh_token"];
 
 export function computeCredentialHint(credential: string, type?: string): string {
+	if (type === "custom_header") {
+		// Try JSON array format: [{"name":"X-Key","value":"val"}, ...]
+		try {
+			const parsed = JSON.parse(credential);
+			if (Array.isArray(parsed) && parsed.length > 0) {
+				const names = parsed
+					.filter((e: unknown) => e && typeof (e as Record<string, unknown>).name === "string")
+					.map((e: { name: string }) => e.name);
+				if (names.length === 1) return `Header: ${names[0]}`;
+				if (names.length > 1) return `${names.length} headers: ${names.join(", ")}`;
+			}
+		} catch { /* legacy format — fall through */ }
+	}
 	if (type === "ssh_key") {
 		if (credential.includes("RSA")) return "SSH Key (RSA)";
 		if (credential.includes("ED25519")) return "SSH Key (Ed25519)";
