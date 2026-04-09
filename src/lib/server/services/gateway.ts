@@ -104,11 +104,23 @@ export async function proxyToTarget(
 			const encoded = Buffer.from(authMethod.credential).toString("base64");
 			headers.set("Authorization", `Basic ${encoded}`);
 		} else if (authMethod.type === "custom_header") {
-			const separatorIndex = authMethod.credential.indexOf(":");
-			if (separatorIndex > 0) {
-				const headerName = authMethod.credential.slice(0, separatorIndex).trim();
-				const headerValue = authMethod.credential.slice(separatorIndex + 1).trim();
-				headers.set(headerName, headerValue);
+			// Try JSON array format first: [{"name":"X-Key","value":"val"}, ...]
+			let parsed: unknown;
+			try { parsed = JSON.parse(authMethod.credential); } catch { /* legacy format */ }
+			if (Array.isArray(parsed)) {
+				for (const entry of parsed) {
+					if (entry && typeof entry.name === "string" && typeof entry.value === "string" && entry.name.trim()) {
+						headers.set(entry.name.trim(), entry.value);
+					}
+				}
+			} else {
+				// Legacy single-header format: "Header: Value"
+				const separatorIndex = authMethod.credential.indexOf(":");
+				if (separatorIndex > 0) {
+					const headerName = authMethod.credential.slice(0, separatorIndex).trim();
+					const headerValue = authMethod.credential.slice(separatorIndex + 1).trim();
+					headers.set(headerName, headerValue);
+				}
 			}
 		} else if (authMethod.type === "query_param") {
 			const separatorIndex = authMethod.credential.indexOf(":");

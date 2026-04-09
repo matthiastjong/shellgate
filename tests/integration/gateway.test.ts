@@ -291,4 +291,53 @@ describe("gateway proxy", () => {
 		expect(payload.iat).toBeGreaterThan(0);
 		expect(payload.exp).toBeGreaterThan(payload.iat);
 	});
+
+	it("proxies request with JSON multi-header custom_header credential", async () => {
+		const { token: tokenRow } = await createTestToken();
+		const target = await createTestTarget("MultiHeaderAPI", "https://api.multi.com");
+		const multiHeaders = JSON.stringify([
+			{ name: "X-API-Key", value: "key-123" },
+			{ name: "X-Org-Id", value: "org-456" },
+		]);
+		await createTestAuthMethod(target.id, { type: "custom_header", credential: multiHeaders });
+		await grantPermission(tokenRow.id, target.id);
+
+		const fullToken = await getFullToken(tokenRow.id);
+
+		const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ ok: true }));
+
+		const request = new Request(`http://localhost/gateway/${target.slug}/data`, {
+			method: "GET",
+		});
+
+		const response = await proxyRequest(fullToken, target.slug, "data", request);
+
+		expect(response.status).toBe(200);
+		expect(fetchSpy).toHaveBeenCalledOnce();
+		const [, init] = fetchSpy.mock.calls[0];
+		expect((init!.headers as Headers).get("X-API-Key")).toBe("key-123");
+		expect((init!.headers as Headers).get("X-Org-Id")).toBe("org-456");
+	});
+
+	it("proxies request with legacy single custom_header credential (backward compat)", async () => {
+		const { token: tokenRow } = await createTestToken();
+		const target = await createTestTarget("LegacyHeaderAPI", "https://api.legacy.com");
+		await createTestAuthMethod(target.id, { type: "custom_header", credential: "X-API-Key: legacy-key" });
+		await grantPermission(tokenRow.id, target.id);
+
+		const fullToken = await getFullToken(tokenRow.id);
+
+		const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ ok: true }));
+
+		const request = new Request(`http://localhost/gateway/${target.slug}/data`, {
+			method: "GET",
+		});
+
+		const response = await proxyRequest(fullToken, target.slug, "data", request);
+
+		expect(response.status).toBe(200);
+		expect(fetchSpy).toHaveBeenCalledOnce();
+		const [, init] = fetchSpy.mock.calls[0];
+		expect((init!.headers as Headers).get("X-API-Key")).toBe("legacy-key");
+	});
 });

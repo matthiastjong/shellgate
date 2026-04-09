@@ -132,10 +132,13 @@ export const actions = {
 			if (!username || !password) return fail(400, { error: "Username and password are required" });
 			credential = `${username}:${password}`;
 		} else if (type === "custom_header") {
-			const headerName = data.get("credential1")?.toString() ?? "";
-			const headerValue = data.get("credential2")?.toString() ?? "";
-			if (!headerName || !headerValue) return fail(400, { error: "Header name and value are required" });
-			credential = `${headerName}: ${headerValue}`;
+			const headerNames = data.getAll("headerName").map((v) => v.toString().trim());
+			const headerValues = data.getAll("headerValue").map((v) => v.toString());
+			const headers = headerNames
+				.map((name, i) => ({ name, value: headerValues[i] ?? "" }))
+				.filter((h) => h.name && h.value);
+			if (headers.length === 0) return fail(400, { error: "At least one header name and value is required" });
+			credential = JSON.stringify(headers);
 		} else if (type === "query_param") {
 			const paramName = data.get("credential1")?.toString() ?? "";
 			const paramValue = data.get("credential2")?.toString() ?? "";
@@ -234,11 +237,13 @@ export const actions = {
 				credential = `${username}:${password}`;
 			}
 		} else if (type === "custom_header") {
-			const headerName = data.get("credential1")?.toString() ?? "";
-			const headerValue = data.get("credential2")?.toString() ?? "";
-			if (headerName || headerValue) {
-				if (!headerName || !headerValue) return fail(400, { error: "Header name and value are required" });
-				credential = `${headerName}: ${headerValue}`;
+			const headerNames = data.getAll("headerName").map((v) => v.toString().trim());
+			const headerValues = data.getAll("headerValue").map((v) => v.toString());
+			const headers = headerNames
+				.map((name, i) => ({ name, value: headerValues[i] ?? "" }))
+				.filter((h) => h.name && h.value);
+			if (headers.length > 0) {
+				credential = JSON.stringify(headers);
 			}
 		} else if (type === "query_param") {
 			const paramName = data.get("credential1")?.toString() ?? "";

@@ -19,4 +19,22 @@ describe("computeCredentialHint", () => {
 		const hint = computeCredentialHint("key:abc-semrush-key-1234");
 		expect(hint).toBe("key••••••••1234");
 	});
+
+	it("shows header name for single JSON custom_header", () => {
+		const credential = JSON.stringify([{ name: "X-API-Key", value: "secret" }]);
+		expect(computeCredentialHint(credential, "custom_header")).toBe("Header: X-API-Key");
+	});
+
+	it("shows count and names for multiple JSON custom_headers", () => {
+		const credential = JSON.stringify([
+			{ name: "X-API-Key", value: "key1" },
+			{ name: "X-Secret", value: "key2" },
+		]);
+		expect(computeCredentialHint(credential, "custom_header")).toBe("2 headers: X-API-Key, X-Secret");
+	});
+
+	it("falls through to default hint for legacy custom_header format", () => {
+		const hint = computeCredentialHint("X-API-Key: my-secret-value", "custom_header");
+		expect(hint).toBe("X-A••••••••alue");
+	});
 });
