@@ -7,7 +7,10 @@ const data = {
 		},
 		{
 			title: "Gateway",
-			items: [{ title: "Targets", url: "/targets" }],
+			items: [
+				{ title: "Targets", url: "/targets" },
+				{ title: "Webhooks", url: "/webhooks" },
+			],
 		},
 		{
 			title: "Security",
