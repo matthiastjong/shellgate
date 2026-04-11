@@ -3,6 +3,7 @@ import type { RequestHandler } from "./$types";
 import { requireBearer } from "$lib/server/api-auth";
 import { listPermissions } from "$lib/server/services/permissions";
 import { getTargetById } from "$lib/server/services/targets";
+import { listEndpoints } from "$lib/server/services/webhook-endpoints";
 
 export const GET: RequestHandler = async ({ request, url }) => {
 	const token = await requireBearer(request);
@@ -27,10 +28,20 @@ export const GET: RequestHandler = async ({ request, url }) => {
 
 	const filtered = targets.filter(Boolean);
 
+	const webhookEndpointsList = await listEndpoints(token.id);
+	const webhooks = webhookEndpointsList
+		.filter((ep) => ep.enabled)
+		.map((ep) => ({
+			name: ep.name,
+			poll: "/webhooks/poll",
+			ack: "/webhooks/ack",
+		}));
+
 	return json({
 		targets: filtered,
-		...(filtered.length === 0 && {
-			message: `No targets are assigned to this API key. Tell the user to go to ${url.origin}/api-keys to add targets to this key.`,
+		webhooks,
+		...(filtered.length === 0 && webhooks.length === 0 && {
+			message: `No targets or webhooks are assigned to this API key. Tell the user to go to ${url.origin}/api-keys to add targets, or ${url.origin}/webhooks to set up webhooks.`,
 		}),
 	});
 };

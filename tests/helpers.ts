@@ -4,7 +4,7 @@ import { createTarget } from "$lib/server/services/targets";
 import { createAuthMethod } from "$lib/server/services/auth-methods";
 import { addPermission } from "$lib/server/services/permissions";
 import { db } from "$lib/server/db";
-import { tokens, targets, targetAuthMethods, tokenPermissions, users } from "$lib/server/db/schema";
+import { tokens, targets, targetAuthMethods, tokenPermissions, users, webhookEndpoints, webhookEvents } from "$lib/server/db/schema";
 
 function uid() {
 	return randomBytes(4).toString("hex");
@@ -34,7 +34,21 @@ export async function grantPermission(tokenId: string, targetId: string) {
 	return addPermission(tokenId, targetId);
 }
 
+export async function createTestWebhookEndpoint(
+	tokenId: string,
+	opts: { name?: string; secret?: string; signatureHeader?: string } = {},
+) {
+	const { createEndpoint } = await import("$lib/server/services/webhook-endpoints");
+	return createEndpoint(tokenId, {
+		name: opts.name ?? `Webhook ${uid()}`,
+		secret: opts.secret,
+		signatureHeader: opts.signatureHeader,
+	});
+}
+
 export async function truncateAll() {
+	await db.delete(webhookEvents);
+	await db.delete(webhookEndpoints);
 	await db.delete(tokenPermissions);
 	await db.delete(targetAuthMethods);
 	await db.delete(tokens);

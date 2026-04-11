@@ -134,3 +134,51 @@ export const auditLogs = pgTable(
 );
 
 export type AuditLog = typeof auditLogs.$inferSelect;
+
+export const webhookEndpoints = pgTable("webhook_endpoints", {
+	id: uuid("id").primaryKey().defaultRandom(),
+	tokenId: uuid("token_id")
+		.notNull()
+		.references(() => tokens.id, { onDelete: "cascade" }),
+	slug: varchar("slug", { length: 255 }).notNull().unique(),
+	name: varchar("name", { length: 255 }).notNull(),
+	secret: text("secret"),
+	signatureHeader: text("signature_header"),
+	handlingInstructions: text("handling_instructions"),
+	enabled: boolean("enabled").notNull().default(true),
+	createdAt: timestamp("created_at", { withTimezone: true })
+		.notNull()
+		.defaultNow(),
+	updatedAt: timestamp("updated_at", { withTimezone: true })
+		.notNull()
+		.defaultNow(),
+});
+
+export type WebhookEndpoint = typeof webhookEndpoints.$inferSelect;
+
+export const webhookEvents = pgTable(
+	"webhook_events",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		endpointId: uuid("endpoint_id")
+			.notNull()
+			.references(() => webhookEndpoints.id, { onDelete: "cascade" }),
+		headers: jsonb("headers").$type<Record<string, string>>().notNull(),
+		body: jsonb("body").notNull(),
+		status: text("status")
+			.notNull()
+			.$type<"pending" | "delivered" | "expired">()
+			.default("pending"),
+		receivedAt: timestamp("received_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+		expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+	},
+	(t) => [
+		index("webhook_events_endpoint_status_idx").on(t.endpointId, t.status),
+		index("webhook_events_expires_at_idx").on(t.expiresAt),
+	],
+);
+
+export type WebhookEvent = typeof webhookEvents.$inferSelect;

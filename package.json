@@ -18,6 +18,7 @@
 		"test": "vitest run"
 	},
 	"devDependencies": {
+		"@lucide/svelte": "^1.8.0",
 		"@sveltejs/adapter-node": "^5.5.4",
 		"@sveltejs/kit": "^2.50.2",
 		"@sveltejs/vite-plugin-svelte": "^6.2.4",
@@ -34,7 +35,6 @@
 	},
 	"dependencies": {
 		"@internationalized/date": "^3.12.0",
-		"@lucide/svelte": "^0.577.0",
 		"@tailwindcss/vite": "^4.2.1",
 		"bits-ui": "^2.16.3",
 		"clsx": "^2.1.1",

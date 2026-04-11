@@ -51,6 +51,66 @@ curl -s -X POST -H "Authorization: Bearer $SHELLGATE_API_KEY" \\
 - \`timeout\` (optional): max seconds to wait, default 30, max 60
 - Response: \`{"exitCode": 0, "stdout": "...", "stderr": "...", "durationMs": 123}\`
 
+## Incoming Webhooks
+
+External services (Linear, GitHub, GitLab, etc.) can send webhooks to Shellgate. You receive them by polling — this may be set up as an automatic cron job.
+
+### Polling for events
+
+\`\`\`bash
+curl -s -H "Authorization: Bearer $SHELLGATE_API_KEY" \\
+  $SHELLGATE_URL/webhooks/poll
+\`\`\`
+
+Returns all pending events across all configured webhook endpoints:
+
+\`\`\`json
+{
+  "events": [
+    {
+      "id": "event-uuid",
+      "endpointName": "Linear webhook",
+      "body": { "action": "create", "type": "Issue" },
+      "receivedAt": "2026-04-10T12:00:00Z"
+    }
+  ]
+}
+\`\`\`
+
+If the events array is empty, stop immediately — there is nothing to process.
+
+### Processing events
+
+Each event includes a \`handlingInstructions\` field with the user's instructions for this webhook endpoint.
+
+**If instructions exist:** Follow them exactly, then ACK the event.
+
+**If instructions are empty (null):** Do NOT ACK. Notify the user with the event details and tell them to configure handling instructions in the Shellgate dashboard:
+
+\`$SHELLGATE_URL/webhooks/<endpointId>\`
+
+Example message:
+> New webhook event from Linear Webhook, no handling instructions configured.
+> [event details]
+> Configure how to handle these events: $SHELLGATE_URL/webhooks/<endpointId>
+
+### Acknowledging events
+
+After processing events (with instructions), ACK them:
+
+\`\`\`bash
+curl -s -X POST -H "Authorization: Bearer $SHELLGATE_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  $SHELLGATE_URL/webhooks/ack \\
+  -d '{"eventIds": ["event-uuid-1", "event-uuid-2"]}'
+\`\`\`
+
+### Webhook rules
+- Always ACK events after processing — unACK'd events will be returned on every poll
+- Never ACK events you haven't processed
+- Events expire after 7 days if not acknowledged
+- The \`endpointName\` tells you which service sent the webhook
+
 ## Rules
 - **ALWAYS** run the discovery curl command above to get your available targets — never assume target slugs
 - **ALWAYS** make the API calls yourself — do not ask the user to run curl commands when you can do it directly
