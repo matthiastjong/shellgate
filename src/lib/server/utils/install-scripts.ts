@@ -83,11 +83,9 @@ if [ "\$SETUP_WEBHOOKS" = "y" ] || [ "\$SETUP_WEBHOOKS" = "Y" ]; then
   POLL_INTERVAL=\${POLL_INTERVAL:-5}
   read -p "Telegram chat ID for notifications (leave empty to skip): " TELEGRAM_ID < /dev/tty
 
-  DELIVER_FLAGS=""
+  DELIVER_FLAG=""
   if [ -n "\$TELEGRAM_ID" ]; then
-    DELIVER_FLAGS="--announce --channel telegram --to \$TELEGRAM_ID"
-  else
-    DELIVER_FLAGS="--no-deliver"
+    DELIVER_FLAG="--deliver telegram:\$TELEGRAM_ID"
   fi
 
   # Remove all existing shellgate-webhooks cron jobs
@@ -96,7 +94,7 @@ if [ "\$SETUP_WEBHOOKS" = "y" ] || [ "\$SETUP_WEBHOOKS" = "Y" ]; then
       hermes cron remove "\$JOB_ID" > /dev/null 2>&1
     done
   fi
-  hermes cron create "every \${POLL_INTERVAL}m" "Poll Shellgate webhooks using your shellgate skill. If no events, respond only with No events." --name shellgate-webhooks \$DELIVER_FLAGS > /dev/null 2>&1 && echo "   Webhook polling: enabled (every \${POLL_INTERVAL}m)" || echo "   Webhook polling: skipped (set up manually with: hermes cron create)"
+  hermes cron create "every \${POLL_INTERVAL}m" "Poll Shellgate webhooks using your shellgate skill. If no events, respond with [SILENT] and nothing else." --name shellgate-webhooks --skill shellgate \$DELIVER_FLAG > /dev/null 2>&1 && echo "   Webhook polling: enabled (every \${POLL_INTERVAL}m)" || echo "   Webhook polling: skipped (set up manually with: hermes cron create)"
 fi
 
 PROMPT="Use the Shellgate skill to find out which targets you have access to"
@@ -170,7 +168,7 @@ if [ "\$SETUP_WEBHOOKS" = "y" ] || [ "\$SETUP_WEBHOOKS" = "Y" ]; then
         openclaw cron remove "\$JOB_ID" > /dev/null 2>&1
       done
     fi
-    openclaw cron add --name shellgate-webhooks --every "\${POLL_INTERVAL}m" --session isolated --light-context --announce --channel telegram --to "\$TELEGRAM_ID" --message "Poll Shellgate webhooks using your shellgate skill. If no events, respond only with No events." > /dev/null 2>&1 && echo "   Webhook polling: enabled (every \${POLL_INTERVAL}m → Telegram)" || echo "   Webhook polling: skipped (set up manually with: openclaw cron add)"
+    openclaw cron add --name shellgate-webhooks --every "\${POLL_INTERVAL}m" --session isolated --light-context --announce --channel telegram --to "\$TELEGRAM_ID" --message "Poll Shellgate webhooks using your shellgate skill. If no events, respond with NO_REPLY and nothing else." > /dev/null 2>&1 && echo "   Webhook polling: enabled (every \${POLL_INTERVAL}m → Telegram)" || echo "   Webhook polling: skipped (set up manually with: openclaw cron add)"
   fi
 fi
 
