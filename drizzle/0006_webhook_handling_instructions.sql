@@ -1,0 +1,1 @@
+ALTER TABLE "webhook_endpoints" ADD COLUMN "handling_instructions" text;
