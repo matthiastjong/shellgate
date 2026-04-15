@@ -67,6 +67,18 @@ export async function getEndpointBySlug(slug: string) {
 	return row ?? null;
 }
 
+export async function updateEndpoint(
+	id: string,
+	data: { secret?: string | null; signatureHeader?: string | null },
+) {
+	const [row] = await db
+		.update(webhookEndpoints)
+		.set({ ...data, updatedAt: new Date() })
+		.where(eq(webhookEndpoints.id, id))
+		.returning();
+	return row ?? null;
+}
+
 export async function updateInstructions(id: string, instructions: string | null) {
 	const [row] = await db
 		.update(webhookEndpoints)

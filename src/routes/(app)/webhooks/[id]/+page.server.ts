@@ -1,6 +1,6 @@
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { getEndpoint, updateInstructions } from "$lib/server/services/webhook-endpoints";
+import { getEndpoint, updateEndpoint, updateInstructions } from "$lib/server/services/webhook-endpoints";
 import { getTokenById } from "$lib/server/services/tokens";
 import { db } from "$lib/server/db";
 import { webhookEvents } from "$lib/server/db/schema";
@@ -26,22 +26,23 @@ export const load: PageServerLoad = async ({ params }) => {
 		.orderBy(desc(webhookEvents.receivedAt))
 		.limit(50);
 
-	// Strip secret before sending to browser — only send masked hint
-	const { secret, ...safeEndpoint } = endpoint;
-	const secretHint = secret
-		? secret.length <= 8
-			? "****"
-			: `${secret.slice(0, 4)}...${secret.slice(-4)}`
-		: null;
-
 	return {
-		endpoint: { ...safeEndpoint, secretHint },
+		endpoint,
 		tokenName: token?.name ?? "Unknown",
 		events,
 	};
 };
 
 export const actions = {
+	updateSettings: async ({ request, params }) => {
+		const formData = await request.formData();
+		const secret = formData.get("secret")?.toString()?.trim() || null;
+		const signatureHeader = formData.get("signatureHeader")?.toString()?.trim() || null;
+		const endpoint = await getEndpoint(params.id);
+		if (!endpoint) return fail(404, { error: "Endpoint not found" });
+		await updateEndpoint(endpoint.id, { secret, signatureHeader });
+		return { updated: true };
+	},
 	saveInstructions: async ({ request, params }) => {
 		const data = await request.formData();
 		const instructions = data.get("instructions")?.toString()?.trim() || null;
