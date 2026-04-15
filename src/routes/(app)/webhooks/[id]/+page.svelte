@@ -9,6 +9,8 @@
 	import * as Breadcrumb from "$lib/components/ui/breadcrumb/index.js";
 	import CopyIcon from "@lucide/svelte/icons/copy";
 	import CheckIcon from "@lucide/svelte/icons/check";
+	import EyeIcon from "@lucide/svelte/icons/eye";
+	import EyeOffIcon from "@lucide/svelte/icons/eye-off";
 	import type { PageData } from "./$types";
 
 	let { data }: { data: PageData } = $props();
@@ -20,13 +22,13 @@
 	let dialogOpen = $state(false);
 	let instructions = $state(data.endpoint.handlingInstructions ?? "");
 	let instructionsSaving = $state(false);
+	let secret = $state(data.endpoint.secret ?? "");
+	let signatureHeader = $state(data.endpoint.signatureHeader ?? "");
+	let settingsSaving = $state(false);
+	let showSecret = $state(false);
 
 	function webhookUrl(slug: string) {
 		return `${page.url.origin}/webhooks/incoming/${slug}`;
-	}
-
-	function displaySecret(hint: string | null): string {
-		return hint ?? "Not configured";
 	}
 
 	function copyToClipboard(text: string) {
@@ -164,14 +166,6 @@
 				</dd>
 			</div>
 			<div>
-				<dt class="text-muted-foreground mb-1 text-sm">Secret</dt>
-				<dd class="font-mono text-sm">{displaySecret(data.endpoint.secretHint)}</dd>
-			</div>
-			<div>
-				<dt class="text-muted-foreground mb-1 text-sm">Signature Header</dt>
-				<dd class="font-mono text-sm">{data.endpoint.signatureHeader ?? "Not configured"}</dd>
-			</div>
-			<div>
 				<dt class="text-muted-foreground mb-1 text-sm">Status</dt>
 				<dd>
 					{#if data.endpoint.enabled}
@@ -186,6 +180,77 @@
 				<dd class="text-sm">{formatDate(data.endpoint.createdAt)}</dd>
 			</div>
 		</dl>
+	</div>
+
+	<!-- Signature Verification Settings -->
+	<div class="rounded-lg border p-6">
+		<h2 class="mb-2 text-lg font-semibold">Signature Verification</h2>
+		<p class="text-muted-foreground mb-4 text-sm">
+			Configure HMAC secret and header to verify incoming webhook signatures.
+		</p>
+		<form
+			method="POST"
+			action="?/updateSettings"
+			use:enhance={() => {
+				settingsSaving = true;
+				return async ({ result, update }) => {
+					settingsSaving = false;
+					if (result.type === "success" && result.data?.updated) {
+						data.endpoint.secret = secret.trim() || null;
+						data.endpoint.signatureHeader = signatureHeader.trim() || null;
+						toast.success("Settings saved");
+					} else if (result.type === "failure") {
+						toast.error((result.data?.error as string) ?? "Failed to save");
+					}
+					await update({ reset: false, invalidateAll: false });
+				};
+			}}
+		>
+			<div class="grid gap-4 sm:grid-cols-2">
+				<div>
+					<label for="secret" class="text-sm font-medium">Secret</label>
+					<div class="relative mt-1">
+						<input
+							id="secret"
+							name="secret"
+							type={showSecret ? "text" : "password"}
+							bind:value={secret}
+							placeholder="Enter webhook secret"
+							class="border-input bg-background placeholder:text-muted-foreground flex h-9 w-full rounded-md border px-3 py-1 pr-9 text-sm font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+						/>
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon"
+							class="absolute right-0 top-0 size-9"
+							onclick={() => (showSecret = !showSecret)}
+						>
+							{#if showSecret}
+								<EyeOffIcon class="size-4" />
+							{:else}
+								<EyeIcon class="size-4" />
+							{/if}
+						</Button>
+					</div>
+				</div>
+				<div>
+					<label for="signatureHeader" class="text-sm font-medium">Signature Header</label>
+					<input
+						id="signatureHeader"
+						name="signatureHeader"
+						type="text"
+						bind:value={signatureHeader}
+						placeholder="e.g. X-Hub-Signature-256"
+						class="mt-1 border-input bg-background placeholder:text-muted-foreground flex h-9 w-full rounded-md border px-3 py-1 text-sm font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+					/>
+				</div>
+			</div>
+			<div class="mt-3">
+				<Button type="submit" disabled={settingsSaving}>
+					{settingsSaving ? "Saving..." : "Save"}
+				</Button>
+			</div>
+		</form>
 	</div>
 
 	<!-- Handling Instructions -->
