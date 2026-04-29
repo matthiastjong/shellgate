@@ -111,6 +111,43 @@ curl -s -X POST -H "Authorization: Bearer $SHELLGATE_API_KEY" \\
 - Events expire after 7 days if not acknowledged
 - The \`endpointName\` tells you which service sent the webhook
 
+## Skills
+
+Shellgate hosts a skill registry with organization-wide skills. At session start, call \`GET /discovery\` — the response includes a \`skills\` array with the name and description of each available skill.
+
+When a task matches a skill description, fetch the full instructions:
+
+\`\`\`bash
+curl -s -H "Authorization: Bearer $SHELLGATE_API_KEY" \\
+  $SHELLGATE_URL/api/skills/{skill-slug}
+\`\`\`
+
+Returns the full SKILL.md content. Follow the instructions in the skill.
+
+### Managing skills
+
+You can create, update, and delete skills:
+
+\`\`\`bash
+# Create a skill (body is raw SKILL.md with YAML frontmatter)
+curl -s -X POST -H "Authorization: Bearer $SHELLGATE_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  $SHELLGATE_URL/api/skills \\
+  -d '{"content": "---\\nname: my-skill\\ndescription: What it does.\\n---\\n\\nInstructions..."}'
+
+# Update a skill
+curl -s -X PUT -H "Authorization: Bearer $SHELLGATE_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  $SHELLGATE_URL/api/skills/{skill-slug} \\
+  -d '{"content": "---\\nname: my-skill\\ndescription: Updated.\\n---\\n\\nNew instructions..."}'
+
+# Delete a skill
+curl -s -X DELETE -H "Authorization: Bearer $SHELLGATE_API_KEY" \\
+  $SHELLGATE_URL/api/skills/{skill-slug}
+\`\`\`
+
+Skills follow the [Agent Skills](https://agentskills.io) specification. The \`name\` field in frontmatter must be lowercase alphanumeric with hyphens (1-64 chars).
+
 ## Rules
 - **ALWAYS** run the discovery curl command above to get your available targets — never assume target slugs
 - **ALWAYS** make the API calls yourself — do not ask the user to run curl commands when you can do it directly

@@ -10,6 +10,7 @@ const data = {
 			items: [
 				{ title: "Targets", url: "/targets" },
 				{ title: "Webhooks", url: "/webhooks" },
+				{ title: "Skills", url: "/skills" },
 			],
 		},
 		{

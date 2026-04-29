@@ -182,3 +182,19 @@ export const webhookEvents = pgTable(
 );
 
 export type WebhookEvent = typeof webhookEvents.$inferSelect;
+
+export const skills = pgTable("skills", {
+	id: uuid("id").primaryKey().defaultRandom(),
+	slug: varchar("slug", { length: 64 }).notNull().unique(),
+	description: varchar("description", { length: 1024 }).notNull(),
+	contentMd: text("content_md").notNull(),
+	version: integer("version").notNull().default(1),
+	createdAt: timestamp("created_at", { withTimezone: true })
+		.notNull()
+		.defaultNow(),
+	updatedAt: timestamp("updated_at", { withTimezone: true })
+		.notNull()
+		.defaultNow(),
+});
+
+export type Skill = typeof skills.$inferSelect;

@@ -4,6 +4,7 @@ import { requireBearer } from "$lib/server/api-auth";
 import { listPermissions } from "$lib/server/services/permissions";
 import { getTargetById } from "$lib/server/services/targets";
 import { listEndpoints } from "$lib/server/services/webhook-endpoints";
+import { listSkills } from "$lib/server/services/skills";
 
 export const GET: RequestHandler = async ({ request, url }) => {
 	const token = await requireBearer(request);
@@ -37,11 +38,14 @@ export const GET: RequestHandler = async ({ request, url }) => {
 			ack: "/webhooks/ack",
 		}));
 
+	const skillsList = await listSkills();
+
 	return json({
 		targets: filtered,
 		webhooks,
-		...(filtered.length === 0 && webhooks.length === 0 && {
-			message: `No targets or webhooks are assigned to this API key. Tell the user to go to ${url.origin}/api-keys to add targets, or ${url.origin}/webhooks to set up webhooks.`,
+		skills: skillsList,
+		...(filtered.length === 0 && webhooks.length === 0 && skillsList.length === 0 && {
+			message: `No targets, webhooks, or skills are assigned to this API key. Tell the user to go to ${url.origin}/api-keys to add targets, ${url.origin}/webhooks to set up webhooks, or ${url.origin}/skills to manage skills.`,
 		}),
 	});
 };
