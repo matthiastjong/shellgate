@@ -4,7 +4,7 @@ import { createTarget } from "$lib/server/services/targets";
 import { createAuthMethod } from "$lib/server/services/auth-methods";
 import { addPermission } from "$lib/server/services/permissions";
 import { db } from "$lib/server/db";
-import { tokens, targets, targetAuthMethods, tokenPermissions, users, webhookEndpoints, webhookEvents } from "$lib/server/db/schema";
+import { tokens, targets, targetAuthMethods, tokenPermissions, users, webhookEndpoints, webhookEvents, skills } from "$lib/server/db/schema";
 
 function uid() {
 	return randomBytes(4).toString("hex");
@@ -47,6 +47,7 @@ export async function createTestWebhookEndpoint(
 }
 
 export async function truncateAll() {
+	await db.delete(skills);
 	await db.delete(webhookEvents);
 	await db.delete(webhookEndpoints);
 	await db.delete(tokenPermissions);
