@@ -50,6 +50,13 @@
       "when": 1775907298059,
       "tag": "0006_webhook_handling_instructions",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1777473128119,
+      "tag": "0007_strange_skullbuster",
+      "breakpoints": true
     }
   ]
 }
