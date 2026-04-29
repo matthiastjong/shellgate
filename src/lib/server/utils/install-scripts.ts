@@ -2,8 +2,8 @@ export function generateClaudeCodeScript(baseUrl: string, token: string): string
 	return `#!/bin/bash
 set -e
 
-SHELLGATE_URL="${baseUrl}"
-SHELLGATE_API_KEY="${token}"
+export SHELLGATE_URL="${baseUrl}"
+export SHELLGATE_API_KEY="${token}"
 
 # Verify token is valid before installing
 echo "Verifying connection..."
@@ -51,8 +51,8 @@ export function generateHermesScript(baseUrl: string, token: string): string {
 	return `#!/bin/bash
 set -e
 
-SHELLGATE_URL="${baseUrl}"
-SHELLGATE_API_KEY="${token}"
+export SHELLGATE_URL="${baseUrl}"
+export SHELLGATE_API_KEY="${token}"
 
 echo "Verifying connection..."
 VERIFY=$(curl -sf -H "Authorization: Bearer $SHELLGATE_API_KEY" "$SHELLGATE_URL/verify-connection" 2>&1) || {
@@ -125,8 +125,8 @@ export function generateOpenClawScript(baseUrl: string, token: string): string {
 	return `#!/bin/bash
 set -e
 
-SHELLGATE_URL="${baseUrl}"
-SHELLGATE_API_KEY="${token}"
+export SHELLGATE_URL="${baseUrl}"
+export SHELLGATE_API_KEY="${token}"
 
 # Verify token is valid before installing
 echo "Verifying connection..."
