@@ -1,16 +1,16 @@
 import { json, error } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
-import { requireAdmin } from "$lib/server/api-auth";
+import { requireBearerOrAdmin } from "$lib/server/api-auth";
 import { listSkills, createSkill } from "$lib/server/services/skills";
 
 export const GET: RequestHandler = async ({ request }) => {
-	await requireAdmin(request);
+	await requireBearerOrAdmin(request);
 	const list = await listSkills();
 	return json({ skills: list });
 };
 
 export const POST: RequestHandler = async ({ request }) => {
-	await requireAdmin(request);
+	await requireBearerOrAdmin(request);
 	const body = await request.json().catch(() => ({}));
 
 	const content = typeof body.content === "string" ? body.content : "";

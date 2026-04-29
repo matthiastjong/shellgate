@@ -15,6 +15,15 @@ export async function requireAdmin(request: Request) {
 	if (!user) throw error(401, "Unauthorized");
 }
 
+export async function requireBearerOrAdmin(request: Request) {
+	const header = request.headers.get("Authorization");
+	if (header?.startsWith("Bearer sg_")) {
+		return requireBearer(request);
+	}
+	await requireAdmin(request);
+	return null;
+}
+
 export async function requireBearer(request: Request) {
 	const header = request.headers.get("Authorization");
 	if (!header?.startsWith("Bearer sg_")) throw error(401, "Unauthorized");

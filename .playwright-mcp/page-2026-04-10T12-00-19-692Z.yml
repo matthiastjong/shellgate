@@ -1,0 +1,78 @@
+- generic [ref=e2]:
+  - region "Notifications alt+T"
+  - generic [ref=e3]:
+    - generic [ref=e6]:
+      - list [ref=e8]:
+        - listitem [ref=e9]:
+          - button "Shellgate Dashboard" [ref=e10]:
+            - img [ref=e12]
+            - generic [ref=e15]:
+              - generic [ref=e16]: Shellgate
+              - generic [ref=e17]: Dashboard
+      - generic [ref=e18]:
+        - generic [ref=e19]:
+          - generic [ref=e20]: Overview
+          - list [ref=e22]:
+            - listitem [ref=e23]:
+              - link "Dashboard" [ref=e24] [cursor=pointer]:
+                - /url: /
+        - generic [ref=e25]:
+          - generic [ref=e26]: Gateway
+          - list [ref=e28]:
+            - listitem [ref=e29]:
+              - link "Targets" [ref=e30] [cursor=pointer]:
+                - /url: /targets
+            - listitem [ref=e31]:
+              - link "Webhooks" [ref=e32] [cursor=pointer]:
+                - /url: /webhooks
+        - generic [ref=e33]:
+          - generic [ref=e34]: Security
+          - list [ref=e36]:
+            - listitem [ref=e37]:
+              - link "API Keys" [ref=e38] [cursor=pointer]:
+                - /url: /api-keys
+            - listitem [ref=e39]:
+              - link "Audit Log" [ref=e40] [cursor=pointer]:
+                - /url: /logs
+        - generic [ref=e41]:
+          - generic [ref=e42]: Integrations
+          - list [ref=e44]:
+            - listitem [ref=e45]:
+              - link "Connect Agent" [ref=e46] [cursor=pointer]:
+                - /url: /connect
+        - generic [ref=e47]:
+          - generic [ref=e48]: System
+          - list [ref=e50]:
+            - listitem [ref=e51]:
+              - link "Settings" [ref=e52] [cursor=pointer]:
+                - /url: /settings
+      - list [ref=e54]:
+        - listitem [ref=e55]:
+          - button "T test@test.com" [ref=e56]:
+            - generic [ref=e57]: T
+            - generic [ref=e59]: test@test.com
+            - img [ref=e60]
+      - button "Toggle Sidebar" [ref=e63]
+    - main [ref=e64]:
+      - button "Toggle Sidebar" [ref=e66]:
+        - img
+        - generic [ref=e67]: Toggle Sidebar
+      - generic [ref=e69]:
+        - generic [ref=e70]:
+          - navigation "breadcrumb" [ref=e71]:
+            - list [ref=e72]:
+              - listitem [ref=e73]:
+                - link "Shellgate" [ref=e74] [cursor=pointer]:
+                  - /url: /
+              - listitem [ref=e75]:
+                - img [ref=e76]
+              - listitem [ref=e78]:
+                - link "Webhooks" [disabled] [ref=e79]
+          - heading "Webhooks" [level=1] [ref=e80]
+          - paragraph [ref=e81]: Receive incoming webhooks from external services.
+        - button "New Webhook" [ref=e83]:
+          - img
+          - text: New Webhook
+        - generic [ref=e84]:
+          - paragraph [ref=e85]: No webhook endpoints yet.
+          - button "Create your first webhook" [ref=e86]

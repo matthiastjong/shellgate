@@ -119,7 +119,7 @@ When a task matches a skill description, fetch the full instructions:
 
 \`\`\`bash
 curl -s -H "Authorization: Bearer $SHELLGATE_API_KEY" \\
-  $SHELLGATE_URL/skills/{skill-slug}
+  $SHELLGATE_URL/api/skills/{skill-slug}
 \`\`\`
 
 Returns the full SKILL.md content. Follow the instructions in the skill.
@@ -132,18 +132,18 @@ You can create, update, and delete skills:
 # Create a skill (body is raw SKILL.md with YAML frontmatter)
 curl -s -X POST -H "Authorization: Bearer $SHELLGATE_API_KEY" \\
   -H "Content-Type: application/json" \\
-  $SHELLGATE_URL/skills \\
+  $SHELLGATE_URL/api/skills \\
   -d '{"content": "---\\nname: my-skill\\ndescription: What it does.\\n---\\n\\nInstructions..."}'
 
 # Update a skill
 curl -s -X PUT -H "Authorization: Bearer $SHELLGATE_API_KEY" \\
   -H "Content-Type: application/json" \\
-  $SHELLGATE_URL/skills/{skill-slug} \\
+  $SHELLGATE_URL/api/skills/{skill-slug} \\
   -d '{"content": "---\\nname: my-skill\\ndescription: Updated.\\n---\\n\\nNew instructions..."}'
 
 # Delete a skill
 curl -s -X DELETE -H "Authorization: Bearer $SHELLGATE_API_KEY" \\
-  $SHELLGATE_URL/skills/{skill-slug}
+  $SHELLGATE_URL/api/skills/{skill-slug}
 \`\`\`
 
 Skills follow the [Agent Skills](https://agentskills.io) specification. The \`name\` field in frontmatter must be lowercase alphanumeric with hyphens (1-64 chars).

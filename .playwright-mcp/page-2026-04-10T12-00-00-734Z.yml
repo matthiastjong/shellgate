@@ -1,0 +1,40 @@
+- generic [ref=e2]:
+  - region "Notifications alt+T":
+    - list:
+      - listitem [ref=e56]:
+        - img [ref=e58]
+        - generic [ref=e61]: API key created
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - img [ref=e7]
+      - heading "Welcome to Shellgate" [level=1] [ref=e10]
+      - paragraph [ref=e11]: Let's set up your first agent connection.
+    - generic [ref=e12]:
+      - generic [ref=e17]: Step 3 of 3
+      - generic [ref=e62]:
+        - heading "Connect Custom to Shellgate" [level=2] [ref=e63]
+        - generic [ref=e64]:
+          - generic [ref=e65]:
+            - generic [ref=e66]: SHELLGATE_URL=http://localhost:5173
+            - button [ref=e67]:
+              - img
+          - generic [ref=e68]:
+            - generic [ref=e69]: SHELLGATE_API_KEY=sg_aea57f3b383bdda953eb3ffbb817d754fc32cc4bc2980a554965dc8d752fc482
+            - button [ref=e70]:
+              - img
+        - button "Copy all" [ref=e71]:
+          - img
+          - text: Copy all
+        - generic [ref=e72]:
+          - heading "Verify the connection" [level=3] [ref=e73]
+          - paragraph [ref=e74]: "Test the connection:"
+          - generic [ref=e76]:
+            - generic [ref=e77]: "curl -s -H \"Authorization: Bearer $SHELLGATE_API_KEY\" $SHELLGATE_URL/verify-connection"
+            - button [ref=e78]:
+              - img
+        - paragraph [ref=e80]: ⚠️ Save your API key now — it won't be shown again.
+        - generic [ref=e81]:
+          - button "Back" [ref=e82]
+          - link "Create your first target" [ref=e83] [cursor=pointer]:
+            - /url: /targets
+  - generic [ref=e43]: Shellgate

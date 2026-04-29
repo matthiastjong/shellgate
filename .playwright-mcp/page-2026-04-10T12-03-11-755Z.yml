@@ -1,0 +1,121 @@
+- generic [ref=e2]:
+  - region "Notifications alt+T"
+  - generic [ref=e3]:
+    - generic [ref=e6]:
+      - list [ref=e8]:
+        - listitem [ref=e9]:
+          - button "Shellgate Dashboard" [ref=e10]:
+            - img [ref=e12]
+            - generic [ref=e15]:
+              - generic [ref=e16]: Shellgate
+              - generic [ref=e17]: Dashboard
+      - generic [ref=e18]:
+        - generic [ref=e19]:
+          - generic [ref=e20]: Overview
+          - list [ref=e22]:
+            - listitem [ref=e23]:
+              - link "Dashboard" [ref=e24] [cursor=pointer]:
+                - /url: /
+        - generic [ref=e25]:
+          - generic [ref=e26]: Gateway
+          - list [ref=e28]:
+            - listitem [ref=e29]:
+              - link "Targets" [ref=e30] [cursor=pointer]:
+                - /url: /targets
+            - listitem [ref=e31]:
+              - link "Webhooks" [ref=e32] [cursor=pointer]:
+                - /url: /webhooks
+        - generic [ref=e33]:
+          - generic [ref=e34]: Security
+          - list [ref=e36]:
+            - listitem [ref=e37]:
+              - link "API Keys" [ref=e38] [cursor=pointer]:
+                - /url: /api-keys
+            - listitem [ref=e39]:
+              - link "Audit Log" [ref=e40] [cursor=pointer]:
+                - /url: /logs
+        - generic [ref=e41]:
+          - generic [ref=e42]: Integrations
+          - list [ref=e44]:
+            - listitem [ref=e45]:
+              - link "Connect Agent" [ref=e46] [cursor=pointer]:
+                - /url: /connect
+        - generic [ref=e47]:
+          - generic [ref=e48]: System
+          - list [ref=e50]:
+            - listitem [ref=e51]:
+              - link "Settings" [ref=e52] [cursor=pointer]:
+                - /url: /settings
+      - list [ref=e54]:
+        - listitem [ref=e55]:
+          - button "? Unknown" [ref=e56]:
+            - generic [ref=e57]: "?"
+            - generic [ref=e59]: Unknown
+            - img [ref=e60]
+      - button "Toggle Sidebar" [ref=e63]
+    - main [ref=e64]:
+      - button "Toggle Sidebar" [ref=e66]:
+        - img
+        - generic [ref=e67]: Toggle Sidebar
+      - generic [ref=e69]:
+        - generic [ref=e70]:
+          - navigation "breadcrumb" [ref=e71]:
+            - list [ref=e72]:
+              - listitem [ref=e73]:
+                - link "Shellgate" [ref=e74] [cursor=pointer]:
+                  - /url: /
+              - listitem [ref=e75]:
+                - img [ref=e76]
+              - listitem [ref=e78]:
+                - link "Webhooks" [ref=e79] [cursor=pointer]:
+                  - /url: /webhooks
+              - listitem [ref=e80]:
+                - img [ref=e81]
+              - listitem [ref=e83]:
+                - link "Linear webhook" [disabled] [ref=e84]
+          - generic [ref=e85]:
+            - heading "Linear webhook" [level=1] [ref=e86]
+            - generic [ref=e87]:
+              - text: linked to
+              - link "Test Agent" [ref=e88] [cursor=pointer]:
+                - /url: /api-keys/bafd9cd2-ecc1-4fe1-bdc0-175c7cb211da
+        - generic [ref=e89]:
+          - heading "Endpoint Details" [level=2] [ref=e90]
+          - generic [ref=e91]:
+            - generic [ref=e92]:
+              - term [ref=e93]: Webhook URL
+              - definition [ref=e94]:
+                - code [ref=e95]: http://localhost:5173/webhooks/incoming/wh_3439bd944f6a43abee270bf2f3ef859ea200968e87f4a5f8
+                - button [ref=e96]:
+                  - img
+            - generic [ref=e97]:
+              - term [ref=e98]: Secret
+              - definition [ref=e99]: my-l...cret
+            - generic [ref=e100]:
+              - term [ref=e101]: Signature Header
+              - definition [ref=e102]: X-Linear-Signature
+            - generic [ref=e103]:
+              - term [ref=e104]: Status
+              - definition [ref=e105]:
+                - generic [ref=e106]: Enabled
+            - generic [ref=e107]:
+              - term [ref=e108]: Created
+              - definition [ref=e109]: Apr 10, 2026
+        - generic [ref=e110]:
+          - generic [ref=e111]:
+            - heading "Recent Events" [level=2] [ref=e112]
+            - paragraph [ref=e113]: Last 50 webhook events received by this endpoint.
+          - table [ref=e116]:
+            - rowgroup [ref=e117]:
+              - row "Status Payload Received Delivered" [ref=e118]:
+                - columnheader "Status" [ref=e119]
+                - columnheader "Payload" [ref=e120]
+                - columnheader "Received" [ref=e121]
+                - columnheader "Delivered" [ref=e122]
+            - rowgroup [ref=e123]:
+              - 'row "delivered {\"data\":{\"id\":\"abc-123\",\"title\":\"Fix login bug\",\"priority\":1},\"type\":\"Issue\",\"ac… Apr 10, 2026, 2:02 PM Apr 10, 2026, 2:02 PM" [ref=e124] [cursor=pointer]':
+                - cell "delivered" [ref=e125]:
+                  - generic [ref=e126]: delivered
+                - 'cell "{\"data\":{\"id\":\"abc-123\",\"title\":\"Fix login bug\",\"priority\":1},\"type\":\"Issue\",\"ac…" [ref=e127]'
+                - cell "Apr 10, 2026, 2:02 PM" [ref=e128]
+                - cell "Apr 10, 2026, 2:02 PM" [ref=e129]

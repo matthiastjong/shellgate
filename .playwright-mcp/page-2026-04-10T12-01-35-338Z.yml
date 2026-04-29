@@ -1,0 +1,129 @@
+- generic:
+  - generic:
+    - region "Notifications alt+T"
+    - generic:
+      - generic:
+        - generic:
+          - generic:
+            - generic:
+              - list:
+                - listitem:
+                  - button "Shellgate Dashboard":
+                    - generic:
+                      - img
+                    - generic:
+                      - generic: Shellgate
+                      - generic: Dashboard
+            - generic:
+              - generic:
+                - generic: Overview
+                - generic:
+                  - list:
+                    - listitem:
+                      - link "Dashboard":
+                        - /url: /
+              - generic:
+                - generic: Gateway
+                - generic:
+                  - list:
+                    - listitem:
+                      - link "Targets":
+                        - /url: /targets
+                    - listitem:
+                      - link "Webhooks":
+                        - /url: /webhooks
+              - generic:
+                - generic: Security
+                - generic:
+                  - list:
+                    - listitem:
+                      - link "API Keys":
+                        - /url: /api-keys
+                    - listitem:
+                      - link "Audit Log":
+                        - /url: /logs
+              - generic:
+                - generic: Integrations
+                - generic:
+                  - list:
+                    - listitem:
+                      - link "Connect Agent":
+                        - /url: /connect
+              - generic:
+                - generic: System
+                - generic:
+                  - list:
+                    - listitem:
+                      - link "Settings":
+                        - /url: /settings
+            - generic:
+              - list:
+                - listitem:
+                  - button "T test@test.com":
+                    - generic: T
+                    - generic:
+                      - generic: test@test.com
+                    - img
+            - button "Toggle Sidebar"
+      - main:
+        - generic:
+          - button "Toggle Sidebar":
+            - img
+            - generic: Toggle Sidebar
+        - generic:
+          - generic:
+            - generic:
+              - navigation "breadcrumb":
+                - list:
+                  - listitem:
+                    - link "Shellgate":
+                      - /url: /
+                  - listitem:
+                    - img
+                  - listitem:
+                    - link "Webhooks" [disabled]
+              - heading "Webhooks" [level=1]
+              - paragraph: Receive incoming webhooks from external services.
+            - generic:
+              - button "New Webhook":
+                - img
+                - text: New Webhook
+            - generic:
+              - paragraph: No webhook endpoints yet.
+              - button "Create your first webhook"
+  - dialog "New Webhook Endpoint" [ref=e89]:
+    - generic [ref=e90]:
+      - heading "New Webhook Endpoint" [level=2] [ref=e91]
+      - generic [ref=e92]: Create an endpoint to receive webhooks from an external service.
+    - generic [ref=e93]:
+      - generic [ref=e94]:
+        - generic [ref=e95]:
+          - generic [ref=e96]: Name
+          - textbox "Name" [ref=e97]:
+            - /placeholder: e.g. Linear webhook
+            - text: Linear webhook
+        - generic [ref=e98]:
+          - generic [ref=e99]: API Key
+          - button "API Key" [active] [ref=e100]:
+            - text: Test Agent
+            - img
+        - generic [ref=e101]:
+          - generic [ref=e102]:
+            - text: Secret
+            - generic [ref=e103]: (optional)
+          - textbox "Secret (optional)" [ref=e104]:
+            - /placeholder: HMAC secret for signature verification
+            - text: my-linear-secret
+        - generic [ref=e105]:
+          - generic [ref=e106]:
+            - text: Signature Header
+            - generic [ref=e107]: (optional)
+          - textbox "Signature Header (optional)" [ref=e108]:
+            - /placeholder: e.g. X-Hub-Signature-256
+            - text: X-Linear-Signature
+      - generic [ref=e109]:
+        - button "Cancel" [ref=e110]
+        - button "Create" [ref=e111]
+    - button "Close" [ref=e112]:
+      - img
+      - generic [ref=e113]: Close

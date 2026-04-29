@@ -1,11 +1,11 @@
 import { json, error } from "@sveltejs/kit";
 <parameter name="content">import { json, error } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
-import { requireAdmin } from "$lib/server/api-auth";
+import { requireBearerOrAdmin } from "$lib/server/api-auth";
 import { getSkill, updateSkill, deleteSkill } from "$lib/server/services/skills";
 
 export const GET: RequestHandler = async ({ request, params }) => {
-	await requireAdmin(request);
+	await requireBearerOrAdmin(request);
 	const skill = await getSkill(params.slug);
 	if (!skill) throw error(404, "Skill not found");
 
@@ -18,7 +18,7 @@ export const GET: RequestHandler = async ({ request, params }) => {
 };
 
 export const PUT: RequestHandler = async ({ request, params }) => {
-	await requireAdmin(request);
+	await requireBearerOrAdmin(request);
 	const body = await request.json().catch(() => ({}));
 
 	const content = typeof body.content === "string" ? body.content : "";
@@ -40,7 +40,7 @@ export const PUT: RequestHandler = async ({ request, params }) => {
 };
 
 export const DELETE: RequestHandler = async ({ request, params }) => {
-	await requireAdmin(request);
+	await requireBearerOrAdmin(request);
 	const deleted = await deleteSkill(params.slug);
 	if (!deleted) throw error(404, "Skill not found");
 	return json({ ok: true });
