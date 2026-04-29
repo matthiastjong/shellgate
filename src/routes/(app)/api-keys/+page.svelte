@@ -54,6 +54,7 @@ let copied = $state(false);
 let submitting = $state(false);
 let confirmRevokeId = $state<string | null>(null);
 let confirmRegenerateId = $state<string | null>(null);
+let confirmDeleteId = $state<string | null>(null);
 
 // Rename sheet state
 let renameId = $state<string | null>(null);
@@ -383,7 +384,40 @@ function toggleTarget(targetId: string) {
 				</Table.Header>
 				<Table.Body>
 					{#each tokenList as token (token.id)}
-						{#if confirmRevokeId === token.id}
+						{#if confirmDeleteId === token.id}
+							<Table.Row class="bg-red-50 dark:bg-red-950/30">
+								<Table.Cell colspan={8}>
+									<div class="flex items-center justify-between gap-4 py-1">
+										<p class="text-sm">
+											Permanently delete this key? This cannot be undone. All permissions and webhook endpoints linked to this key will also be removed.
+										</p>
+										<div class="flex shrink-0 gap-2">
+											<Button variant="outline" size="sm" onclick={() => (confirmDeleteId = null)}>Cancel</Button>
+											<form
+												method="POST"
+												action="?/delete"
+												use:enhance={() => {
+													return async ({ result, update }) => {
+														if (result.type === 'success' && result.data?.deleted) {
+															const deletedId = result.data.deleted as string;
+															updateTokenList((tokens) => tokens.filter((t) => t.id !== deletedId));
+															confirmDeleteId = null;
+															toast.success('Key deleted');
+														} else if (result.type === 'failure') {
+															toast.error((result.data?.error as string) ?? 'Failed to delete key');
+														}
+														await update({ reset: false, invalidateAll: false });
+													};
+												}}
+											>
+												<input type="hidden" name="id" value={token.id} />
+												<Button type="submit" variant="destructive" size="sm">Yes, delete permanently</Button>
+											</form>
+										</div>
+									</div>
+								</Table.Cell>
+							</Table.Row>
+						{:else if confirmRevokeId === token.id}
 							<Table.Row class="bg-red-50 dark:bg-red-950/30">
 								<Table.Cell colspan={8}>
 									<div class="flex items-center justify-between gap-4 py-1">
@@ -492,7 +526,6 @@ function toggleTarget(targetId: string) {
 								<Table.Cell class="text-muted-foreground text-sm">{formatDate(token.createdAt)}</Table.Cell>
 								<Table.Cell class="text-muted-foreground text-sm">{formatRelativeTime(token.updatedAt)}</Table.Cell>
 								<Table.Cell>
-								{#if !token.revokedAt}
 									<DropdownMenu.Root>
 										<DropdownMenu.Trigger>
 											{#snippet child({ props })}
@@ -503,6 +536,7 @@ function toggleTarget(targetId: string) {
 											{/snippet}
 										</DropdownMenu.Trigger>
 										<DropdownMenu.Content align="end">
+											{#if !token.revokedAt}
 												<DropdownMenu.Item onclick={() => openRenameSheet(token)}>Rename</DropdownMenu.Item>
 												<DropdownMenu.Item onclick={() => (confirmRegenerateId = token.id)}>Regenerate</DropdownMenu.Item>
 												<DropdownMenu.Separator />
@@ -512,9 +546,16 @@ function toggleTarget(targetId: string) {
 												>
 													Revoke
 												</DropdownMenu.Item>
+												<DropdownMenu.Separator />
+											{/if}
+											<DropdownMenu.Item
+												class="text-destructive"
+												onclick={() => (confirmDeleteId = token.id)}
+											>
+												Delete
+											</DropdownMenu.Item>
 										</DropdownMenu.Content>
 									</DropdownMenu.Root>
-								{/if}
 								</Table.Cell>
 							</Table.Row>
 						{/if}

@@ -5,11 +5,13 @@ import { Button } from "$lib/components/ui/button/index.js";
 import { Badge } from "$lib/components/ui/badge/index.js";
 import * as Table from "$lib/components/ui/table/index.js";
 import * as Sheet from "$lib/components/ui/sheet/index.js";
+import * as Dialog from "$lib/components/ui/dialog/index.js";
 import * as Breadcrumb from "$lib/components/ui/breadcrumb/index.js";
 import { Input } from "$lib/components/ui/input/index.js";
 import { Label } from "$lib/components/ui/label/index.js";
 import { Switch } from "$lib/components/ui/switch/index.js";
 import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
+import TrashIcon from "@lucide/svelte/icons/trash-2";
 import type { PageData } from "./$types";
 
 type Token = {
@@ -49,6 +51,10 @@ let sheetOpen = $state(false);
 let sheetSubmitting = $state(false);
 let editName = $state("");
 
+// Delete dialog state
+let deleteDialogOpen = $state(false);
+let deleteSubmitting = $state(false);
+
 function openRenameSheet() {
 	editName = token.name;
 	sheetSubmitting = false;
@@ -80,6 +86,39 @@ function formatRelativeTime(dateStr: string | Date | null): string {
 	return rtf.format(-diffSec, "second");
 }
 </script>
+
+<!-- Delete Confirmation Dialog -->
+<Dialog.Root bind:open={deleteDialogOpen}>
+	<Dialog.Content class="sm:max-w-md">
+		<Dialog.Header>
+			<Dialog.Title>Delete API Key</Dialog.Title>
+			<Dialog.Description>
+				Permanently delete <strong>{token.name}</strong>? This cannot be undone. All permissions and webhook endpoints linked to this key will also be removed.
+			</Dialog.Description>
+		</Dialog.Header>
+		<Dialog.Footer>
+			<Button variant="outline" onclick={() => (deleteDialogOpen = false)}>Cancel</Button>
+			<form
+				method="POST"
+				action="?/delete"
+				use:enhance={() => {
+					deleteSubmitting = true;
+					return async ({ update }) => {
+						deleteSubmitting = false;
+						await update();
+					};
+				}}
+			>
+				<Button type="submit" variant="destructive" disabled={deleteSubmitting}>
+					{#if deleteSubmitting}
+						<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
+					{/if}
+					Yes, delete permanently
+				</Button>
+			</form>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
 
 <!-- Rename Sheet -->
 <Sheet.Root bind:open={sheetOpen}>
@@ -144,6 +183,10 @@ function formatRelativeTime(dateStr: string | Date | null): string {
 		<div class="mt-1 flex items-center gap-2">
 			<h1 class="text-2xl font-bold tracking-tight">{token.name}</h1>
 			<Button variant="ghost" size="sm" class="h-6 text-xs" onclick={openRenameSheet}>Edit</Button>
+			<Button variant="ghost" size="sm" class="text-destructive h-6 text-xs" onclick={() => (deleteDialogOpen = true)}>
+				<TrashIcon class="mr-1 size-3" />
+				Delete
+			</Button>
 		</div>
 	</div>
 

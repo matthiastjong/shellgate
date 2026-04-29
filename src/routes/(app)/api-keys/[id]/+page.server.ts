@@ -1,5 +1,5 @@
-import { error, fail } from "@sveltejs/kit";
-import { getTokenById, renameToken } from "$lib/server/services/tokens";
+import { error, fail, redirect } from "@sveltejs/kit";
+import { getTokenById, renameToken, deleteToken } from "$lib/server/services/tokens";
 import { listTargets } from "$lib/server/services/targets";
 import { listPermissions, addPermission, removePermission } from "$lib/server/services/permissions";
 import type { Actions, PageServerLoad } from "./$types";
@@ -44,6 +44,12 @@ export const actions = {
 		const result = await removePermission(token.id, targetId);
 		if (!result) return fail(404, { error: "Permission not found" });
 		return { revoked: targetId };
+	},
+
+	delete: async ({ params }) => {
+		const result = await deleteToken(params.id);
+		if (!result) return fail(404, { error: "API key not found" });
+		redirect(303, "/api-keys");
 	},
 
 	rename: async ({ request, params }) => {

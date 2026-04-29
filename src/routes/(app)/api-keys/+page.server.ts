@@ -2,7 +2,7 @@ import { fail } from "@sveltejs/kit";
 import { sql } from "drizzle-orm";
 import { db } from "$lib/server/db";
 import { tokenPermissions } from "$lib/server/db/schema";
-import { listTokens, createToken, renameToken, revokeToken, regenerateToken } from "$lib/server/services/tokens";
+import { listTokens, createToken, renameToken, revokeToken, regenerateToken, deleteToken } from "$lib/server/services/tokens";
 import { listTargets } from "$lib/server/services/targets";
 import { addPermission } from "$lib/server/services/permissions";
 import type { Actions, PageServerLoad } from "./$types";
@@ -80,6 +80,16 @@ export const actions = {
 		const result = await renameToken(id, name);
 		if (!result) return fail(404, { error: "Token not found" });
 		return { renamed: { id, name } };
+	},
+
+	delete: async ({ request }) => {
+		const data = await request.formData();
+		const id = data.get("id")?.toString() ?? "";
+		if (!id) return fail(400, { error: "ID is required" });
+
+		const result = await deleteToken(id);
+		if (!result) return fail(404, { error: "Token not found" });
+		return { deleted: id };
 	},
 
 	regenerate: async ({ request }) => {
