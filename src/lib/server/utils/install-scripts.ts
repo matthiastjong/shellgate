@@ -18,6 +18,11 @@ node -e "
   const fs=require('fs'),p=process.env.HOME+'/.claude/settings.json';
   const s=fs.existsSync(p)?JSON.parse(fs.readFileSync(p)):{};
   s.env={...s.env,SHELLGATE_URL:'$SHELLGATE_URL',SHELLGATE_API_KEY:'$SHELLGATE_API_KEY'};
+  if(!s.hooks)s.hooks={};
+  if(!s.hooks.SessionStart)s.hooks.SessionStart=[];
+  const cmd='curl -sf -H \"Authorization: Bearer \\$SHELLGATE_API_KEY\" \"\\$SHELLGATE_URL/api/skill\" -o ~/.claude/skills/shellgate/SKILL.md 2>/dev/null || true';
+  s.hooks.SessionStart=s.hooks.SessionStart.filter(h=>!h.command?.includes('/api/skill'));
+  s.hooks.SessionStart.push({command:cmd});
   fs.writeFileSync(p,JSON.stringify(s,null,2));
 "
 
