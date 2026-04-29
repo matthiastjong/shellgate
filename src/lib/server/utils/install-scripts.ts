@@ -21,7 +21,7 @@ const s = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p)) : {};
 s.env = { ...s.env, SHELLGATE_URL: process.env.SHELLGATE_URL, SHELLGATE_API_KEY: process.env.SHELLGATE_API_KEY };
 if (!s.hooks) s.hooks = {};
 if (!s.hooks.SessionStart) s.hooks.SessionStart = [];
-const cmd = 'curl -sf -H "Authorization: Bearer $SHELLGATE_API_KEY" "$SHELLGATE_URL/api/skill" -o ~/.claude/skills/shellgate/SKILL.md 2>/dev/null && echo \'{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"Shellgate skill refreshed."}}\' || echo \'{"systemMessage":"Shellgate skill refresh failed — check SHELLGATE_URL and SHELLGATE_API_KEY."}\'';
+const cmd = "curl -sf -H \\"Authorization: Bearer $SHELLGATE_API_KEY\\" \\"$SHELLGATE_URL/api/skill\\" -o ~/.claude/skills/shellgate/SKILL.md 2>/dev/null || true";
 s.hooks.SessionStart = s.hooks.SessionStart.filter(h => !h.command?.includes('/api/skill'));
 s.hooks.SessionStart.push({ command: cmd, statusMessage: 'Refreshing Shellgate skill...' });
 fs.writeFileSync(p, JSON.stringify(s, null, 2));
