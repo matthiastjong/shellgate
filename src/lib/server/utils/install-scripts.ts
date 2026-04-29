@@ -2,8 +2,8 @@ export function generateClaudeCodeScript(baseUrl: string, token: string): string
 	return `#!/bin/bash
 set -e
 
-SHELLGATE_URL="${baseUrl}"
-SHELLGATE_API_KEY="${token}"
+export SHELLGATE_URL="${baseUrl}"
+export SHELLGATE_API_KEY="${token}"
 
 # Verify token is valid before installing
 echo "Verifying connection..."
@@ -22,7 +22,11 @@ s.env = { ...s.env, SHELLGATE_URL: process.env.SHELLGATE_URL, SHELLGATE_API_KEY:
 if (!s.hooks) s.hooks = {};
 if (!s.hooks.SessionStart) s.hooks.SessionStart = [];
 const cmd = "curl -sf -H \\"Authorization: Bearer $SHELLGATE_API_KEY\\" \\"$SHELLGATE_URL/api/skill\\" -o ~/.claude/skills/shellgate/SKILL.md 2>/dev/null || true";
-s.hooks.SessionStart = s.hooks.SessionStart.filter(h => !h.hooks?.some(hook => hook.command?.includes('/api/skill')));
+s.hooks.SessionStart = s.hooks.SessionStart.filter(h => {
+  if (h.command?.includes('/api/skill')) return false;
+  if (h.hooks?.some(hook => hook.command?.includes('/api/skill'))) return false;
+  return true;
+});
 s.hooks.SessionStart.push({ matcher: "*", hooks: [{ type: "command", command: cmd, statusMessage: "Refreshing Shellgate skill..." }] });
 fs.writeFileSync(p, JSON.stringify(s, null, 2));
 NODEEOF
@@ -47,8 +51,8 @@ export function generateHermesScript(baseUrl: string, token: string): string {
 	return `#!/bin/bash
 set -e
 
-SHELLGATE_URL="${baseUrl}"
-SHELLGATE_API_KEY="${token}"
+export SHELLGATE_URL="${baseUrl}"
+export SHELLGATE_API_KEY="${token}"
 
 echo "Verifying connection..."
 VERIFY=$(curl -sf -H "Authorization: Bearer $SHELLGATE_API_KEY" "$SHELLGATE_URL/verify-connection" 2>&1) || {
@@ -121,8 +125,8 @@ export function generateOpenClawScript(baseUrl: string, token: string): string {
 	return `#!/bin/bash
 set -e
 
-SHELLGATE_URL="${baseUrl}"
-SHELLGATE_API_KEY="${token}"
+export SHELLGATE_URL="${baseUrl}"
+export SHELLGATE_API_KEY="${token}"
 
 # Verify token is valid before installing
 echo "Verifying connection..."
