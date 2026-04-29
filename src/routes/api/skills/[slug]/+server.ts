@@ -1,5 +1,4 @@
 import { json, error } from "@sveltejs/kit";
-<parameter name="content">import { json, error } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
 import { requireBearerOrAdmin } from "$lib/server/api-auth";
 import { getSkill, updateSkill, deleteSkill } from "$lib/server/services/skills";
