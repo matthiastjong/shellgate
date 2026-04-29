@@ -231,7 +231,7 @@ async function copyToClipboard(text: string | null) {
 
 			<div class="space-y-4">
 				{#if localTargets.length > 0}
-					<div class="space-y-2">
+					<div class="space-y-2 max-h-[40vh] overflow-y-auto pr-1">
 						{#each localTargets as target (target.id)}
 							<div class="flex items-center justify-between rounded-lg border p-3">
 								<div class="flex flex-col gap-0.5">
