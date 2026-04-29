@@ -196,7 +196,7 @@ function toggleTarget(targetId: string) {
 				{#if (data.targets as Target[]).length === 0}
 					<p class="text-muted-foreground text-sm">No targets yet — you can add permissions later.</p>
 				{:else}
-					<div class="flex flex-col gap-2">
+					<div class="flex flex-col gap-2 max-h-[40vh] overflow-y-auto pr-1">
 						{#each data.targets as target (target.id)}
 							<div class="flex items-center justify-between rounded-lg border p-3">
 								<div class="flex flex-col gap-0.5">

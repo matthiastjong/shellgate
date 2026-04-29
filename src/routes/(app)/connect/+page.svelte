@@ -16,7 +16,7 @@ function handleClose() {
 </script>
 
 <Dialog.Root bind:open onOpenChange={(v) => { if (!v) handleClose(); }}>
-	<Dialog.Content class="sm:max-w-2xl">
+	<Dialog.Content class="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
 		<Dialog.Header>
 			<Dialog.Title>Connect Agent</Dialog.Title>
 			<Dialog.Description>Set up a secure connection between your AI agent and Shellgate.</Dialog.Description>
