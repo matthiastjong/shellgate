@@ -133,6 +133,20 @@ export async function getTokenById(id: string) {
 	return row ?? null;
 }
 
+export async function deleteToken(id: string) {
+	const [existing] = await db
+		.select({ id: tokens.id })
+		.from(tokens)
+		.where(eq(tokens.id, id))
+		.limit(1);
+
+	if (!existing) return null;
+
+	await db.delete(tokens).where(eq(tokens.id, id));
+
+	return { id: existing.id, deleted: true };
+}
+
 export async function updateLastUsed(id: string) {
 	await db
 		.update(tokens)
