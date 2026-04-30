@@ -23,4 +23,4 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
 .idea/
-.worktrees/.playwright-mcp/
+.worktrees/
