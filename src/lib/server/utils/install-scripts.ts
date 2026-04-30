@@ -65,6 +65,59 @@ claude mcp remove shellgate 2>/dev/null || true
 claude mcp add --transport http shellgate "$SHELLGATE_URL/mcp" \\
   --header "Authorization: Bearer $SHELLGATE_API_KEY"
 
+# Create discovery helper scripts
+mkdir -p ~/.claude/shellgate
+
+cat > ~/.claude/shellgate/format.js << 'JSEOF'
+const d=JSON.parse(require("fs").readFileSync(0,"utf8"));
+const t=d.targets||[], s=d.skills||[], w=d.webhooks||[];
+const lines=["Shellgate context:"];
+if(t.length) lines.push("Targets: "+t.map(x=>x.slug+" ("+x.type+")").join(", "));
+if(s.length) lines.push("Org skills (fetch via org_skill_read MCP tool, NOT via Skill tool): "+s.map(x=>x.slug+" - "+(x.description||"")).join("; "));
+if(w.length) lines.push("Webhooks: "+w.map(x=>x.name).join(", "));
+lines.push("IMPORTANT: Org skills are NOT local skills. Do NOT use the Skill tool for them. Use the shellgate org_skill_read MCP tool to load org skills, and shellgate api_request for external API calls.");
+process.stdout.write(lines.join("\\n")+"\\n");
+JSEOF
+
+cat > ~/.claude/shellgate/discover.sh << 'SHEOF'
+#!/bin/bash
+curl -sf -H "Authorization: Bearer $SHELLGATE_API_KEY" "$SHELLGATE_URL/discovery" 2>/dev/null \
+  | node ~/.claude/shellgate/format.js 2>/dev/null \
+  || echo "Shellgate: could not fetch discovery (server may be offline)"
+SHEOF
+chmod +x ~/.claude/shellgate/discover.sh
+
+# Add SessionStart hook and env vars to settings.json
+export SHELLGATE_URL SHELLGATE_API_KEY
+node << SETTINGSEOF
+const fs = require("fs");
+const p = require("os").homedir() + "/.claude/settings.json";
+const s = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, "utf8")) : {};
+
+if (!s.env) s.env = {};
+s.env.SHELLGATE_URL = process.env.SHELLGATE_URL;
+s.env.SHELLGATE_API_KEY = process.env.SHELLGATE_API_KEY;
+
+if (!s.hooks) s.hooks = {};
+if (!s.hooks.SessionStart) s.hooks.SessionStart = [];
+
+s.hooks.SessionStart = s.hooks.SessionStart.filter(h => {
+  if (h.hooks && h.hooks.some(hook => hook.command && hook.command.includes("shellgate"))) return false;
+  return true;
+});
+
+s.hooks.SessionStart.push({
+  matcher: "*",
+  hooks: [{
+    type: "command",
+    command: "bash ~/.claude/shellgate/discover.sh",
+    statusMessage: "Loading Shellgate context..."
+  }]
+});
+
+fs.writeFileSync(p, JSON.stringify(s, null, 2));
+SETTINGSEOF
+
 echo ""
 echo "Shellgate MCP server registered in Claude Code"
 echo "   URL: $SHELLGATE_URL/mcp"
