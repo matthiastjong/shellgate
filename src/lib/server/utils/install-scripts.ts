@@ -65,6 +65,39 @@ claude mcp remove shellgate 2>/dev/null || true
 claude mcp add --transport http shellgate "$SHELLGATE_URL/mcp" \\
   --header "Authorization: Bearer $SHELLGATE_API_KEY"
 
+# Add SessionStart hook to load discovery context at session start
+node -e '
+const fs = require("fs");
+const p = require("os").homedir() + "/.claude/settings.json";
+const s = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, "utf8")) : {};
+
+// Store Shellgate env vars for the hook
+if (!s.env) s.env = {};
+s.env.SHELLGATE_URL = "'"$SHELLGATE_URL"'";
+s.env.SHELLGATE_API_KEY = "'"$SHELLGATE_API_KEY"'";
+
+// Add SessionStart hook that fetches discovery context
+if (!s.hooks) s.hooks = {};
+if (!s.hooks.SessionStart) s.hooks.SessionStart = [];
+
+// Remove any existing shellgate hooks
+s.hooks.SessionStart = s.hooks.SessionStart.filter(h => {
+  if (h.hooks && h.hooks.some(hook => hook.command && hook.command.includes("shellgate"))) return false;
+  return true;
+});
+
+s.hooks.SessionStart.push({
+  matcher: "*",
+  hooks: [{
+    type: "command",
+    command: "curl -sf -H \"Authorization: Bearer $SHELLGATE_API_KEY\" \"$SHELLGATE_URL/discovery\" 2>/dev/null | node -e \"const d=JSON.parse(require(\\\"fs\\\").readFileSync(0,\\\"utf8\\\"));const t=d.targets||[];const s=d.skills||[];const w=d.webhooks||[];let o=\\\"Shellgate context:\\\\n\\\";if(t.length)o+=\\\"Targets: \\\"+t.map(x=>x.slug+\\\" (\\\"+x.type+\\\")\\\").join(\\\", \\\")+\\\"\\\\n\\\";if(s.length)o+=\\\"Org skills: \\\"+s.map(x=>x.slug+\\\" — \\\"+x.description).join(\\\"; \\\")+\\\"\\\\n\\\";if(w.length)o+=\\\"Webhooks: \\\"+w.map(x=>x.name).join(\\\", \\\")+\\\"\\\\n\\\";o+=\\\"Use Shellgate MCP tools (discover, api_request, ssh_exec, org_skill_*) for all external API calls. Check org skills before starting tasks.\\\";process.stdout.write(o)\" 2>/dev/null || echo \"Shellgate: could not fetch discovery (server may be offline)\"",
+    statusMessage: "Loading Shellgate context..."
+  }]
+});
+
+fs.writeFileSync(p, JSON.stringify(s, null, 2));
+'
+
 echo ""
 echo "Shellgate MCP server registered in Claude Code"
 echo "   URL: $SHELLGATE_URL/mcp"
