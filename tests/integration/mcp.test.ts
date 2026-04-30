@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { truncateAll, createTestToken, createTestTarget, grantPermission, createTestAuthMethod, createTestWebhookEndpoint } from "../helpers";
 import { createMcpToolHandler } from "$lib/server/mcp/server";
+import { createEvent } from "$lib/server/services/webhook-events";
 import { db } from "$lib/server/db";
 import { tokens } from "$lib/server/db/schema";
 import type { Token } from "$lib/server/db/schema";
@@ -79,6 +80,79 @@ describe("MCP tools", () => {
 			expect(result.matched).toBe("rm -r");
 			expect(result.request).toEqual({ type: "ssh", command: "rm -rf /tmp/old" });
 			expect(result.next_action).toContain("approved: true");
+		});
+	});
+
+	describe("webhook_poll", () => {
+		it("returns pending events for the token's endpoints", async () => {
+			const { token } = await createTestToken();
+			const endpoint = await createTestWebhookEndpoint(token.id, { name: "GitHub" });
+			await createEvent(endpoint.id, { "content-type": "application/json" }, { action: "opened" });
+
+			const handler = createMcpToolHandler(token);
+			const result = await handler("webhook_poll", {}) as { events: Array<{ endpointName: string; body: unknown }> };
+
+			expect(result).toHaveProperty("events");
+			expect(result.events).toHaveLength(1);
+			expect(result.events[0].endpointName).toBe("GitHub");
+			expect(result.events[0].body).toEqual({ action: "opened" });
+		});
+
+		it("returns empty events when no pending events exist", async () => {
+			const { token } = await createTestToken();
+			const handler = createMcpToolHandler(token);
+			const result = await handler("webhook_poll", {}) as { events: unknown[] };
+
+			expect(result.events).toHaveLength(0);
+		});
+	});
+
+	describe("webhook_ack", () => {
+		it("acknowledges events by id and returns count", async () => {
+			const { token } = await createTestToken();
+			const endpoint = await createTestWebhookEndpoint(token.id, { name: "Stripe" });
+			await createEvent(endpoint.id, { "x-stripe-signature": "abc" }, { type: "payment.succeeded" });
+
+			const handler = createMcpToolHandler(token);
+			const pollResult = await handler("webhook_poll", {}) as { events: Array<{ id: string }> };
+			expect(pollResult.events).toHaveLength(1);
+
+			const eventId = pollResult.events[0].id;
+			const ackResult = await handler("webhook_ack", { eventIds: [eventId] }) as { acknowledged: number };
+
+			expect(ackResult.acknowledged).toBe(1);
+
+			// Polling again should return no pending events
+			const pollAgain = await handler("webhook_poll", {}) as { events: unknown[] };
+			expect(pollAgain.events).toHaveLength(0);
+		});
+
+		it("returns error when eventIds is empty", async () => {
+			const { token } = await createTestToken();
+			const handler = createMcpToolHandler(token);
+			const result = await handler("webhook_ack", { eventIds: [] }) as { error: string };
+
+			expect(result.error).toContain("eventIds is required");
+		});
+
+		it("returns error when eventIds is not provided", async () => {
+			const { token } = await createTestToken();
+			const handler = createMcpToolHandler(token);
+			const result = await handler("webhook_ack", {}) as { error: string };
+
+			expect(result.error).toContain("eventIds is required");
+		});
+
+		it("does not acknowledge events belonging to another token", async () => {
+			const { token: token1 } = await createTestToken();
+			const { token: token2 } = await createTestToken();
+			const endpoint = await createTestWebhookEndpoint(token1.id, { name: "Linear" });
+			const event = await createEvent(endpoint.id, {}, { payload: "data" });
+
+			const handler2 = createMcpToolHandler(token2);
+			const ackResult = await handler2("webhook_ack", { eventIds: [event.id] }) as { acknowledged: number };
+
+			expect(ackResult.acknowledged).toBe(0);
 		});
 	});
 
