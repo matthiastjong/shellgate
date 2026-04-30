@@ -86,7 +86,9 @@ export async function apiRequest(token: Token, args: ApiRequestArgs) {
 
 	if (body !== undefined && method.toUpperCase() !== "GET" && method.toUpperCase() !== "HEAD") {
 		const bodyStr = typeof body === "string" ? body : JSON.stringify(body);
-		(requestInit.headers as Headers).set("Content-Type", "application/json");
+		if (!(requestInit.headers as Headers).has("Content-Type")) {
+			(requestInit.headers as Headers).set("Content-Type", "application/json");
+		}
 		requestInit.body = bodyStr;
 	}
 

@@ -63,17 +63,19 @@ fi
 
 # Verify connection
 echo "Verifying connection..."
-curl -sf -H "Authorization: Bearer $SHELLGATE_API_KEY" "$SHELLGATE_URL/verify-connection" > /dev/null || {
-  echo "Invalid token or Shellgate unreachable"
-  exit 1
-}
-
-echo ""
-echo "Shellgate MCP server registered in Claude Code"
-echo "   URL: $SHELLGATE_URL/mcp"
-echo "   Config: ~/.claude/settings.json"
-echo ""
-echo "Restart Claude Code to connect to the Shellgate MCP server."
+if curl -sf -H "Authorization: Bearer $SHELLGATE_API_KEY" "$SHELLGATE_URL/verify-connection" > /dev/null 2>&1; then
+  echo ""
+  echo "Shellgate MCP server registered in Claude Code"
+  echo "   URL: $SHELLGATE_URL/mcp"
+  echo "   Config: ~/.claude/settings.json"
+  echo ""
+  echo "Restart Claude Code to connect to the Shellgate MCP server."
+else
+  echo ""
+  echo "Warning: Could not verify connection to Shellgate at $SHELLGATE_URL"
+  echo "MCP config has been written to ~/.claude/settings.json"
+  echo "Verify your Shellgate instance is running, then restart Claude Code."
+fi
 `;
 }
 

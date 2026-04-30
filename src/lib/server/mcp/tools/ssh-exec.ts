@@ -98,7 +98,7 @@ export async function sshExec(token: Token, args: SshExecArgs) {
 		}
 	}
 
-	const timeoutMs = typeof timeout === "number" ? timeout * 1000 : undefined;
+	const timeoutMs = typeof timeout === "number" ? Math.min(timeout, 60) * 1000 : undefined;
 
 	try {
 		const result = await executeCommand(config, authMethod.credential, command, timeoutMs);
