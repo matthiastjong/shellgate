@@ -374,8 +374,8 @@ async function copyToClipboard(text: string | null) {
 						<p class="text-muted-foreground">This will:</p>
 						<ul class="text-muted-foreground list-disc list-inside space-y-0.5">
 							<li>Verify your API key works</li>
-							<li>Configure Claude Code environment variables</li>
-							<li>Install the Shellgate skill</li>
+							<li>Register the Shellgate MCP server in Claude Code</li>
+							<li>Clean up any old skill-based config</li>
 						</ul>
 					</div>
 				{:else if selectedAgent === "hermes"}
