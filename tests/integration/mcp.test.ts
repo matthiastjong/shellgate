@@ -49,6 +49,39 @@ describe("MCP tools", () => {
 		});
 	});
 
+	describe("ssh_exec", () => {
+		it("returns approval_required for a destructive command without approved flag", async () => {
+			const { token: tokenRow } = await createTestToken();
+			const target = await createTestTarget("DeployServer", "https://unused.example.com");
+			await grantPermission(tokenRow.id, target.id);
+
+			// Update target to SSH type with config
+			const { db } = await import("$lib/server/db");
+			const { targets: targetsTable } = await import("$lib/server/db/schema");
+			const { eq } = await import("drizzle-orm");
+			await db.update(targetsTable).set({
+				type: "ssh",
+				config: { host: "10.0.0.1", port: 22, username: "deploy" },
+			}).where(eq(targetsTable.id, target.id));
+
+			await createTestAuthMethod(target.id, { type: "ssh_key", credential: "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----" });
+
+			const fullToken = await getFullToken(tokenRow.id);
+
+			const handler = createMcpToolHandler(fullToken);
+			const result = await handler("ssh_exec", {
+				target: target.slug,
+				command: "rm -rf /tmp/old",
+			}) as { status: string; reason: string; matched: string; next_action: string; request: { type: string; command: string } };
+
+			expect(result.status).toBe("approval_required");
+			expect(result.reason).toContain("rm -r");
+			expect(result.matched).toBe("rm -r");
+			expect(result.request).toEqual({ type: "ssh", command: "rm -rf /tmp/old" });
+			expect(result.next_action).toContain("approved: true");
+		});
+	});
+
 	describe("api_request", () => {
 		it("proxies a GET request to the upstream target", async () => {
 			const { token: tokenRow } = await createTestToken();
