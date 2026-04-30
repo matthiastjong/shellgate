@@ -1,10 +1,23 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { truncateAll, createTestToken, createTestTarget, grantPermission, createTestAuthMethod, createTestWebhookEndpoint } from "../helpers";
 import { createMcpToolHandler } from "$lib/server/mcp/server";
+import { db } from "$lib/server/db";
+import { tokens } from "$lib/server/db/schema";
+import type { Token } from "$lib/server/db/schema";
+import { eq } from "drizzle-orm";
+
+async function getFullToken(tokenId: string): Promise<Token> {
+	const [row] = await db.select().from(tokens).where(eq(tokens.id, tokenId)).limit(1);
+	return row;
+}
 
 describe("MCP tools", () => {
 	beforeEach(async () => {
 		await truncateAll();
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
 	});
 
 	describe("discover", () => {
@@ -33,6 +46,59 @@ describe("MCP tools", () => {
 
 			expect(result.targets).toHaveLength(0);
 			expect(result.webhooks).toHaveLength(0);
+		});
+	});
+
+	describe("api_request", () => {
+		it("proxies a GET request to the upstream target", async () => {
+			const { token: tokenRow } = await createTestToken();
+			const target = await createTestTarget("OpenAI", "https://api.openai.com");
+			await createTestAuthMethod(target.id, { credential: "sk-test-1234567890" });
+			await grantPermission(tokenRow.id, target.id);
+
+			const fullToken = await getFullToken(tokenRow.id);
+
+			const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+				new Response(JSON.stringify({ models: [] }), {
+					status: 200,
+					headers: { "content-type": "application/json" },
+				}),
+			);
+
+			const handler = createMcpToolHandler(fullToken);
+			const result = await handler("api_request", {
+				target: target.slug,
+				method: "GET",
+				path: "v1/models",
+			}) as { status: number; headers: Record<string, string>; body: unknown };
+
+			expect(result.status).toBe(200);
+			expect(result.body).toEqual({ models: [] });
+			expect(fetchSpy).toHaveBeenCalledOnce();
+			const [url, init] = fetchSpy.mock.calls[0];
+			expect(url).toBe("https://api.openai.com/v1/models");
+			expect((init!.headers as Headers).get("Authorization")).toBe("Bearer sk-test-1234567890");
+		});
+
+		it("returns approval_required for a DELETE request without approved flag", async () => {
+			const { token: tokenRow } = await createTestToken();
+			const target = await createTestTarget("SomeAPI", "https://api.example.com");
+			await createTestAuthMethod(target.id);
+			await grantPermission(tokenRow.id, target.id);
+
+			const fullToken = await getFullToken(tokenRow.id);
+
+			const handler = createMcpToolHandler(fullToken);
+			const result = await handler("api_request", {
+				target: target.slug,
+				method: "DELETE",
+				path: "v1/resource/123",
+			}) as { status: string; reason: string; matched: string; next_action: string };
+
+			expect(result.status).toBe("approval_required");
+			expect(result.reason).toContain("DELETE");
+			expect(result.matched).toBe("DELETE");
+			expect(result.next_action).toContain("approved: true");
 		});
 	});
 });
