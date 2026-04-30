@@ -13,6 +13,33 @@ async function getFullToken(tokenId: string): Promise<Token> {
 	return row;
 }
 
+describe("MCP auth", () => {
+	it("rejects requests without bearer token", async () => {
+		const { POST } = await import("../../src/routes/mcp/+server");
+		const request = new Request("http://localhost/mcp", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				jsonrpc: "2.0",
+				method: "initialize",
+				params: {
+					protocolVersion: "2025-03-26",
+					capabilities: {},
+					clientInfo: { name: "test", version: "0.1" },
+				},
+				id: 1,
+			}),
+		});
+
+		try {
+			await POST({ request } as any);
+			expect.fail("Should have thrown");
+		} catch (e: any) {
+			expect(e.status).toBe(401);
+		}
+	});
+});
+
 describe("MCP tools", () => {
 	beforeEach(async () => {
 		await truncateAll();
