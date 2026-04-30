@@ -2,48 +2,78 @@ export function generateClaudeCodeScript(baseUrl: string, token: string): string
 	return `#!/bin/bash
 set -e
 
-export SHELLGATE_URL="${baseUrl}"
-export SHELLGATE_API_KEY="${token}"
+SHELLGATE_URL="${baseUrl}"
+SHELLGATE_API_KEY="${token}"
 
-# Verify token is valid before installing
+# Validate API key format
+if [[ "$SHELLGATE_API_KEY" != sg_* ]]; then
+  echo "Invalid API key: must start with sg_"
+  exit 1
+fi
+
+# Ensure ~/.claude/settings.json exists
+mkdir -p ~/.claude
+if [ ! -f ~/.claude/settings.json ]; then
+  echo '{}' > ~/.claude/settings.json
+fi
+
+# Update settings: remove old skill config, add MCP server
+node -e '
+const fs = require("fs");
+const p = require("os").homedir() + "/.claude/settings.json";
+const s = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, "utf8")) : {};
+
+// Remove old env vars
+if (s.env) {
+  delete s.env.SHELLGATE_URL;
+  delete s.env.SHELLGATE_API_KEY;
+  if (Object.keys(s.env).length === 0) delete s.env;
+}
+
+// Remove old SessionStart hooks referencing /api/skill
+if (s.hooks && s.hooks.SessionStart) {
+  s.hooks.SessionStart = s.hooks.SessionStart.filter(h => {
+    if (h.command && h.command.includes("/api/skill")) return false;
+    if (h.hooks && h.hooks.some(hook => hook.command && hook.command.includes("/api/skill"))) return false;
+    return true;
+  });
+  if (s.hooks.SessionStart.length === 0) delete s.hooks.SessionStart;
+  if (Object.keys(s.hooks).length === 0) delete s.hooks;
+}
+
+// Add MCP server config
+if (!s.mcpServers) s.mcpServers = {};
+s.mcpServers.shellgate = {
+  type: "url",
+  url: "${baseUrl}/mcp",
+  headers: {
+    Authorization: "Bearer ${token}"
+  }
+};
+
+fs.writeFileSync(p, JSON.stringify(s, null, 2));
+console.log("Settings updated.");
+'
+
+# Clean up old skill directory
+if [ -d ~/.claude/skills/shellgate ]; then
+  rm -rf ~/.claude/skills/shellgate
+  echo "Removed old skill directory: ~/.claude/skills/shellgate"
+fi
+
+# Verify connection
 echo "Verifying connection..."
-VERIFY=$(curl -sf -H "Authorization: Bearer $SHELLGATE_API_KEY" "$SHELLGATE_URL/verify-connection" 2>&1) || {
-  echo "❌ Invalid token or Shellgate unreachable"
+curl -sf -H "Authorization: Bearer $SHELLGATE_API_KEY" "$SHELLGATE_URL/verify-connection" > /dev/null || {
+  echo "Invalid token or Shellgate unreachable"
   exit 1
 }
 
-# Configure Claude Code environment variables and skill refresh hook
-mkdir -p ~/.claude
-node << 'NODEEOF'
-const fs = require('fs');
-const p = process.env.HOME + '/.claude/settings.json';
-const s = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p)) : {};
-s.env = { ...s.env, SHELLGATE_URL: process.env.SHELLGATE_URL, SHELLGATE_API_KEY: process.env.SHELLGATE_API_KEY };
-if (!s.hooks) s.hooks = {};
-if (!s.hooks.SessionStart) s.hooks.SessionStart = [];
-const cmd = "curl -sf -H \\"Authorization: Bearer $SHELLGATE_API_KEY\\" \\"$SHELLGATE_URL/api/skill\\" -o ~/.claude/skills/shellgate/SKILL.md 2>/dev/null || true";
-s.hooks.SessionStart = s.hooks.SessionStart.filter(h => {
-  if (h.command?.includes('/api/skill')) return false;
-  if (h.hooks?.some(hook => hook.command?.includes('/api/skill'))) return false;
-  return true;
-});
-s.hooks.SessionStart.push({ matcher: "*", hooks: [{ type: "command", command: cmd, statusMessage: "Refreshing Shellgate skill..." }] });
-fs.writeFileSync(p, JSON.stringify(s, null, 2));
-NODEEOF
-
-# Install skill
-mkdir -p ~/.claude/skills/shellgate
-curl -sf -H "Authorization: Bearer $SHELLGATE_API_KEY" \\
-  "$SHELLGATE_URL/api/skill" > ~/.claude/skills/shellgate/SKILL.md
-
 echo ""
-echo "✅ Shellgate connected to Claude Code"
-echo "   URL: $SHELLGATE_URL"
-echo "   Skill installed: ~/.claude/skills/shellgate/SKILL.md"
-echo "   Env configured: ~/.claude/settings.json"
+echo "Shellgate MCP server registered in Claude Code"
+echo "   URL: $SHELLGATE_URL/mcp"
+echo "   Config: ~/.claude/settings.json"
 echo ""
-echo "Verifying with Claude Code..."
-claude "Confirm the shellgate skill is loaded, then run: curl -s -H \\"Authorization: Bearer \\$SHELLGATE_API_KEY\\" \\$SHELLGATE_URL/verify-connection"
+echo "Restart Claude Code to connect to the Shellgate MCP server."
 `;
 }
 
