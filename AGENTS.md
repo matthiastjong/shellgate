@@ -73,6 +73,7 @@ These are NOT behind dashboard auth — they use bearer token auth (`requireBear
 | `GET /webhooks/poll` | Poll pending webhook events for this token |
 | `POST /webhooks/ack` | Acknowledge processed webhook events |
 | `POST /webhooks/endpoints/[id]/instructions` | Save handling instructions for endpoint |
+| `POST /mcp` | MCP server (Streamable HTTP transport) |
 
 ### Dashboard routes
 
@@ -111,6 +112,16 @@ Behind session auth (cookie-based):
 4. Parse `{ command, timeout? }` from request body
 5. Connect via `ssh2`, execute, return `{ stdout, stderr, exitCode, durationMs }`
 6. Log to `audit_logs`
+
+### MCP Server
+
+Shellgate exposes all agent-facing functionality as an MCP server at `POST /mcp` using Streamable HTTP transport. Claude Code connects via `mcpServers` config in `~/.claude/settings.json`.
+
+**Tools:** `discover`, `api_request`, `ssh_exec`, `webhook_poll`, `webhook_ack`, `skill_list`, `skill_read`, `skill_upsert`, `skill_delete`
+
+**Auth:** Same bearer token as REST endpoints. Passed via `Authorization` header.
+
+**Instructions:** On initialize, the server sends instructions telling the agent to call `discover` and `skill_list` at session start.
 
 ## Testing
 
