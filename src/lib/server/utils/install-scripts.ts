@@ -11,17 +11,25 @@ if [[ "$SHELLGATE_API_KEY" != sg_* ]]; then
   exit 1
 fi
 
-# Ensure ~/.claude/settings.json exists
-mkdir -p ~/.claude
-if [ ! -f ~/.claude/settings.json ]; then
-  echo '{}' > ~/.claude/settings.json
+# Verify connection first
+echo "Verifying connection..."
+if ! curl -sf -H "Authorization: Bearer $SHELLGATE_API_KEY" "$SHELLGATE_URL/verify-connection" > /dev/null 2>&1; then
+  echo "Warning: Could not verify connection to Shellgate at $SHELLGATE_URL"
+  echo "Continuing with setup — verify your Shellgate instance is running."
 fi
 
-# Update settings: remove old skill config, add MCP server
-node -e '
+# Clean up old skill-based config
+if [ -d ~/.claude/skills/shellgate ]; then
+  rm -rf ~/.claude/skills/shellgate
+  echo "Removed old skill directory"
+fi
+
+# Remove old env vars and hooks from settings.json
+if [ -f ~/.claude/settings.json ]; then
+  node -e '
 const fs = require("fs");
 const p = require("os").homedir() + "/.claude/settings.json";
-const s = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, "utf8")) : {};
+const s = JSON.parse(fs.readFileSync(p, "utf8"));
 
 // Remove old env vars
 if (s.env) {
@@ -41,41 +49,27 @@ if (s.hooks && s.hooks.SessionStart) {
   if (Object.keys(s.hooks).length === 0) delete s.hooks;
 }
 
-// Add MCP server config
-if (!s.mcpServers) s.mcpServers = {};
-s.mcpServers.shellgate = {
-  type: "url",
-  url: "${baseUrl}/mcp",
-  headers: {
-    Authorization: "Bearer ${token}"
-  }
-};
+// Remove old mcpServers.shellgate if present
+if (s.mcpServers) {
+  delete s.mcpServers.shellgate;
+  if (Object.keys(s.mcpServers).length === 0) delete s.mcpServers;
+}
 
 fs.writeFileSync(p, JSON.stringify(s, null, 2));
-console.log("Settings updated.");
 '
-
-# Clean up old skill directory
-if [ -d ~/.claude/skills/shellgate ]; then
-  rm -rf ~/.claude/skills/shellgate
-  echo "Removed old skill directory: ~/.claude/skills/shellgate"
+  echo "Cleaned up old config"
 fi
 
-# Verify connection
-echo "Verifying connection..."
-if curl -sf -H "Authorization: Bearer $SHELLGATE_API_KEY" "$SHELLGATE_URL/verify-connection" > /dev/null 2>&1; then
-  echo ""
-  echo "Shellgate MCP server registered in Claude Code"
-  echo "   URL: $SHELLGATE_URL/mcp"
-  echo "   Config: ~/.claude/settings.json"
-  echo ""
-  echo "Restart Claude Code to connect to the Shellgate MCP server."
-else
-  echo ""
-  echo "Warning: Could not verify connection to Shellgate at $SHELLGATE_URL"
-  echo "MCP config has been written to ~/.claude/settings.json"
-  echo "Verify your Shellgate instance is running, then restart Claude Code."
-fi
+# Register MCP server via Claude CLI
+claude mcp remove shellgate 2>/dev/null || true
+claude mcp add --transport http shellgate "$SHELLGATE_URL/mcp" \\
+  --header "Authorization: Bearer $SHELLGATE_API_KEY"
+
+echo ""
+echo "Shellgate MCP server registered in Claude Code"
+echo "   URL: $SHELLGATE_URL/mcp"
+echo ""
+echo "Restart Claude Code to connect to the Shellgate MCP server."
 `;
 }
 

@@ -78,9 +78,10 @@ describe("install script generation", () => {
 			expect(script).toContain("SHELLGATE_API_KEY");
 		});
 
-		it("registers MCP server in settings", () => {
+		it("registers MCP server via claude CLI", () => {
 			const script = generateClaudeCodeScript(BASE, TOKEN);
-			expect(script).toContain("mcpServers");
+			expect(script).toContain("claude mcp add");
+			expect(script).toContain("--transport http");
 			expect(script).toContain("/mcp");
 		});
 
