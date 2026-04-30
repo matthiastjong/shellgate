@@ -184,13 +184,13 @@ describe("MCP tools", () => {
 		});
 	});
 
-	describe("skill_list", () => {
+	describe("org_skill_list", () => {
 		it("returns array with slug and description", async () => {
 			const { token } = await createTestToken();
 			await createSkill("---\nname: test-skill\ndescription: A test skill\n---\n# Test\nSome content.");
 
 			const handler = createMcpToolHandler(token);
-			const result = await handler("skill_list", {}) as Array<{ slug: string; description: string }>;
+			const result = await handler("org_skill_list", {}) as Array<{ slug: string; description: string }>;
 
 			expect(Array.isArray(result)).toBe(true);
 			expect(result).toHaveLength(1);
@@ -199,14 +199,14 @@ describe("MCP tools", () => {
 		});
 	});
 
-	describe("skill_read", () => {
+	describe("org_skill_read", () => {
 		it("returns full skill content", async () => {
 			const { token } = await createTestToken();
 			const content = "---\nname: my-skill\ndescription: My skill description\n---\n# My Skill\nDoes stuff.";
 			await createSkill(content);
 
 			const handler = createMcpToolHandler(token);
-			const result = await handler("skill_read", { slug: "my-skill" }) as { slug: string; description: string; content: string; version: number };
+			const result = await handler("org_skill_read", { slug: "my-skill" }) as { slug: string; description: string; content: string; version: number };
 
 			expect(result.slug).toBe("my-skill");
 			expect(result.description).toBe("My skill description");
@@ -218,19 +218,19 @@ describe("MCP tools", () => {
 			const { token } = await createTestToken();
 
 			const handler = createMcpToolHandler(token);
-			const result = await handler("skill_read", { slug: "does-not-exist" }) as { error: string };
+			const result = await handler("org_skill_read", { slug: "does-not-exist" }) as { error: string };
 
 			expect(result.error).toContain("does-not-exist");
 		});
 	});
 
-	describe("skill_upsert", () => {
+	describe("org_skill_upsert", () => {
 		it("creates a new skill and returns slug and version", async () => {
 			const { token } = await createTestToken();
 			const content = "---\nname: new-skill\ndescription: Brand new skill\n---\n# New Skill\nContent here.";
 
 			const handler = createMcpToolHandler(token);
-			const result = await handler("skill_upsert", { content }) as { slug: string; version: number };
+			const result = await handler("org_skill_upsert", { content }) as { slug: string; version: number };
 
 			expect(result.slug).toBe("new-skill");
 			expect(result.version).toBe(1);
@@ -244,20 +244,20 @@ describe("MCP tools", () => {
 			const updated = "---\nname: existing-skill\ndescription: Updated description\n---\n# Updated\nNew content.";
 
 			const handler = createMcpToolHandler(token);
-			const result = await handler("skill_upsert", { content: updated }) as { slug: string; version: number };
+			const result = await handler("org_skill_upsert", { content: updated }) as { slug: string; version: number };
 
 			expect(result.slug).toBe("existing-skill");
 			expect(result.version).toBeGreaterThanOrEqual(2);
 		});
 	});
 
-	describe("skill_delete", () => {
+	describe("org_skill_delete", () => {
 		it("deletes a skill and returns { deleted: true }", async () => {
 			const { token } = await createTestToken();
 			await createSkill("---\nname: delete-me\ndescription: To be deleted\n---\n# Delete Me\nContent.");
 
 			const handler = createMcpToolHandler(token);
-			const result = await handler("skill_delete", { slug: "delete-me" }) as { deleted: boolean };
+			const result = await handler("org_skill_delete", { slug: "delete-me" }) as { deleted: boolean };
 
 			expect(result.deleted).toBe(true);
 		});
@@ -266,7 +266,7 @@ describe("MCP tools", () => {
 			const { token } = await createTestToken();
 
 			const handler = createMcpToolHandler(token);
-			const result = await handler("skill_delete", { slug: "ghost-skill" }) as { error: string };
+			const result = await handler("org_skill_delete", { slug: "ghost-skill" }) as { error: string };
 
 			expect(result.error).toContain("ghost-skill");
 		});

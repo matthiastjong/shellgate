@@ -9,7 +9,9 @@ import type { SshExecArgs } from "./tools/ssh-exec";
 import { webhookPoll, webhookAck } from "./tools/webhooks";
 import { skillList, skillRead, skillUpsert, skillDelete } from "./tools/skills";
 
-const INSTRUCTIONS = `Always call discover at the start of each session to learn available targets, webhooks, and skills. Then call skill_list to see available skills. Only call skill_read when you need a specific skill's full instructions.`;
+const INSTRUCTIONS = `Always call discover at the start of each session to learn available targets, webhooks, and organization skills. Then call org_skill_list to see available organization skills. Only call org_skill_read when you need a specific skill's full instructions.
+
+Shellgate manages organization-wide skills shared across all agents — these are different from local Claude Code skills. Use org_skill_* tools for shared organization skills, and the superpowers writing-skills skill for local Claude Code skills.`;
 
 export function createMcpServer() {
 	const server = new McpServer(
@@ -72,14 +74,14 @@ export function registerTools(server: McpServer, token: Token) {
 		}
 	);
 
-	server.tool("skill_list", "List all organization skills with slug and description", async () => {
+	server.tool("org_skill_list", "List all organization-wide skills shared across Shellgate agents (slug and description)", async () => {
 		const result = await skillList();
 		return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 	});
 
 	server.tool(
-		"skill_read",
-		"Read the full content of a skill",
+		"org_skill_read",
+		"Read the full content of a shared organization skill from Shellgate",
 		{ slug: z.string().describe("Skill slug") },
 		async (args) => {
 			const result = await skillRead(args);
@@ -88,8 +90,8 @@ export function registerTools(server: McpServer, token: Token) {
 	);
 
 	server.tool(
-		"skill_upsert",
-		"Create or update a skill. Content must be full markdown with YAML frontmatter (name, description)",
+		"org_skill_upsert",
+		"Create or update a shared organization skill in Shellgate. Content must be full markdown with YAML frontmatter (name, description). These skills are shared across all agents.",
 		{ content: z.string().describe("Full skill markdown with YAML frontmatter") },
 		async (args) => {
 			const result = await skillUpsert(args);
@@ -98,8 +100,8 @@ export function registerTools(server: McpServer, token: Token) {
 	);
 
 	server.tool(
-		"skill_delete",
-		"Delete a skill",
+		"org_skill_delete",
+		"Delete a shared organization skill from Shellgate",
 		{ slug: z.string().describe("Skill slug") },
 		async (args) => {
 			const result = await skillDelete(args);
@@ -125,13 +127,13 @@ export function createMcpToolHandler(token: TokenLike): ToolHandler {
 				return webhookPoll(t);
 			case "webhook_ack":
 				return webhookAck(t, args as unknown as { eventIds: string[] });
-			case "skill_list":
+			case "org_skill_list":
 				return skillList();
-			case "skill_read":
+			case "org_skill_read":
 				return skillRead(args as unknown as { slug: string });
-			case "skill_upsert":
+			case "org_skill_upsert":
 				return skillUpsert(args as unknown as { content: string });
-			case "skill_delete":
+			case "org_skill_delete":
 				return skillDelete(args as unknown as { slug: string });
 			default:
 				throw new Error(`Unknown tool: ${name}`);
