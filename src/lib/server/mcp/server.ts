@@ -12,16 +12,15 @@ import { skillList, skillRead, skillUpsert, skillDelete } from "./tools/skills";
 const INSTRUCTIONS = `Always call discover at the start of each session to learn available targets, webhooks, and skills. Then call skill_list to see available skills. Only call skill_read when you need a specific skill's full instructions.`;
 
 export function createMcpServer() {
-	const server = new McpServer({
-		name: "shellgate",
-		version: "1.0.0",
-		instructions: INSTRUCTIONS,
-	});
+	const server = new McpServer(
+		{ name: "shellgate", version: "1.0.0" },
+		{ instructions: INSTRUCTIONS }
+	);
 	return server;
 }
 
 export function registerTools(server: McpServer, token: Token) {
-	server.tool("discover", "List all targets, webhook endpoints, and skills accessible to this token", {}, async () => {
+	server.tool("discover", "List all targets, webhook endpoints, and skills accessible to this token", async () => {
 		const result = await discover(token);
 		return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 	});
@@ -33,8 +32,8 @@ export function registerTools(server: McpServer, token: Token) {
 			target: z.string().describe("Target slug"),
 			method: z.enum(["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]).describe("HTTP method"),
 			path: z.string().describe("Path appended to target's baseUrl"),
-			headers: z.record(z.string()).optional().describe("Additional request headers"),
-			body: z.union([z.string(), z.record(z.unknown())]).optional().describe("Request body"),
+			headers: z.record(z.string(), z.string()).optional().describe("Additional request headers"),
+			body: z.union([z.string(), z.record(z.string(), z.unknown())]).optional().describe("Request body"),
 			approved: z.boolean().optional().describe("Set to true after user approves a guarded request"),
 		},
 		async (args) => {
@@ -58,7 +57,7 @@ export function registerTools(server: McpServer, token: Token) {
 		}
 	);
 
-	server.tool("webhook_poll", "Poll for pending webhook events", {}, async () => {
+	server.tool("webhook_poll", "Poll for pending webhook events", async () => {
 		const result = await webhookPoll(token);
 		return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 	});
@@ -73,7 +72,7 @@ export function registerTools(server: McpServer, token: Token) {
 		}
 	);
 
-	server.tool("skill_list", "List all organization skills with slug and description", {}, async () => {
+	server.tool("skill_list", "List all organization skills with slug and description", async () => {
 		const result = await skillList();
 		return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 	});
@@ -110,20 +109,22 @@ export function registerTools(server: McpServer, token: Token) {
 }
 
 type ToolHandler = (name: string, args: Record<string, unknown>) => Promise<unknown>;
+type TokenLike = Pick<Token, "id" | "name">;
 
-export function createMcpToolHandler(token: Token): ToolHandler {
+export function createMcpToolHandler(token: TokenLike): ToolHandler {
+	const t = token as Token;
 	return async (name: string, args: Record<string, unknown>) => {
 		switch (name) {
 			case "discover":
-				return discover(token);
+				return discover(t);
 			case "api_request":
-				return apiRequest(token, args as unknown as ApiRequestArgs);
+				return apiRequest(t, args as unknown as ApiRequestArgs);
 			case "ssh_exec":
-				return sshExec(token, args as unknown as SshExecArgs);
+				return sshExec(t, args as unknown as SshExecArgs);
 			case "webhook_poll":
-				return webhookPoll(token);
+				return webhookPoll(t);
 			case "webhook_ack":
-				return webhookAck(token, args as unknown as { eventIds: string[] });
+				return webhookAck(t, args as unknown as { eventIds: string[] });
 			case "skill_list":
 				return skillList();
 			case "skill_read":

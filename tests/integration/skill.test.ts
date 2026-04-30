@@ -78,24 +78,20 @@ describe("install script generation", () => {
 			expect(script).toContain("SHELLGATE_API_KEY");
 		});
 
-		it("installs skill file", () => {
+		it("registers MCP server in settings", () => {
 			const script = generateClaudeCodeScript(BASE, TOKEN);
-			expect(script).toContain(".claude/skills/shellgate/SKILL.md");
-			expect(script).toContain("/api/skill");
+			expect(script).toContain("mcpServers");
+			expect(script).toContain("/mcp");
 		});
 
-		it("verifies connection before installing", () => {
+		it("verifies connection", () => {
 			const script = generateClaudeCodeScript(BASE, TOKEN);
-			const verifyIdx = script.indexOf("/verify-connection");
-			const skillIdx = script.indexOf("/api/skill");
-			expect(verifyIdx).toBeGreaterThan(-1);
-			expect(skillIdx).toBeGreaterThan(-1);
-			expect(verifyIdx).toBeLessThan(skillIdx);
+			expect(script).toContain("/verify-connection");
 		});
 
-		it("invokes claude CLI for verification", () => {
+		it("cleans up old skill-based config", () => {
 			const script = generateClaudeCodeScript(BASE, TOKEN);
-			expect(script).toContain('claude "');
+			expect(script).toContain("skills/shellgate");
 		});
 
 		it("exits on failed verification", () => {
