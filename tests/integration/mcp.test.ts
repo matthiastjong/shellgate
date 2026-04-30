@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { truncateAll, createTestToken, createTestTarget, grantPermission, createTestAuthMethod, createTestWebhookEndpoint } from "../helpers";
 import { createMcpToolHandler } from "$lib/server/mcp/server";
 import { createEvent } from "$lib/server/services/webhook-events";
+import { createSkill } from "$lib/server/services/skills";
 import { db } from "$lib/server/db";
 import { tokens } from "$lib/server/db/schema";
 import type { Token } from "$lib/server/db/schema";
@@ -153,6 +154,94 @@ describe("MCP tools", () => {
 			const ackResult = await handler2("webhook_ack", { eventIds: [event.id] }) as { acknowledged: number };
 
 			expect(ackResult.acknowledged).toBe(0);
+		});
+	});
+
+	describe("skill_list", () => {
+		it("returns array with slug and description", async () => {
+			const { token } = await createTestToken();
+			await createSkill("---\nname: test-skill\ndescription: A test skill\n---\n# Test\nSome content.");
+
+			const handler = createMcpToolHandler(token);
+			const result = await handler("skill_list", {}) as Array<{ slug: string; description: string }>;
+
+			expect(Array.isArray(result)).toBe(true);
+			expect(result).toHaveLength(1);
+			expect(result[0].slug).toBe("test-skill");
+			expect(result[0].description).toBe("A test skill");
+		});
+	});
+
+	describe("skill_read", () => {
+		it("returns full skill content", async () => {
+			const { token } = await createTestToken();
+			const content = "---\nname: my-skill\ndescription: My skill description\n---\n# My Skill\nDoes stuff.";
+			await createSkill(content);
+
+			const handler = createMcpToolHandler(token);
+			const result = await handler("skill_read", { slug: "my-skill" }) as { slug: string; description: string; content: string; version: number };
+
+			expect(result.slug).toBe("my-skill");
+			expect(result.description).toBe("My skill description");
+			expect(result.content).toBe(content);
+			expect(result.version).toBe(1);
+		});
+
+		it("returns error for nonexistent slug", async () => {
+			const { token } = await createTestToken();
+
+			const handler = createMcpToolHandler(token);
+			const result = await handler("skill_read", { slug: "does-not-exist" }) as { error: string };
+
+			expect(result.error).toContain("does-not-exist");
+		});
+	});
+
+	describe("skill_upsert", () => {
+		it("creates a new skill and returns slug and version", async () => {
+			const { token } = await createTestToken();
+			const content = "---\nname: new-skill\ndescription: Brand new skill\n---\n# New Skill\nContent here.";
+
+			const handler = createMcpToolHandler(token);
+			const result = await handler("skill_upsert", { content }) as { slug: string; version: number };
+
+			expect(result.slug).toBe("new-skill");
+			expect(result.version).toBe(1);
+		});
+
+		it("updates an existing skill and returns version >= 2", async () => {
+			const { token } = await createTestToken();
+			const original = "---\nname: existing-skill\ndescription: Original description\n---\n# Original\nOld content.";
+			await createSkill(original);
+
+			const updated = "---\nname: existing-skill\ndescription: Updated description\n---\n# Updated\nNew content.";
+
+			const handler = createMcpToolHandler(token);
+			const result = await handler("skill_upsert", { content: updated }) as { slug: string; version: number };
+
+			expect(result.slug).toBe("existing-skill");
+			expect(result.version).toBeGreaterThanOrEqual(2);
+		});
+	});
+
+	describe("skill_delete", () => {
+		it("deletes a skill and returns { deleted: true }", async () => {
+			const { token } = await createTestToken();
+			await createSkill("---\nname: delete-me\ndescription: To be deleted\n---\n# Delete Me\nContent.");
+
+			const handler = createMcpToolHandler(token);
+			const result = await handler("skill_delete", { slug: "delete-me" }) as { deleted: boolean };
+
+			expect(result.deleted).toBe(true);
+		});
+
+		it("returns error when skill not found", async () => {
+			const { token } = await createTestToken();
+
+			const handler = createMcpToolHandler(token);
+			const result = await handler("skill_delete", { slug: "ghost-skill" }) as { error: string };
+
+			expect(result.error).toContain("ghost-skill");
 		});
 	});
 
