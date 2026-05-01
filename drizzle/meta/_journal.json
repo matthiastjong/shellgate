@@ -57,6 +57,13 @@
       "when": 1777473128119,
       "tag": "0007_strange_skullbuster",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1777645476928,
+      "tag": "0008_lonely_venus",
+      "breakpoints": true
     }
   ]
 }
