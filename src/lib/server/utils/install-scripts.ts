@@ -61,8 +61,10 @@ fs.writeFileSync(p, JSON.stringify(s, null, 2));
 fi
 
 # Register MCP server via Claude CLI
-claude mcp remove shellgate 2>/dev/null || true
-claude mcp add --transport http shellgate "$SHELLGATE_URL/mcp" \\
+claude mcp remove shellgate --scope user 2>/dev/null || true
+claude mcp remove shellgate --scope local 2>/dev/null || true
+claude mcp remove shellgate --scope project 2>/dev/null || true
+claude mcp add --transport http --scope user shellgate "$SHELLGATE_URL/mcp" \\
   --header "Authorization: Bearer $SHELLGATE_API_KEY"
 
 # Create discovery helper scripts
