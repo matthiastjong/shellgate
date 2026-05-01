@@ -21,6 +21,7 @@ export async function listTokens() {
 			revokedAt: tokens.revokedAt,
 			lastUsedAt: tokens.lastUsedAt,
 			updatedAt: tokens.updatedAt,
+			defaultUser: tokens.defaultUser,
 		})
 		.from(tokens)
 		.orderBy(desc(tokens.createdAt));
@@ -83,6 +84,7 @@ export async function regenerateToken(id: string) {
 			revokedAt: tokens.revokedAt,
 			lastUsedAt: tokens.lastUsedAt,
 			updatedAt: tokens.updatedAt,
+			defaultUser: tokens.defaultUser,
 		});
 
 	return { token: updated, plainToken };
@@ -126,6 +128,7 @@ export async function getTokenById(id: string) {
 			revokedAt: tokens.revokedAt,
 			lastUsedAt: tokens.lastUsedAt,
 			updatedAt: tokens.updatedAt,
+			defaultUser: tokens.defaultUser,
 		})
 		.from(tokens)
 		.where(eq(tokens.id, id))
@@ -152,4 +155,22 @@ export async function updateLastUsed(id: string) {
 		.update(tokens)
 		.set({ lastUsedAt: new Date() })
 		.where(eq(tokens.id, id));
+}
+
+export async function updateDefaultUser(id: string, defaultUser: string | null) {
+	const [existing] = await db
+		.select({ id: tokens.id })
+		.from(tokens)
+		.where(eq(tokens.id, id))
+		.limit(1);
+
+	if (!existing) return null;
+
+	const [updated] = await db
+		.update(tokens)
+		.set({ defaultUser, updatedAt: new Date() })
+		.where(eq(tokens.id, id))
+		.returning({ id: tokens.id, defaultUser: tokens.defaultUser });
+
+	return updated;
 }
