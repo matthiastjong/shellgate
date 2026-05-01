@@ -106,7 +106,7 @@ describe("MCP tools", () => {
 			expect(result.status).toBe("approval_required");
 			expect(result.reason).toContain("rm -r");
 			expect(result.matched).toBe("rm -r");
-			expect(result.request).toEqual({ type: "ssh", command: "rm -rf /tmp/old" });
+			expect(result.request).toEqual({ target: "deployserver", command: "rm -rf /tmp/old", timeout: undefined });
 			expect(result.next_action).toContain("approved: true");
 		});
 	});

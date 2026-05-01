@@ -91,9 +91,9 @@ export async function sshExec(token: Token, args: SshExecArgs) {
 				status: "approval_required",
 				reason: guardResult.reason,
 				matched: guardResult.matched,
-				request: { type: "ssh", command },
+				request: { target: targetSlug, command, timeout },
 				next_action:
-					"STOP. Do NOT re-send this request yet. You MUST present the blocked command to the user, explain what it does and why it was flagged, then wait for the user to explicitly reply with approval. Only after the user responds confirming approval may you re-call this tool with approved: true. If the user denies, abort. Never auto-approve.",
+					"STOP. Do NOT re-send this request yet. Present the command to the user, explain what it does and why it was flagged. Wait for the user to explicitly approve. Only then re-call this SAME tool with all the SAME parameters (target, command, timeout) AND set approved: true. If the user denies, abort. Never auto-approve.",
 			};
 		}
 	}

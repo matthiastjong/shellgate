@@ -69,9 +69,9 @@ export async function apiRequest(token: Token, args: ApiRequestArgs) {
 				status: "approval_required",
 				reason: guardResult.reason,
 				matched: guardResult.matched,
-				request: { type: "api", method, path },
+				request: { target: targetSlug, method, path, headers, body },
 				next_action:
-					"STOP. Do NOT re-send this request yet. Present the reason to the user, wait for their explicit approval, then re-call this tool with approved: true.",
+					"STOP. Do NOT re-send this request yet. Present the reason to the user and explain why it was flagged. Wait for the user to explicitly approve. Only then re-call this SAME tool with all the SAME parameters (target, method, path, headers, body) AND set approved: true.",
 			};
 		}
 	}

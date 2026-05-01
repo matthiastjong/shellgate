@@ -36,7 +36,7 @@ export function registerTools(server: McpServer, token: Token) {
 			path: z.string().describe("Path appended to target's baseUrl"),
 			headers: z.record(z.string(), z.string()).optional().describe("Additional request headers"),
 			body: z.union([z.string(), z.record(z.string(), z.unknown())]).optional().describe("Request body"),
-			approved: z.boolean().optional().describe("Set to true after user approves a guarded request"),
+			approved: z.preprocess(val => val === "true" || val === true, z.boolean()).optional().describe("Set to true after user approves a guarded request"),
 		},
 		async (args) => {
 			const result = await apiRequest(token, args);
@@ -51,7 +51,7 @@ export function registerTools(server: McpServer, token: Token) {
 			target: z.string().describe("Target slug"),
 			command: z.string().describe("Shell command to execute"),
 			timeout: z.number().optional().describe("Timeout in seconds (default 30, max 60)"),
-			approved: z.boolean().optional().describe("Set to true after user approves a guarded request"),
+			approved: z.preprocess(val => val === "true" || val === true, z.boolean()).optional().describe("Set to true after user approves a guarded request"),
 		},
 		async (args) => {
 			const result = await sshExec(token, args);
