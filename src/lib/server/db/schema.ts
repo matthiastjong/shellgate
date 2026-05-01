@@ -24,6 +24,7 @@ export const tokens = pgTable("tokens", {
 	updatedAt: timestamp("updated_at", { withTimezone: true })
 		.notNull()
 		.defaultNow(),
+	defaultUser: varchar("default_user", { length: 128 }),
 });
 
 export type Token = typeof tokens.$inferSelect;
@@ -198,3 +199,31 @@ export const skills = pgTable("skills", {
 });
 
 export type Skill = typeof skills.$inferSelect;
+
+export const memories = pgTable(
+	"memories",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		tokenId: uuid("token_id")
+			.notNull()
+			.references(() => tokens.id, { onDelete: "cascade" }),
+		userIdentifier: varchar("user_identifier", { length: 128 }),
+		visibility: varchar("visibility", { length: 16 }).notNull(),
+		summary: varchar("summary", { length: 500 }).notNull(),
+		content: text("content").notNull(),
+		metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(t) => [
+		index("idx_memories_token").on(t.tokenId),
+		index("idx_memories_visibility").on(t.visibility),
+		index("idx_memories_user").on(t.userIdentifier),
+	],
+);
+
+export type Memory = typeof memories.$inferSelect;

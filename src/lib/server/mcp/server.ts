@@ -8,8 +8,9 @@ import { sshExec } from "./tools/ssh-exec";
 import type { SshExecArgs } from "./tools/ssh-exec";
 import { webhookPoll, webhookAck } from "./tools/webhooks";
 import { skillList, skillRead, skillUpsert, skillDelete } from "./tools/skills";
+import { memoryList, memoryRead, memoryAdd, memoryDelete } from "./tools/memories";
 
-const INSTRUCTIONS = `Always call discover at the start of each session to learn available targets, webhooks, and organization skills. Then call org_skill_list to see available organization skills. Only call org_skill_read when you need a specific skill's full instructions.
+const INSTRUCTIONS = `Always call discover at the start of each session to learn available targets, webhooks, and organization skills. Then call org_skill_list to see available organization skills and memory_list to load the memory index. Scan memory summaries and call memory_read for any memories relevant to the current task. Only call org_skill_read when you need a specific skill's full instructions.
 
 Shellgate manages organization-wide skills shared across all agents — these are different from local Claude Code skills. Use org_skill_* tools for shared organization skills, and the superpowers writing-skills skill for local Claude Code skills.`;
 
@@ -108,6 +109,74 @@ export function registerTools(server: McpServer, token: Token) {
 			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 		}
 	);
+
+	server.tool(
+		"memory_list",
+		`Returns a compact index of all accessible memories (id, summary, visibility, user, updatedAt). Call at session start and before memory_add to check for duplicates or memories to update. Max 100 results.
+
+You see: all org memories, user memories matching your user, and your own token memories.`,
+		{
+			visibility: z.enum(["org", "user", "token"]).optional().describe("Filter by visibility level"),
+			user: z.string().optional().describe("Filter by user identifier"),
+		},
+		async (args) => {
+			const result = await memoryList(token, args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+		}
+	);
+
+	server.tool(
+		"memory_read",
+		"Returns the full content of a specific memory. Only fetch memories relevant to your current task — don't read everything.",
+		{
+			id: z.string().describe("Memory ID"),
+		},
+		async (args) => {
+			const result = await memoryRead(token, args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+		}
+	);
+
+	server.tool(
+		"memory_add",
+		`Store a fact, preference, or learning. Rules:
+- summary: one-line description (max 500 chars) — this is the index entry
+- content: full detail — be concise but complete
+- Always call memory_list first to check for existing similar memories
+- If updating a fact, memory_delete the old one then memory_add the new
+- One fact per memory — don't bundle unrelated things
+- Write memories when you learn something useful for future sessions
+
+Visibility guide:
+- org: Facts useful to ALL team members and agents. Examples: project names & repo URLs, infra details, team conventions.
+- user: Personal preferences and context for ONE person. Examples: coding style, communication preferences, role/responsibilities.
+- token: Context specific to THIS agent instance only. Examples: session conclusions, task-specific learnings.
+
+When in doubt, prefer 'user' over 'org' — easier to promote later than to clean up noise.`,
+		{
+			summary: z.string().describe("One-line description (max 500 chars) — the index entry"),
+			content: z.string().describe("Full detail of the memory"),
+			visibility: z.enum(["org", "user", "token"]).describe("Visibility level"),
+			user: z.string().optional().describe("User identifier (resolved from token defaultUser if not provided)"),
+			metadata: z.record(z.string(), z.unknown()).optional().describe("Arbitrary key-value metadata"),
+		},
+		async (args) => {
+			const result = await memoryAdd(token, args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+		}
+	);
+
+	server.tool(
+		"memory_delete",
+		"Delete a memory that is outdated, incorrect, or superseded. Prefer updating (delete + add) over keeping stale memories. You can only delete memories created by your token.",
+		{
+			id: z.string().describe("Memory ID to delete"),
+		},
+		async (args) => {
+			const result = await memoryDelete(token, args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+		}
+	);
 }
 
 type ToolHandler = (name: string, args: Record<string, unknown>) => Promise<unknown>;
@@ -135,6 +204,14 @@ export function createMcpToolHandler(token: TokenLike): ToolHandler {
 				return skillUpsert(args as unknown as { content: string });
 			case "org_skill_delete":
 				return skillDelete(args as unknown as { slug: string });
+			case "memory_list":
+				return memoryList(t, args as unknown as { visibility?: string; user?: string });
+			case "memory_read":
+				return memoryRead(t, args as unknown as { id: string });
+			case "memory_add":
+				return memoryAdd(t, args as unknown as { summary: string; content: string; visibility: string; user?: string; metadata?: Record<string, unknown> });
+			case "memory_delete":
+				return memoryDelete(t, args as unknown as { id: string });
 			default:
 				throw new Error(`Unknown tool: ${name}`);
 		}

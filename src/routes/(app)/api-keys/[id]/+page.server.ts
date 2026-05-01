@@ -1,5 +1,5 @@
 import { error, fail, redirect } from "@sveltejs/kit";
-import { getTokenById, renameToken, deleteToken } from "$lib/server/services/tokens";
+import { getTokenById, renameToken, deleteToken, updateDefaultUser } from "$lib/server/services/tokens";
 import { listTargets } from "$lib/server/services/targets";
 import { listPermissions, addPermission, removePermission } from "$lib/server/services/permissions";
 import type { Actions, PageServerLoad } from "./$types";
@@ -61,5 +61,15 @@ export const actions = {
 		const result = await renameToken(params.id, name);
 		if (!result) return fail(404, { error: "API key not found" });
 		return { renamed: { id: params.id, name } };
+	},
+
+	setDefaultUser: async ({ request, params }) => {
+		const data = await request.formData();
+		const defaultUser = data.get("defaultUser")?.toString()?.trim() || null;
+		if (defaultUser && defaultUser.length > 128) return fail(400, { error: "Default user must be 128 characters or less" });
+
+		const result = await updateDefaultUser(params.id, defaultUser);
+		if (!result) return fail(404, { error: "API key not found" });
+		return { defaultUserSet: { id: params.id, defaultUser } };
 	},
 } satisfies Actions;

@@ -11,6 +11,7 @@ const data = {
 				{ title: "Targets", url: "/targets" },
 				{ title: "Webhooks", url: "/webhooks" },
 				{ title: "Skills", url: "/skills" },
+				{ title: "Memories", url: "/memories" },
 			],
 		},
 		{

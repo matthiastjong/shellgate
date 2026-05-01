@@ -17,6 +17,7 @@ import type { PageData } from "./$types";
 type Token = {
 	id: string;
 	name: string;
+	defaultUser: string | null;
 	createdAt: string | Date;
 	revokedAt: string | Date | null;
 	lastUsedAt: string | Date | null;
@@ -54,6 +55,9 @@ let editName = $state("");
 // Delete dialog state
 let deleteDialogOpen = $state(false);
 let deleteSubmitting = $state(false);
+
+let defaultUserSubmitting = $state(false);
+let editDefaultUser = $state(token.defaultUser ?? "");
 
 function openRenameSheet() {
 	editName = token.name;
@@ -217,6 +221,50 @@ function formatRelativeTime(dateStr: string | Date | null): string {
 				<dd class="text-sm">{formatDate(token.updatedAt)}</dd>
 			</div>
 		</dl>
+	</div>
+
+	<!-- Default User -->
+	<div class="rounded-lg border p-6">
+		<h2 class="mb-1 text-lg font-semibold">Default User</h2>
+		<p class="text-muted-foreground mb-4 text-sm">
+			When set, all memories created by this token are attributed to this user.
+			Personal agent tokens should have this set.
+		</p>
+		<form
+			method="POST"
+			action="?/setDefaultUser"
+			class="flex items-end gap-2"
+			use:enhance={() => {
+				defaultUserSubmitting = true;
+				return async ({ result, update }) => {
+					defaultUserSubmitting = false;
+					if (result.type === "success" && result.data?.defaultUserSet) {
+						const { defaultUser } = result.data.defaultUserSet as { id: string; defaultUser: string | null };
+						localToken = { ...token, defaultUser };
+						toast.success(defaultUser ? `Default user set to "${defaultUser}"` : "Default user cleared");
+					} else if (result.type === "failure") {
+						toast.error((result.data?.error as string) ?? "Failed to update");
+					}
+					await update({ reset: false, invalidateAll: false });
+				};
+			}}
+		>
+			<div class="grid flex-1 gap-2">
+				<Label for="default-user">User identifier</Label>
+				<Input
+					id="default-user"
+					name="defaultUser"
+					placeholder="e.g. matthias"
+					bind:value={editDefaultUser}
+				/>
+			</div>
+			<Button type="submit" disabled={defaultUserSubmitting}>
+				{#if defaultUserSubmitting}
+					<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
+				{/if}
+				Save
+			</Button>
+		</form>
 	</div>
 
 	<!-- Permissions -->

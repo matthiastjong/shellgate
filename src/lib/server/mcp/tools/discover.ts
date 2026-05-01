@@ -2,6 +2,7 @@ import { listPermissions } from "$lib/server/services/permissions";
 import { getTargetById } from "$lib/server/services/targets";
 import { listEndpoints } from "$lib/server/services/webhook-endpoints";
 import { listSkills } from "$lib/server/services/skills";
+import { countMemories } from "$lib/server/services/memories";
 import type { Token } from "$lib/server/db/schema";
 
 export async function discover(token: Token) {
@@ -36,5 +37,8 @@ export async function discover(token: Token) {
 
 	const skills = await listSkills();
 
-	return { targets, webhooks, skills };
+	const resolvedUser = token.defaultUser ?? null;
+	const memoryCount = await countMemories(token.id, resolvedUser);
+
+	return { targets, webhooks, skills, memoryCount };
 }
