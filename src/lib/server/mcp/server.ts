@@ -15,7 +15,9 @@ const INSTRUCTIONS = `Always call discover at the start of each session to learn
 
 Shellgate manages organization-wide skills shared across all agents — these are different from local Claude Code skills. Use org_skill_* tools for shared organization skills, and the superpowers writing-skills skill for local Claude Code skills.
 
-Shellgate also provides a wiki for compiled organizational knowledge. Call wiki_list_pages to browse available pages. Use wiki tools for factual knowledge ("what do we know?"), memories for behavioral guidance ("how should I act?"), and skills for procedures ("what steps to follow?").`;
+Shellgate also provides a wiki for compiled organizational knowledge. Call wiki_list_pages to browse available pages. Use wiki tools for factual knowledge ("what do we know?"), memories for behavioral guidance ("how should I act?"), and skills for procedures ("what steps to follow?").
+
+IMPORTANT: Proactively store company knowledge in the wiki. If the user shares or you encounter factual knowledge that would be valuable to the organization — analysis results, architecture decisions, research findings, market data, technical documentation — store it via wiki tools. Read the wiki-compile-research or wiki-create-page skill for guidance on how to structure it. Don't wait to be asked; if it's knowledge worth keeping, write it to the wiki.`;
 
 export function createMcpServer() {
 	const server = new McpServer(
