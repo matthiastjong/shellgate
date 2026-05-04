@@ -9,10 +9,13 @@ import type { SshExecArgs } from "./tools/ssh-exec";
 import { webhookPoll, webhookAck } from "./tools/webhooks";
 import { skillList, skillRead, skillUpsert, skillDelete } from "./tools/skills";
 import { memoryList, memoryRead, memoryAdd, memoryDelete } from "./tools/memories";
+import { wikiListPages, wikiReadPage, wikiUpsertPage, wikiDeletePage, wikiLintPage } from "./tools/wiki";
 
 const INSTRUCTIONS = `Always call discover at the start of each session to learn available targets, webhooks, and organization skills. Then call org_skill_list to see available organization skills and memory_list to load the memory index. Scan memory summaries and call memory_read for any memories relevant to the current task. Only call org_skill_read when you need a specific skill's full instructions.
 
-Shellgate manages organization-wide skills shared across all agents — these are different from local Claude Code skills. Use org_skill_* tools for shared organization skills, and the superpowers writing-skills skill for local Claude Code skills.`;
+Shellgate manages organization-wide skills shared across all agents — these are different from local Claude Code skills. Use org_skill_* tools for shared organization skills, and the superpowers writing-skills skill for local Claude Code skills.
+
+Shellgate also provides a wiki for compiled organizational knowledge. Call wiki_list_pages to browse available pages. Use wiki tools for factual knowledge ("what do we know?"), memories for behavioral guidance ("how should I act?"), and skills for procedures ("what steps to follow?").`;
 
 export function createMcpServer() {
 	const server = new McpServer(
@@ -177,6 +180,92 @@ When in doubt, prefer 'user' over 'org' — easier to promote later than to clea
 			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 		}
 	);
+
+	server.tool(
+		"wiki_list_pages",
+		"Browse the wiki index. Returns slug, title, namespace, tags, summary, status, version, updatedAt, updatedBy for each page. No body — use wiki_read_page for full content.",
+		{
+			namespace: z.string().optional().describe("Filter by namespace (default: all)"),
+			status: z.string().optional().describe("Filter by status: 'active' (default), 'draft', 'archived', or 'all'"),
+			tag: z.string().optional().describe("Filter by tag"),
+		},
+		async (args) => {
+			const result = await wikiListPages(args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+		}
+	);
+
+	server.tool(
+		"wiki_read_page",
+		"Read a wiki page's full content including body, sources, and version. Use for background knowledge before starting a task.",
+		{
+			namespace: z.string().optional().describe("Namespace (default: 'general')"),
+			slug: z.string().describe("Page slug"),
+		},
+		async (args) => {
+			const result = await wikiReadPage(args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+		}
+	);
+
+	server.tool(
+		"wiki_upsert_page",
+		"Create or update a wiki page. For updates, pass expectedVersion for optimistic concurrency. Write-back pattern: read → modify → upsert with expectedVersion.",
+		{
+			namespace: z.string().optional().describe("Namespace (default: 'general')"),
+			slug: z.string().describe("Page slug (lowercase alphanumeric + hyphens)"),
+			title: z.string().describe("Page title"),
+			body: z.string().describe("Full markdown content"),
+			summary: z.string().optional().describe("One-line summary (max 500 chars)"),
+			tags: z.array(z.string()).optional().describe("Tags for categorization"),
+			sources: z.array(z.object({
+				type: z.enum(["url", "file", "mcp", "manual", "semrush"]).describe("Source type"),
+				title: z.string().optional().describe("Source title"),
+				uri: z.string().optional().describe("Source URI (required for url, mcp, semrush)"),
+				retrievedAt: z.string().optional().describe("ISO timestamp when source was fetched"),
+			})).optional().describe("Source references"),
+			status: z.enum(["draft", "active", "archived"]).optional().describe("Page status (default: 'active')"),
+			expectedVersion: z.number().optional().describe("Expected current version for optimistic concurrency"),
+		},
+		async (args) => {
+			const result = await wikiUpsertPage(token, args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+		}
+	);
+
+	server.tool(
+		"wiki_delete_page",
+		"Archive a wiki page (soft delete). Sets status to 'archived'.",
+		{
+			namespace: z.string().optional().describe("Namespace (default: 'general')"),
+			slug: z.string().describe("Page slug"),
+		},
+		async (args) => {
+			const result = await wikiDeletePage(args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+		}
+	);
+
+	server.tool(
+		"wiki_lint_page",
+		"Validate a wiki page's structure. Can lint an existing page (by slug) or raw content (title+body). Checks title, body length, sources, boundary violations (memory/skill content), and broken [[wiki-links]].",
+		{
+			namespace: z.string().optional().describe("Namespace for existing page lookup"),
+			slug: z.string().optional().describe("Slug of existing page to lint"),
+			title: z.string().optional().describe("Title for direct content lint"),
+			body: z.string().optional().describe("Body for direct content lint"),
+			sources: z.array(z.object({
+				type: z.enum(["url", "file", "mcp", "manual", "semrush"]),
+				title: z.string().optional(),
+				uri: z.string().optional(),
+				retrievedAt: z.string().optional(),
+			})).optional().describe("Sources for direct content lint"),
+		},
+		async (args) => {
+			const result = await wikiLintPage(args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+		}
+	);
 }
 
 type ToolHandler = (name: string, args: Record<string, unknown>) => Promise<unknown>;
@@ -212,6 +301,16 @@ export function createMcpToolHandler(token: TokenLike): ToolHandler {
 				return memoryAdd(t, args as unknown as { summary: string; content: string; visibility: string; user?: string; metadata?: Record<string, unknown> });
 			case "memory_delete":
 				return memoryDelete(t, args as unknown as { id: string });
+			case "wiki_list_pages":
+				return wikiListPages(args as unknown as { namespace?: string; status?: string; tag?: string });
+			case "wiki_read_page":
+				return wikiReadPage(args as unknown as { namespace?: string; slug: string });
+			case "wiki_upsert_page":
+				return wikiUpsertPage(t, args as unknown as { namespace?: string; slug: string; title: string; body: string; summary?: string; tags?: string[]; sources?: Array<{ type: string; title?: string; uri?: string; retrievedAt?: string }>; status?: string; expectedVersion?: number });
+			case "wiki_delete_page":
+				return wikiDeletePage(args as unknown as { namespace?: string; slug: string });
+			case "wiki_lint_page":
+				return wikiLintPage(args as unknown as { namespace?: string; slug?: string; title?: string; body?: string; sources?: Array<{ type: string; title?: string; uri?: string; retrievedAt?: string }> });
 			default:
 				throw new Error(`Unknown tool: ${name}`);
 		}
