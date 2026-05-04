@@ -3,6 +3,7 @@ import { getTargetById } from "$lib/server/services/targets";
 import { listEndpoints } from "$lib/server/services/webhook-endpoints";
 import { listSkills } from "$lib/server/services/skills";
 import { countMemories } from "$lib/server/services/memories";
+import { countWikiPages } from "$lib/server/services/wiki";
 import type { Token } from "$lib/server/db/schema";
 
 export async function discover(token: Token) {
@@ -39,6 +40,7 @@ export async function discover(token: Token) {
 
 	const resolvedUser = token.defaultUser ?? null;
 	const memoryCount = await countMemories(token.id, resolvedUser);
+	const wikiPageCount = await countWikiPages();
 
-	return { targets, webhooks, skills, memoryCount };
+	return { targets, webhooks, skills, memoryCount, wikiPageCount };
 }
