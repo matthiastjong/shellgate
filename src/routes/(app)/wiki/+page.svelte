@@ -166,9 +166,17 @@
 									<div class="text-muted-foreground mb-2 text-xs">
 										{page.slug}{#if page.summary} — {page.summary}{/if}
 									</div>
-									<div class="bg-muted/50 rounded-md p-4 text-sm whitespace-pre-wrap">
-										Note: full body content is available via MCP wiki_read_page tool.
-									</div>
+									<div class="bg-muted/50 rounded-md p-4 text-sm whitespace-pre-wrap">{page.body}</div>
+									{#if page.sources && page.sources.length > 0}
+										<div class="mt-2 text-xs text-muted-foreground">
+											<span class="font-medium">Sources:</span>
+											{#each page.sources as src, i}
+												<span>
+													{src.title ?? src.type}{#if src.uri} (<a href={src.uri} target="_blank" class="underline">{src.uri}</a>){/if}{#if i < page.sources.length - 1}, {/if}
+												</span>
+											{/each}
+										</div>
+									{/if}
 								</Table.Cell>
 							</Table.Row>
 						{/if}
