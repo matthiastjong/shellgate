@@ -1,5 +1,6 @@
 import { listSkills, getSkill, createSkill, updateSkill, deleteSkill } from "$lib/server/services/skills";
 import { parseSkillMd } from "$lib/server/utils/skill-parser";
+import { isBuiltInSkill } from "$lib/server/built-in-skills";
 
 export async function skillList() {
 	return listSkills();
@@ -26,8 +27,11 @@ export async function skillUpsert(args: { content: string }) {
 	} catch (err) {
 		return { error: err instanceof Error ? err.message : "Invalid skill content" };
 	}
+	if (isBuiltInSkill(parsed.slug)) {
+		return { error: `Skill "${parsed.slug}" is a built-in skill and cannot be modified` };
+	}
 	const existing = await getSkill(parsed.slug);
-	if (existing) {
+	if (existing && !existing.builtIn) {
 		const updated = await updateSkill(parsed.slug, args.content);
 		return { slug: updated!.slug, version: updated!.version };
 	}
@@ -36,6 +40,9 @@ export async function skillUpsert(args: { content: string }) {
 }
 
 export async function skillDelete(args: { slug: string }) {
+	if (isBuiltInSkill(args.slug)) {
+		return { error: `Skill "${args.slug}" is a built-in skill and cannot be deleted` };
+	}
 	const deleted = await deleteSkill(args.slug);
 	if (!deleted) return { error: `Skill "${args.slug}" not found` };
 	return { deleted: true };

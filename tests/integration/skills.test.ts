@@ -60,7 +60,10 @@ describe("skills service", () => {
 		await createSkill(anotherSkillMd);
 
 		const list = await listSkills();
-		expect(list).toHaveLength(2);
+		// List includes built-in skills + 2 DB skills
+		expect(list.length).toBeGreaterThanOrEqual(2);
+		const dbSkills = list.filter((s) => !s.builtIn);
+		expect(dbSkills).toHaveLength(2);
 		expect(list[0]).toHaveProperty("slug");
 		expect(list[0]).toHaveProperty("description");
 		expect(list[0]).not.toHaveProperty("contentMd");

@@ -193,9 +193,11 @@ describe("MCP tools", () => {
 			const result = await handler("org_skill_list", {}) as Array<{ slug: string; description: string }>;
 
 			expect(Array.isArray(result)).toBe(true);
-			expect(result).toHaveLength(1);
-			expect(result[0].slug).toBe("test-skill");
-			expect(result[0].description).toBe("A test skill");
+			// Includes built-in skills + 1 DB skill
+			const dbSkills = result.filter((s) => !s.builtIn);
+			expect(dbSkills).toHaveLength(1);
+			expect(dbSkills[0].slug).toBe("test-skill");
+			expect(dbSkills[0].description).toBe("A test skill");
 		});
 	});
 

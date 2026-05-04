@@ -5,13 +5,14 @@
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { Label } from "$lib/components/ui/label/index.js";
 	import * as Breadcrumb from "$lib/components/ui/breadcrumb/index.js";
+	import { Badge } from "$lib/components/ui/badge/index.js";
 	import TrashIcon from "@lucide/svelte/icons/trash-2";
 	import PlusIcon from "@lucide/svelte/icons/plus";
 	import { toast } from "svelte-sonner";
 
 	let { data } = $props();
 
-	type SkillEntry = { slug: string; description: string };
+	type SkillEntry = { slug: string; description: string; builtIn: boolean };
 
 	let localSkills = $state<SkillEntry[] | null>(null);
 	let skills = $derived(localSkills ?? data.skills);
@@ -67,17 +68,24 @@
 					{#each skills as skill (skill.slug)}
 						<Table.Row>
 							<Table.Cell>
-								<a href="/skills/{skill.slug}" class="font-medium font-mono text-sm hover:underline">{skill.slug}</a>
+								<span class="flex items-center gap-2">
+									<a href="/skills/{skill.slug}" class="font-medium font-mono text-sm hover:underline">{skill.slug}</a>
+									{#if skill.builtIn}
+										<Badge class="border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">built-in</Badge>
+									{/if}
+								</span>
 							</Table.Cell>
 							<Table.Cell class="text-muted-foreground text-sm max-w-md truncate">{skill.description}</Table.Cell>
 							<Table.Cell>
-								<Button
-									variant="ghost"
-									size="icon"
-									onclick={() => { deleteTarget = skill; deleteOpen = true; }}
-								>
-									<TrashIcon class="size-4" />
-								</Button>
+								{#if !skill.builtIn}
+									<Button
+										variant="ghost"
+										size="icon"
+										onclick={() => { deleteTarget = skill; deleteOpen = true; }}
+									>
+										<TrashIcon class="size-4" />
+									</Button>
+								{/if}
 							</Table.Cell>
 						</Table.Row>
 					{/each}
