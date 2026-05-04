@@ -17,7 +17,7 @@ Shellgate manages organization-wide skills shared across all agents — these ar
 
 Shellgate also provides a wiki for compiled organizational knowledge. Call wiki_list_pages to browse available pages. Use wiki tools for factual knowledge ("what do we know?"), memories for behavioral guidance ("how should I act?"), and skills for procedures ("what steps to follow?").
 
-IMPORTANT: Proactively store company knowledge in the wiki. If the user shares or you encounter factual knowledge that would be valuable to the organization — analysis results, architecture decisions, research findings, market data, technical documentation — store it via wiki tools. Read the wiki-compile-research or wiki-create-page skill for guidance on how to structure it. Don't wait to be asked; if it's knowledge worth keeping, write it to the wiki.`;
+IMPORTANT — Wiki workflow: Proactively store company knowledge in the wiki when you encounter valuable factual information. BEFORE creating or updating any wiki page, you MUST first call org_skill_read for the relevant wiki skill (wiki-create-page, wiki-update-page, or wiki-compile-research) and follow its instructions. These skills define required structure, namespace conventions, source attribution, and validation steps (including wiki_lint_page). Never write to the wiki without reading the skill first.`;
 
 export function createMcpServer() {
 	const server = new McpServer(
