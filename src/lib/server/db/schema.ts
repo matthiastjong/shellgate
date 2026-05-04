@@ -7,6 +7,7 @@ import {
 	text,
 	timestamp,
 	unique,
+	uniqueIndex,
 	uuid,
 	varchar,
 } from "drizzle-orm/pg-core";
@@ -227,3 +228,40 @@ export const memories = pgTable(
 );
 
 export type Memory = typeof memories.$inferSelect;
+
+export type WikiSourceRef = {
+	type: "url" | "file" | "mcp" | "manual" | "semrush";
+	title?: string;
+	uri?: string;
+	retrievedAt?: string;
+};
+
+export const wikiPages = pgTable(
+	"wiki_pages",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		namespace: varchar("namespace", { length: 64 }).notNull().default("general"),
+		slug: varchar("slug", { length: 128 }).notNull(),
+		title: varchar("title", { length: 256 }).notNull(),
+		summary: varchar("summary", { length: 500 }),
+		tags: jsonb("tags").$type<string[]>().default([]),
+		body: text("body").notNull(),
+		sources: jsonb("sources").$type<WikiSourceRef[]>().default([]),
+		status: varchar("status", { length: 16 }).notNull().default("active"),
+		version: integer("version").notNull().default(1),
+		updatedBy: varchar("updated_by", { length: 128 }),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(t) => [
+		uniqueIndex("uq_wiki_namespace_slug").on(t.namespace, t.slug),
+		index("idx_wiki_namespace").on(t.namespace),
+		index("idx_wiki_status").on(t.status),
+	],
+);
+
+export type WikiPage = typeof wikiPages.$inferSelect;
