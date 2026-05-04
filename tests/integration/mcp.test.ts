@@ -190,7 +190,7 @@ describe("MCP tools", () => {
 			await createSkill("---\nname: test-skill\ndescription: A test skill\n---\n# Test\nSome content.");
 
 			const handler = createMcpToolHandler(token);
-			const result = await handler("org_skill_list", {}) as Array<{ slug: string; description: string }>;
+			const result = await handler("org_skill_list", {}) as Array<{ slug: string; description: string; builtIn: boolean }>;
 
 			expect(Array.isArray(result)).toBe(true);
 			// Includes built-in skills + 1 DB skill

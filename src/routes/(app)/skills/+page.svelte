@@ -111,7 +111,7 @@
 					createSubmitting = false;
 					if (result.type === "success" && result.data?.created) {
 						const created = result.data.created as { slug: string; description: string };
-						localSkills = [...skills, { slug: created.slug, description: created.description }];
+						localSkills = [...skills, { slug: created.slug, description: created.description, builtIn: false }];
 						createOpen = false;
 						toast.success("Skill created");
 					} else if (result.type === "failure") {
