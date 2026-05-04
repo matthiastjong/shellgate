@@ -64,6 +64,13 @@
       "when": 1777645476928,
       "tag": "0008_lonely_venus",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1777890136497,
+      "tag": "0009_perfect_scarlet_witch",
+      "breakpoints": true
     }
   ]
 }
