@@ -4,7 +4,7 @@ import { createTarget } from "$lib/server/services/targets";
 import { createAuthMethod } from "$lib/server/services/auth-methods";
 import { addPermission } from "$lib/server/services/permissions";
 import { db } from "$lib/server/db";
-import { tokens, targets, targetAuthMethods, tokenPermissions, users, webhookEndpoints, webhookEvents, skills, memories, wikiPages } from "$lib/server/db/schema";
+import { tokens, targets, targetAuthMethods, tokenPermissions, users, webhookEndpoints, webhookEvents, skills, memories, wikiPages, vaults, vaultItems, vaultItemFields, tokenVaultPermissions } from "$lib/server/db/schema";
 
 function uid() {
 	return randomBytes(4).toString("hex");
@@ -52,6 +52,10 @@ export async function truncateAll() {
 	await db.delete(skills);
 	await db.delete(webhookEvents);
 	await db.delete(webhookEndpoints);
+	await db.delete(vaultItemFields);
+	await db.delete(vaultItems);
+	await db.delete(tokenVaultPermissions);
+	await db.delete(vaults);
 	await db.delete(tokenPermissions);
 	await db.delete(targetAuthMethods);
 	await db.delete(tokens);

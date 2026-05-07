@@ -71,6 +71,13 @@
       "when": 1777890136497,
       "tag": "0009_perfect_scarlet_witch",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1778152691434,
+      "tag": "0010_hard_whirlwind",
+      "breakpoints": true
     }
   ]
 }
