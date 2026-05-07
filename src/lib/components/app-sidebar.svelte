@@ -12,6 +12,7 @@ const data = {
 				{ title: "Webhooks", url: "/webhooks" },
 				{ title: "Skills", url: "/skills" },
 				{ title: "Memories", url: "/memories" },
+				{ title: "Vaults", url: "/vaults" },
 				{ title: "Wiki", url: "/wiki" },
 			],
 		},
