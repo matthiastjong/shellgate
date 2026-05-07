@@ -24,3 +24,5 @@ vite.config.ts.timestamp-*
 
 .idea/
 .worktrees/
+.playwright-mcp/
+.playwright-mcp/
