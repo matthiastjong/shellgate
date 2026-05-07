@@ -10,6 +10,7 @@ import { webhookPoll, webhookAck } from "./tools/webhooks";
 import { skillList, skillRead, skillUpsert, skillDelete } from "./tools/skills";
 import { memoryList, memoryRead, memoryAdd, memoryDelete } from "./tools/memories";
 import { wikiListPages, wikiReadPage, wikiUpsertPage, wikiDeletePage, wikiLintPage } from "./tools/wiki";
+import { vaultSearch } from "./tools/vaults";
 
 const INSTRUCTIONS = `Always call discover at the start of each session to learn available targets, webhooks, and organization skills. Then call org_skill_list to see available organization skills and memory_list to load the memory index. Scan memory summaries and call memory_read for any memories relevant to the current task. Only call org_skill_read when you need a specific skill's full instructions.
 
@@ -17,7 +18,9 @@ Shellgate manages organization-wide skills shared across all agents — these ar
 
 Shellgate also provides a wiki for compiled organizational knowledge. Call wiki_list_pages to browse available pages. Use wiki tools for factual knowledge ("what do we know?"), memories for behavioral guidance ("how should I act?"), and skills for procedures ("what steps to follow?").
 
-IMPORTANT — Wiki workflow: Proactively store company knowledge in the wiki when you encounter valuable factual information. BEFORE creating or updating any wiki page, you MUST first call org_skill_read for the relevant wiki skill (wiki-create-page, wiki-update-page, or wiki-compile-research) and follow its instructions. These skills define required structure, namespace conventions, source attribution, and validation steps (including wiki_lint_page). Never write to the wiki without reading the skill first.`;
+IMPORTANT — Wiki workflow: Proactively store company knowledge in the wiki when you encounter valuable factual information. BEFORE creating or updating any wiki page, you MUST first call org_skill_read for the relevant wiki skill (wiki-create-page, wiki-update-page, or wiki-compile-research) and follow its instructions. These skills define required structure, namespace conventions, source attribution, and validation steps (including wiki_lint_page). Never write to the wiki without reading the skill first.
+
+Call vault_search when you need credentials for browser automation — it returns handles for blind-fill, not secret values.`;
 
 export function createMcpServer() {
 	const server = new McpServer(
@@ -268,6 +271,18 @@ When in doubt, prefer 'user' over 'org' — easier to promote later than to clea
 			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 		}
 	);
+
+	server.tool(
+		"vault_search",
+		"Search for credential items in vaults accessible to this token. Returns item handles with non-sensitive field values (e.g. username). Sensitive values (e.g. password) are only available via the local blind-fill MCP tool.",
+		{
+			query: z.string().describe("Search query — matches against item name, domain, and description"),
+		},
+		async (args) => {
+			const result = await vaultSearch(token, args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+		}
+	);
 }
 
 type ToolHandler = (name: string, args: Record<string, unknown>) => Promise<unknown>;
@@ -313,6 +328,8 @@ export function createMcpToolHandler(token: TokenLike): ToolHandler {
 				return wikiDeletePage(args as unknown as { namespace?: string; slug: string });
 			case "wiki_lint_page":
 				return wikiLintPage(args as unknown as { namespace?: string; slug?: string; title?: string; body?: string; sources?: Array<{ type: string; title?: string; uri?: string; retrievedAt?: string }> });
+			case "vault_search":
+				return vaultSearch(t, args as unknown as { query: string });
 			default:
 				throw new Error(`Unknown tool: ${name}`);
 		}

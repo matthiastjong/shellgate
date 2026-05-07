@@ -4,7 +4,7 @@ import { createTarget } from "$lib/server/services/targets";
 import { createAuthMethod } from "$lib/server/services/auth-methods";
 import { addPermission } from "$lib/server/services/permissions";
 import { db } from "$lib/server/db";
-import { tokens, targets, targetAuthMethods, tokenPermissions, users, webhookEndpoints, webhookEvents, skills, memories, wikiPages } from "$lib/server/db/schema";
+import { tokens, targets, targetAuthMethods, tokenPermissions, users, webhookEndpoints, webhookEvents, skills, memories, wikiPages, vaults, vaultItems, vaultItemFields, tokenVaultPermissions } from "$lib/server/db/schema";
 
 function uid() {
 	return randomBytes(4).toString("hex");
@@ -46,12 +46,38 @@ export async function createTestWebhookEndpoint(
 	});
 }
 
+export async function createTestVault(name?: string) {
+	const { createVault } = await import("$lib/server/services/vaults");
+	return createVault({ name: name ?? `Vault ${uid()}` });
+}
+
+export async function createTestVaultItem(
+	vaultId: string,
+	opts: { name?: string; domain?: string; fields?: Array<{ name: string; value: string; sensitive?: boolean }> } = {},
+) {
+	const { createItem } = await import("$lib/server/services/vault-items");
+	return createItem(vaultId, {
+		name: opts.name ?? `Item ${uid()}`,
+		domain: opts.domain,
+		fields: opts.fields ?? [],
+	});
+}
+
+export async function grantVaultPermission(tokenId: string, vaultId: string) {
+	const { addVaultPermission } = await import("$lib/server/services/vault-permissions");
+	return addVaultPermission(tokenId, vaultId);
+}
+
 export async function truncateAll() {
 	await db.delete(wikiPages);
 	await db.delete(memories);
 	await db.delete(skills);
 	await db.delete(webhookEvents);
 	await db.delete(webhookEndpoints);
+	await db.delete(vaultItemFields);
+	await db.delete(vaultItems);
+	await db.delete(tokenVaultPermissions);
+	await db.delete(vaults);
 	await db.delete(tokenPermissions);
 	await db.delete(targetAuthMethods);
 	await db.delete(tokens);

@@ -265,3 +265,78 @@ export const wikiPages = pgTable(
 );
 
 export type WikiPage = typeof wikiPages.$inferSelect;
+
+export const vaults = pgTable("vaults", {
+	id: uuid("id").primaryKey().defaultRandom(),
+	name: varchar("name", { length: 255 }).notNull(),
+	slug: varchar("slug", { length: 255 }).notNull().unique(),
+	description: text("description"),
+	createdAt: timestamp("created_at", { withTimezone: true })
+		.notNull()
+		.defaultNow(),
+	updatedAt: timestamp("updated_at", { withTimezone: true })
+		.notNull()
+		.defaultNow(),
+});
+
+export type Vault = typeof vaults.$inferSelect;
+
+export const vaultItems = pgTable(
+	"vault_items",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		vaultId: uuid("vault_id")
+			.notNull()
+			.references(() => vaults.id, { onDelete: "cascade" }),
+		name: varchar("name", { length: 255 }).notNull(),
+		slug: varchar("slug", { length: 255 }).notNull(),
+		domain: varchar("domain", { length: 255 }),
+		description: text("description"),
+		allowedOrigins: jsonb("allowed_origins").$type<string[]>(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(t) => [unique().on(t.vaultId, t.slug)],
+);
+
+export type VaultItem = typeof vaultItems.$inferSelect;
+
+export const vaultItemFields = pgTable(
+	"vault_item_fields",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		itemId: uuid("item_id")
+			.notNull()
+			.references(() => vaultItems.id, { onDelete: "cascade" }),
+		name: varchar("name", { length: 255 }).notNull(),
+		encryptedValue: text("encrypted_value").notNull(),
+		sensitive: boolean("sensitive").notNull().default(true),
+		sortOrder: integer("sort_order").notNull().default(0),
+	},
+	(t) => [unique().on(t.itemId, t.name)],
+);
+
+export type VaultItemField = typeof vaultItemFields.$inferSelect;
+
+export const tokenVaultPermissions = pgTable(
+	"token_vault_permissions",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		tokenId: uuid("token_id")
+			.notNull()
+			.references(() => tokens.id, { onDelete: "cascade" }),
+		vaultId: uuid("vault_id")
+			.notNull()
+			.references(() => vaults.id, { onDelete: "cascade" }),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(t) => [unique().on(t.tokenId, t.vaultId)],
+);
+
+export type TokenVaultPermission = typeof tokenVaultPermissions.$inferSelect;

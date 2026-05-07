@@ -37,6 +37,16 @@ type Permission = {
 	targetId: string;
 };
 
+type Vault = {
+	id: string;
+	name: string;
+	slug: string;
+};
+
+type VaultPermission = {
+	vaultId: string;
+};
+
 let { data }: { data: PageData } = $props();
 
 let localToken = $state<Token | null>(null);
@@ -45,6 +55,11 @@ let token = $derived<Token>(localToken ?? data.token as Token);
 let localPermissionSet = $state<Set<string> | null>(null);
 let permissionSet = $derived<Set<string>>(
 	localPermissionSet ?? new Set((data.permissions as Permission[]).map((p) => p.targetId))
+);
+
+let localVaultPermSet = $state<Set<string> | null>(null);
+let vaultPermSet = $derived<Set<string>>(
+	localVaultPermSet ?? new Set((data.vaultPermissions as VaultPermission[]).map((p) => p.vaultId))
 );
 
 // Sheet state
@@ -334,6 +349,73 @@ function formatRelativeTime(dateStr: string | Date | null): string {
 									<Switch
 										checked={hasPermission}
 										onCheckedChange={() => (document.getElementById(`perm-form-${target.id}`) as HTMLFormElement)?.requestSubmit()}
+									/>
+								</Table.Cell>
+							</Table.Row>
+						{/each}
+					</Table.Body>
+				</Table.Root>
+			</div>
+		{/if}
+	</div>
+
+	<!-- Vault Access -->
+	<div>
+		<div class="mb-4">
+			<h2 class="text-lg font-semibold">Vault Access</h2>
+			<p class="text-muted-foreground text-sm">Control which credential vaults this API key can search.</p>
+		</div>
+
+		{#if (data.vaults as Vault[]).length === 0}
+			<div class="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed py-12">
+				<p class="text-muted-foreground text-sm">No vaults configured yet. Create a vault first.</p>
+			</div>
+		{:else}
+			<div class="rounded-lg border">
+				<Table.Root>
+					<Table.Header>
+						<Table.Row>
+							<Table.Head>Vault</Table.Head>
+							<Table.Head class="w-20">Access</Table.Head>
+						</Table.Row>
+					</Table.Header>
+					<Table.Body>
+						{#each data.vaults as vault (vault.id)}
+							{@const hasVaultPermission = vaultPermSet.has(vault.id)}
+							<Table.Row>
+								<Table.Cell class="font-medium">
+									<a href="/vaults/{vault.slug}" class="hover:underline">{vault.name}</a>
+								</Table.Cell>
+								<Table.Cell>
+									<form
+										method="POST"
+										action={hasVaultPermission ? "?/revokeVault" : "?/grantVault"}
+										class="hidden"
+										id="vault-perm-form-{vault.id}"
+										use:enhance={() => {
+											return async ({ result, update }) => {
+												if (result.type === 'success') {
+													const next = new Set(vaultPermSet);
+													if (hasVaultPermission) {
+														next.delete(vault.id);
+														toast.success('Vault access revoked');
+													} else {
+														next.add(vault.id);
+														toast.success('Vault access granted');
+													}
+													localVaultPermSet = next;
+												} else if (result.type === 'failure') {
+													toast.error((result.data?.error as string) ?? 'Failed');
+												}
+												await update({ reset: false, invalidateAll: false });
+											};
+										}}
+									>
+										<input type="hidden" name="vaultId" value={vault.id} />
+									</form>
+									<Switch
+										checked={hasVaultPermission}
+										onCheckedChange={() => (document.getElementById(`vault-perm-form-${vault.id}`) as HTMLFormElement)?.requestSubmit()}
 									/>
 								</Table.Cell>
 							</Table.Row>
