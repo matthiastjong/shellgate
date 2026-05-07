@@ -18,7 +18,9 @@ Shellgate manages organization-wide skills shared across all agents — these ar
 
 Shellgate also provides a wiki for compiled organizational knowledge. Call wiki_list_pages to browse available pages. Use wiki tools for factual knowledge ("what do we know?"), memories for behavioral guidance ("how should I act?"), and skills for procedures ("what steps to follow?").
 
-IMPORTANT — Wiki workflow: Proactively store company knowledge in the wiki when you encounter valuable factual information. BEFORE creating or updating any wiki page, you MUST first call org_skill_read for the relevant wiki skill (wiki-create-page, wiki-update-page, or wiki-compile-research) and follow its instructions. These skills define required structure, namespace conventions, source attribution, and validation steps (including wiki_lint_page). Never write to the wiki without reading the skill first.`;
+IMPORTANT — Wiki workflow: Proactively store company knowledge in the wiki when you encounter valuable factual information. BEFORE creating or updating any wiki page, you MUST first call org_skill_read for the relevant wiki skill (wiki-create-page, wiki-update-page, or wiki-compile-research) and follow its instructions. These skills define required structure, namespace conventions, source attribution, and validation steps (including wiki_lint_page). Never write to the wiki without reading the skill first.
+
+Call vault_search when you need credentials for browser automation — it returns handles for blind-fill, not secret values.`;
 
 export function createMcpServer() {
 	const server = new McpServer(
