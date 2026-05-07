@@ -2,18 +2,22 @@ import { error, fail, redirect } from "@sveltejs/kit";
 import { getTokenById, renameToken, deleteToken, updateDefaultUser } from "$lib/server/services/tokens";
 import { listTargets } from "$lib/server/services/targets";
 import { listPermissions, addPermission, removePermission } from "$lib/server/services/permissions";
+import { listVaults } from "$lib/server/services/vaults";
+import { listVaultPermissions, addVaultPermission, removeVaultPermission } from "$lib/server/services/vault-permissions";
 import type { Actions, PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async ({ params }) => {
 	const token = await getTokenById(params.id);
 	if (!token) throw error(404, "API key not found");
 
-	const [allTargets, permissions] = await Promise.all([
+	const [allTargets, permissions, allVaults, vaultPermissions] = await Promise.all([
 		listTargets(),
 		listPermissions(params.id),
+		listVaults(),
+		listVaultPermissions(params.id),
 	]);
 
-	return { token, targets: allTargets, permissions };
+	return { token, targets: allTargets, permissions, vaults: allVaults, vaultPermissions };
 };
 
 export const actions = {
@@ -44,6 +48,35 @@ export const actions = {
 		const result = await removePermission(token.id, targetId);
 		if (!result) return fail(404, { error: "Permission not found" });
 		return { revoked: targetId };
+	},
+
+	grantVault: async ({ request, params }) => {
+		const token = await getTokenById(params.id);
+		if (!token) return fail(404, { error: "API key not found" });
+
+		const data = await request.formData();
+		const vaultId = data.get("vaultId")?.toString() ?? "";
+		if (!vaultId) return fail(400, { error: "Vault ID is required" });
+
+		try {
+			await addVaultPermission(token.id, vaultId);
+			return { vaultGranted: vaultId };
+		} catch (err) {
+			return fail(400, { error: err instanceof Error ? err.message : "Failed to grant vault access" });
+		}
+	},
+
+	revokeVault: async ({ request, params }) => {
+		const token = await getTokenById(params.id);
+		if (!token) return fail(404, { error: "API key not found" });
+
+		const data = await request.formData();
+		const vaultId = data.get("vaultId")?.toString() ?? "";
+		if (!vaultId) return fail(400, { error: "Vault ID is required" });
+
+		const result = await removeVaultPermission(token.id, vaultId);
+		if (!result) return fail(404, { error: "Permission not found" });
+		return { vaultRevoked: vaultId };
 	},
 
 	delete: async ({ params }) => {
