@@ -46,6 +46,28 @@ export async function createTestWebhookEndpoint(
 	});
 }
 
+export async function createTestVault(name?: string) {
+	const { createVault } = await import("$lib/server/services/vaults");
+	return createVault({ name: name ?? `Vault ${uid()}` });
+}
+
+export async function createTestVaultItem(
+	vaultId: string,
+	opts: { name?: string; domain?: string; fields?: Array<{ name: string; value: string; sensitive?: boolean }> } = {},
+) {
+	const { createItem } = await import("$lib/server/services/vault-items");
+	return createItem(vaultId, {
+		name: opts.name ?? `Item ${uid()}`,
+		domain: opts.domain,
+		fields: opts.fields ?? [],
+	});
+}
+
+export async function grantVaultPermission(tokenId: string, vaultId: string) {
+	const { addVaultPermission } = await import("$lib/server/services/vault-permissions");
+	return addVaultPermission(tokenId, vaultId);
+}
+
 export async function truncateAll() {
 	await db.delete(wikiPages);
 	await db.delete(memories);
