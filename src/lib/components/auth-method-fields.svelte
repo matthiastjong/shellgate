@@ -33,6 +33,12 @@ let oauth2ClientSecret = $state("");
 let oauth2RefreshToken = $state("");
 let oauth2TokenUrl = $state("");
 
+// OAuth2 Client Credentials state
+let oauth2CcClientId = $state("");
+let oauth2CcClientSecret = $state("");
+let oauth2CcTokenUrl = $state("");
+let oauth2CcScope = $state("");
+
 const optionalHint = mode === 'edit' ? ' (leave blank to keep existing)' : '';
 </script>
 
@@ -48,6 +54,7 @@ const optionalHint = mode === 'edit' ? ' (leave blank to keep existing)' : '';
 			<option value="query_param">Query Parameter</option>
 			<option value="jwt_es256">JWT ES256 (Apple, etc.)</option>
 			<option value="oauth2_refresh_token">OAuth2 Refresh Token (Google, etc.)</option>
+			<option value="oauth2_client_credentials">OAuth2 Client Credentials (M2M)</option>
 		{/if}
 	</select>
 </div>
@@ -247,6 +254,45 @@ const optionalHint = mode === 'edit' ? ' (leave blank to keep existing)' : '';
 	<div class="grid gap-2">
 		<Label for="{idPrefix}-oauth2-token-url">Token URL <span class="text-muted-foreground text-xs">(optional, defaults to Google)</span></Label>
 		<Input id="{idPrefix}-oauth2-token-url" name="oauth2TokenUrl" bind:value={oauth2TokenUrl} placeholder="https://oauth2.googleapis.com/token" />
+	</div>
+{:else if authType === 'oauth2_client_credentials'}
+	<div class="grid gap-2">
+		<Label for="{idPrefix}-oauth2cc-client-id">Client ID{#if mode === 'edit'} <span class="text-muted-foreground text-xs">{optionalHint}</span>{/if}</Label>
+		<Input id="{idPrefix}-oauth2cc-client-id" name="oauth2CcClientId" bind:value={oauth2CcClientId} placeholder="e.g. amzn1.application-oa2-client.abc123" required={mode === 'add'} />
+	</div>
+	<div class="grid gap-2">
+		<Label for="{idPrefix}-oauth2cc-client-secret">Client Secret{#if mode === 'edit'} <span class="text-muted-foreground text-xs">{optionalHint}</span>{/if}</Label>
+		<div class="relative">
+			<Input
+				id="{idPrefix}-oauth2cc-client-secret"
+				name="oauth2CcClientSecret"
+				type={showCredential ? 'text' : 'password'}
+				bind:value={oauth2CcClientSecret}
+				placeholder="client secret"
+				required={mode === 'add'}
+			/>
+			<Button
+				type="button"
+				variant="ghost"
+				size="icon"
+				class="absolute right-0 top-0 h-full px-3"
+				onclick={() => (showCredential = !showCredential)}
+			>
+				{#if showCredential}
+					<EyeOffIcon class="size-4" />
+				{:else}
+					<EyeIcon class="size-4" />
+				{/if}
+			</Button>
+		</div>
+	</div>
+	<div class="grid gap-2">
+		<Label for="{idPrefix}-oauth2cc-token-url">Token URL{#if mode === 'edit'} <span class="text-muted-foreground text-xs">{optionalHint}</span>{/if}</Label>
+		<Input id="{idPrefix}-oauth2cc-token-url" name="oauth2CcTokenUrl" bind:value={oauth2CcTokenUrl} placeholder="https://example.com/oauth2/token" required={mode === 'add'} />
+	</div>
+	<div class="grid gap-2">
+		<Label for="{idPrefix}-oauth2cc-scope">Scope <span class="text-muted-foreground text-xs">(optional)</span></Label>
+		<Input id="{idPrefix}-oauth2cc-scope" name="oauth2CcScope" bind:value={oauth2CcScope} placeholder="e.g. creatorsapi/default" />
 	</div>
 {:else}
 	<div class="grid gap-2">
