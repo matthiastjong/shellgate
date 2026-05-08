@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "../db";
 import { targetAuthMethods } from "../db/schema";
 
-const VALID_TYPES = ["bearer", "basic", "custom_header", "query_param", "ssh_key", "jwt_es256", "oauth2_refresh_token"];
+const VALID_TYPES = ["bearer", "basic", "custom_header", "query_param", "ssh_key", "jwt_es256", "oauth2_refresh_token", "oauth2_client_credentials"];
 
 export function computeCredentialHint(credential: string, type?: string): string {
 	if (type === "ssh_key") {
@@ -27,6 +27,15 @@ export function computeCredentialHint(credential: string, type?: string): string
 			return "OAuth2 Refresh Token";
 		} catch {
 			return "OAuth2 (invalid config)";
+		}
+	}
+	if (type === "oauth2_client_credentials") {
+		try {
+			const config = JSON.parse(credential);
+			if (config.clientId) return `OAuth2 CC ••• ${config.clientId.slice(0, 8)}`;
+			return "OAuth2 Client Credentials";
+		} catch {
+			return "OAuth2 CC (invalid config)";
 		}
 	}
 	if (credential.length < 10) return "••••••••";

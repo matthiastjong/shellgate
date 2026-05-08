@@ -5,7 +5,7 @@ import type { Target, Token } from "../db/schema";
 import { getDefaultAuthMethod } from "./auth-methods";
 import { hasPermission } from "./permissions";
 import { signES256JWT } from "../utils/jwt";
-import { getOAuth2AccessToken } from "../utils/oauth2";
+import { getOAuth2AccessToken, getOAuth2ClientCredentialsToken } from "../utils/oauth2";
 
 /**
  * Resolve and validate a target for gateway proxying.
@@ -149,6 +149,23 @@ export async function proxyToTarget(
 				console.error("[gateway] ✗ OAuth2 token refresh failed:", err);
 				return Response.json(
 					{ error: "OAuth2 token refresh failed" },
+					{ status: 500 },
+				);
+			}
+		} else if (authMethod.type === "oauth2_client_credentials") {
+			try {
+				const config = JSON.parse(authMethod.credential);
+				const accessToken = await getOAuth2ClientCredentialsToken({
+					clientId: config.clientId,
+					clientSecret: config.clientSecret,
+					tokenUrl: config.tokenUrl,
+					scope: config.scope,
+				});
+				headers.set("Authorization", `Bearer ${accessToken}`);
+			} catch (err) {
+				console.error("[gateway] ✗ OAuth2 client credentials token failed:", err);
+				return Response.json(
+					{ error: "OAuth2 client credentials token failed" },
 					{ status: 500 },
 				);
 			}

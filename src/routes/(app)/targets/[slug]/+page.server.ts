@@ -165,6 +165,17 @@ export const actions = {
 			if (tokenUrl) config.tokenUrl = tokenUrl;
 
 			credential = JSON.stringify(config);
+		} else if (type === "oauth2_client_credentials") {
+			const clientId = data.get("oauth2CcClientId")?.toString()?.trim() ?? "";
+			const clientSecret = data.get("oauth2CcClientSecret")?.toString()?.trim() ?? "";
+			const tokenUrl = data.get("oauth2CcTokenUrl")?.toString()?.trim() ?? "";
+			if (!clientId || !clientSecret || !tokenUrl) return fail(400, { error: "Client ID, Client Secret, and Token URL are required" });
+
+			const config: Record<string, unknown> = { clientId, clientSecret, tokenUrl };
+			const scope = data.get("oauth2CcScope")?.toString()?.trim();
+			if (scope) config.scope = scope;
+
+			credential = JSON.stringify(config);
 		} else {
 			credential = data.get("credential")?.toString() ?? "";
 			if (!credential) return fail(400, { error: "Credential is required" });
@@ -269,6 +280,17 @@ export const actions = {
 				const config: Record<string, unknown> = { clientId, clientSecret, refreshToken };
 				const tokenUrl = data.get("oauth2TokenUrl")?.toString()?.trim();
 				if (tokenUrl) config.tokenUrl = tokenUrl;
+				credential = JSON.stringify(config);
+			}
+		} else if (type === "oauth2_client_credentials") {
+			const clientId = data.get("oauth2CcClientId")?.toString()?.trim() ?? "";
+			const clientSecret = data.get("oauth2CcClientSecret")?.toString()?.trim() ?? "";
+			const tokenUrl = data.get("oauth2CcTokenUrl")?.toString()?.trim() ?? "";
+			if (clientId || clientSecret || tokenUrl) {
+				if (!clientId || !clientSecret || !tokenUrl) return fail(400, { error: "Client ID, Client Secret, and Token URL are all required when updating" });
+				const config: Record<string, unknown> = { clientId, clientSecret, tokenUrl };
+				const scope = data.get("oauth2CcScope")?.toString()?.trim();
+				if (scope) config.scope = scope;
 				credential = JSON.stringify(config);
 			}
 		} else {
