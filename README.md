@@ -1,5 +1,11 @@
 # Shellgate
 
+[![GitHub Stars](https://img.shields.io/github/stars/matthiastjong/shellgate?style=flat)](https://github.com/matthiastjong/shellgate/stargazers)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Docker](https://img.shields.io/badge/docker-ready-blue)](https://ghcr.io/matthiastjong/shellgate)
+[![TypeScript](https://img.shields.io/badge/TypeScript-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![MCP Compatible](https://img.shields.io/badge/MCP-compatible-green)](https://modelcontextprotocol.io/)
+
 **Stop giving your AI agents your API keys.**
 
 Shellgate sits between your AI agents and your infrastructure. Agents get a scoped token — they never see real credentials, SSH keys, or passwords. You control what runs, everything is logged, and dangerous commands ask for your approval before executing.
