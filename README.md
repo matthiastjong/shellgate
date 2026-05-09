@@ -186,7 +186,7 @@ Control exactly which APIs each agent can access. Agent A gets OpenAI, Agent B g
 Web UI for managing targets, tokens, and permissions. No CLI required.
 
 ### Agent Integration
-Built-in install scripts for **OpenClaw** and **Claude Code**. Connect your agent in one click from the dashboard.
+Built-in install scripts for **Claude Code**, **OpenClaw**, and **Hermes**. Connect your agent in one click from the dashboard.
 
 ### SSH Execution
 Run commands on remote servers through Shellgate. Same token, same audit trail.
@@ -213,6 +213,75 @@ Shellgate intercepts dangerous commands before they execute and asks for your ap
 Works for both SSH commands and API calls (e.g. `DELETE` requests). Destructive patterns like `rm -r`, `DROP TABLE`, `systemctl stop`, and `DELETE FROM` trigger approval by default. Blocked patterns like `/etc/shadow` and `curl | bash` are always rejected, regardless of approval.
 
 This also acts as a **prompt injection defense** — even if a malicious prompt tricks your agent into sending a dangerous command, Shellgate catches it before it reaches your infrastructure.
+
+### MCP Server
+
+Shellgate exposes all agent-facing functionality as an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server. Claude Code and other MCP-compatible agents connect directly — no REST calls needed.
+
+**Built-in tools:**
+
+| Tool | Description |
+|---|---|
+| `discover` | List accessible targets, webhooks, and org skills |
+| `api_request` | Proxy HTTP requests with automatic credential injection |
+| `ssh_exec` | Execute SSH commands with guard protection |
+| `webhook_poll` | Poll for incoming webhook events |
+| `webhook_ack` | Acknowledge processed webhook events |
+| `vault_search` | Search credential vault for blind-fill handles |
+| `memory_list` / `memory_read` / `memory_add` / `memory_delete` | Manage agent memories |
+| `org_skill_list` / `org_skill_read` / `org_skill_upsert` / `org_skill_delete` | Manage shared organization skills |
+| `wiki_list_pages` / `wiki_read_page` / `wiki_upsert_page` / `wiki_delete_page` / `wiki_lint_page` | Organization knowledge base |
+
+Connect via `mcpServers` config pointing to `POST /mcp` with your `sg_` token as the Bearer header.
+
+### Webhooks
+
+Receive webhooks from external services (Stripe, GitHub, Slack, etc.) and route them to your agents.
+
+1. Create a webhook endpoint in the dashboard — you get a unique URL
+2. Point external services at that URL
+3. Your agent polls for new events and acknowledges them when processed
+
+Each endpoint supports optional **handling instructions** — plain text guidance that tells the agent what to do when an event arrives.
+
+### Vault
+
+Store and manage credentials securely. Agents never see raw secrets — they get blind-fill handles that Shellgate resolves at request time.
+
+- Organize credentials into multiple vaults
+- Per-token vault permissions
+- Sensitive fields are encrypted and never exposed to agents
+- `vault_search` MCP tool lets agents discover available credentials by domain
+
+### Organization Skills
+
+Shared, reusable procedures that any agent can access. Skills are markdown documents with structured instructions — like runbooks your agents can follow.
+
+- Create and version skills from the dashboard or via MCP
+- Agents call `org_skill_list` to discover available skills
+- Call `org_skill_read` to load a skill's full instructions before executing
+
+### Memories
+
+Give your agents persistent memory across sessions. Memories can be scoped to the organization, a specific user, or a specific token.
+
+- Agents store and recall context between conversations
+- Three visibility levels: `org`, `user`, `token`
+- Full CRUD via MCP tools
+
+### Wiki
+
+A built-in knowledge base for compiled organizational knowledge. Store research, documentation, and reference material that agents can query.
+
+- Multi-namespace support
+- Status tracking (draft, active, archived)
+- Source attribution
+- Tagging and search
+- Built-in linting/validation
+
+### Audit Log
+
+Every gateway request, SSH command, and guard action is logged with full context — method, path, status code, duration, client IP, and guard decisions. Searchable from the dashboard.
 
 ---
 
@@ -281,6 +350,28 @@ Response: `{ "exitCode": 0, "stdout": "...", "stderr": "...", "durationMs": 123 
 If the command is intercepted by the guard: `{ "status": "approval_required", "reason": "...", "matched": "...", "request": {...} }` (HTTP 202)
 
 Re-submit with `X-Shellgate-Approved: true` header to execute after human approval.
+
+### MCP
+
+```
+POST /mcp   # MCP server (Streamable HTTP transport)
+```
+
+Bearer token auth. All tools listed in [MCP Server](#mcp-server) are available.
+
+### Webhooks
+
+```
+POST /webhooks/incoming/:slug         # Receive webhook from external service
+GET  /webhooks/poll                   # Poll pending events (Bearer token)
+POST /webhooks/ack                    # Acknowledge events (Bearer token)
+```
+
+### Discovery
+
+```
+GET /discovery   # List targets, webhooks, and skills accessible to this token
+```
 
 ### Health
 
