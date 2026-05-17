@@ -64,13 +64,19 @@ export const actions = {
 		}
 	},
 
-	updateField: async ({ request }) => {
+	updateField: async ({ request, params }) => {
+		const vault = await getVaultBySlug(params.slug);
+		if (!vault) return fail(404, { error: "Vault not found" });
+		const item = await getItem(vault.id, params.itemSlug);
+		if (!item) return fail(404, { error: "Item not found" });
+
 		const data = await request.formData();
 		const id = data.get("id")?.toString() ?? "";
 		const value = data.get("value")?.toString() ?? "";
 		const sensitiveRaw = data.get("sensitive")?.toString();
 
 		if (!id) return fail(400, { error: "Field ID is required" });
+		if (!item.fields.some((f) => f.id === id)) return fail(404, { error: "Field not found in this item" });
 
 		const updates: { value?: string; sensitive?: boolean } = {};
 		if (value) updates.value = value;
@@ -84,10 +90,16 @@ export const actions = {
 		}
 	},
 
-	deleteField: async ({ request }) => {
+	deleteField: async ({ request, params }) => {
+		const vault = await getVaultBySlug(params.slug);
+		if (!vault) return fail(404, { error: "Vault not found" });
+		const item = await getItem(vault.id, params.itemSlug);
+		if (!item) return fail(404, { error: "Item not found" });
+
 		const data = await request.formData();
 		const id = data.get("id")?.toString() ?? "";
 		if (!id) return fail(400, { error: "Field ID is required" });
+		if (!item.fields.some((f) => f.id === id)) return fail(404, { error: "Field not found in this item" });
 
 		try {
 			await deleteField(id);
@@ -97,10 +109,16 @@ export const actions = {
 		}
 	},
 
-	revealField: async ({ request }) => {
+	revealField: async ({ request, params }) => {
+		const vault = await getVaultBySlug(params.slug);
+		if (!vault) return fail(404, { error: "Vault not found" });
+		const item = await getItem(vault.id, params.itemSlug);
+		if (!item) return fail(404, { error: "Item not found" });
+
 		const data = await request.formData();
 		const id = data.get("id")?.toString() ?? "";
 		if (!id) return fail(400, { error: "Field ID is required" });
+		if (!item.fields.some((f) => f.id === id)) return fail(404, { error: "Field not found in this item" });
 
 		const [field] = await db.select().from(vaultItemFields).where(eq(vaultItemFields.id, id)).limit(1);
 		if (!field) return fail(404, { error: "Field not found" });

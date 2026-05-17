@@ -42,10 +42,17 @@
 
 	function formatAction(log: AuditLog): string {
 		if (log.type === "ssh") return log.path ?? "-";
+		if (log.type === "vault") return `${log.method ?? "GET"} ${log.path ?? "-"}`;
 		// gateway: "POST /users" or "GET /v1/chat"
 		const method = log.method ?? "";
 		const path = log.path ?? "";
 		return method ? `${method} /${path}` : path || "-";
+	}
+
+	function typeLabel(type: string): string {
+		if (type === "gateway") return "API";
+		if (type === "vault") return "Vault";
+		return "SSH";
 	}
 
 	function formatRelativeTime(dateStr: string | Date): string {
@@ -126,7 +133,7 @@
 			<Dialog.Title>Audit Log Detail</Dialog.Title>
 			<Dialog.Description>
 				{#if detailLog}
-					{detailLog.type === "gateway" ? "API" : "SSH"} request to {detailLog.targetSlug ?? "unknown"}
+					{detailLog.type === "vault" ? `Vault secret access` : `${typeLabel(detailLog.type)} request to ${detailLog.targetSlug ?? "unknown"}`}
 				{/if}
 			</Dialog.Description>
 		</Dialog.Header>
@@ -149,7 +156,7 @@
 				<div class="grid grid-cols-[120px_1fr] gap-x-4 gap-y-2">
 					<span class="text-muted-foreground font-medium">Type</span>
 					<span>
-						<Badge variant="secondary">{detailLog.type === "gateway" ? "API" : "SSH"}</Badge>
+						<Badge variant="secondary">{typeLabel(detailLog.type)}</Badge>
 					</span>
 
 					<span class="text-muted-foreground font-medium">Target</span>
@@ -220,6 +227,7 @@
 			<option value="">All types</option>
 			<option value="gateway">Gateway</option>
 			<option value="ssh">SSH</option>
+			<option value="vault">Vault</option>
 		</select>
 
 		<select
@@ -276,7 +284,7 @@
 							<Table.Cell class="text-sm">
 								<div class="flex items-center gap-2">
 									<Badge variant="secondary" class="w-10 justify-center text-xs">
-										{log.type === "gateway" ? "API" : "SSH"}
+										{typeLabel(log.type)}
 									</Badge>
 									<span class="font-mono">{log.targetSlug ?? "-"}</span>
 								</div>
