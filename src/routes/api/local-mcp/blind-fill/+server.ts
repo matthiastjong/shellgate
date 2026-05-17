@@ -8,8 +8,8 @@ function getScript(): string {
 	if (cachedScript) return cachedScript;
 
 	const attempts = [
-		join(process.cwd(), "local-mcp", "blind-fill.bundle.mjs"),
-		join(process.cwd(), "src", "local-mcp", "blind-fill.bundle.mjs"),
+		join(process.cwd(), "local-mcp", "blind-fill.mjs"),
+		join(process.cwd(), "src", "local-mcp", "blind-fill.mjs"),
 	];
 
 	for (const path of attempts) {
