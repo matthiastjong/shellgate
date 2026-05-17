@@ -116,7 +116,7 @@ export const auditLogs = pgTable(
 			onDelete: "set null",
 		}),
 		targetSlug: varchar("target_slug", { length: 255 }),
-		type: text("type").notNull().$type<"gateway" | "ssh">(),
+		type: text("type").notNull().$type<"gateway" | "ssh" | "vault">(),
 		method: text("method"),
 		path: text("path"),
 		statusCode: integer("status_code"),

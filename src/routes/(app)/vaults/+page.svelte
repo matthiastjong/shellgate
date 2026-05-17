@@ -7,6 +7,7 @@
 	import { Input } from "$lib/components/ui/input/index.js";
 	import { Label } from "$lib/components/ui/label/index.js";
 	import PlusIcon from "@lucide/svelte/icons/plus";
+	import BlindFillGuide from "./BlindFillGuide.svelte";
 	import TrashIcon from "@lucide/svelte/icons/trash-2";
 	import KeyRoundIcon from "@lucide/svelte/icons/key-round";
 	import { toast } from "svelte-sonner";
@@ -50,7 +51,8 @@
 		<p class="text-muted-foreground text-sm">Store and manage secrets and credentials for your agents.</p>
 	</div>
 
-	<div class="flex justify-end">
+	<div class="flex justify-end gap-2">
+		<BlindFillGuide />
 		<Button onclick={() => { createOpen = true; }}>
 			<PlusIcon class="mr-2 size-4" />
 			New Vault

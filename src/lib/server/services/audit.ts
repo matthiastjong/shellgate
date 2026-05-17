@@ -6,7 +6,7 @@ type AuditLogData = {
 	tokenName: string | null;
 	targetId: string | null;
 	targetSlug: string | null;
-	type: "gateway" | "ssh";
+	type: "gateway" | "ssh" | "vault";
 	method: string | null;
 	path: string | null;
 	statusCode: number | null;
