@@ -25,4 +25,6 @@ vite.config.ts.timestamp-*
 .idea/
 .worktrees/
 .playwright-mcp/
-.playwright-mcp/
+
+# Generated bundles
+src/local-mcp/blind-fill.bundle.mjs

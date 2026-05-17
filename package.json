@@ -15,7 +15,8 @@
 		"db:push": "drizzle-kit push",
 		"db:reset": "npx tsx --env-file=.env scripts/db-reset.ts && drizzle-kit migrate",
 		"db:studio": "drizzle-kit studio",
-		"test": "vitest run"
+		"test": "vitest run",
+		"build:blind-fill": "node src/local-mcp/build.mjs"
 	},
 	"devDependencies": {
 		"@lucide/svelte": "^1.8.0",
@@ -26,6 +27,7 @@
 		"@types/node": "^25.5.0",
 		"@types/ssh2": "^1.15.5",
 		"drizzle-kit": "^0.31.9",
+		"esbuild": "^0.28.0",
 		"svelte": "^5.51.0",
 		"svelte-check": "^4.4.2",
 		"testcontainers": "^11.13.0",
