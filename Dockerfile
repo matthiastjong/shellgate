@@ -14,7 +14,6 @@ COPY --from=builder /app/build ./build
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/package-lock.json ./
 COPY --from=builder /app/drizzle ./drizzle
-COPY --from=builder /app/src/local-mcp ./local-mcp
 RUN npm ci --omit=dev
 RUN apk add --no-cache curl
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s CMD curl -sf http://localhost:3000/health || exit 1

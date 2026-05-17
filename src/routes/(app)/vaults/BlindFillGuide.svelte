@@ -28,23 +28,17 @@
 				<h3 class="font-semibold mb-1">Hoe werkt het?</h3>
 				<p class="text-muted-foreground">
 					De agent zoekt credentials via <code>vault_search</code> en krijgt een handle terug — nooit het wachtwoord zelf.
-					Een lokaal MCP-script haalt het wachtwoord op bij Shellgate en vult het direct in de browser via Chrome DevTools Protocol.
+					Een lokale MCP-server haalt het wachtwoord op bij Shellgate en vult het direct in de browser via Chrome DevTools Protocol.
 				</p>
 			</section>
 
 			<section>
-				<h3 class="font-semibold mb-1">1. Download het script</h3>
-				<pre class="bg-muted rounded-md p-3 text-xs overflow-x-auto"><code>curl -o ~/.shellgate/blind-fill.mjs \
-  {shellgateUrl}/api/local-mcp/blind-fill</code></pre>
-			</section>
-
-			<section>
-				<h3 class="font-semibold mb-1">2. Configureer als MCP server</h3>
+				<h3 class="font-semibold mb-1">1. Configureer als MCP server</h3>
 				<p class="text-muted-foreground mb-2">Voeg dit toe aan je MCP config:</p>
 				<pre class="bg-muted rounded-md p-3 text-xs overflow-x-auto"><code>{JSON.stringify({
 	"shellgate-secrets": {
-		command: "node",
-		args: ["~/.shellgate/blind-fill.mjs"],
+		command: "npx",
+		args: ["-y", "shellgate-secrets"],
 		env: {
 			SHELLGATE_URL: shellgateUrl,
 			SHELLGATE_TOKEN: "sg_...",
@@ -55,7 +49,7 @@
 			</section>
 
 			<section>
-				<h3 class="font-semibold mb-1">3. Start Chrome met debugging</h3>
+				<h3 class="font-semibold mb-1">2. Start Chrome met debugging</h3>
 				<p class="text-muted-foreground mb-2">Chrome moet gestart zijn met remote debugging:</p>
 				<pre class="bg-muted rounded-md p-3 text-xs overflow-x-auto"><code>google-chrome --remote-debugging-port=9222</code></pre>
 				<p class="text-muted-foreground text-xs mt-1">

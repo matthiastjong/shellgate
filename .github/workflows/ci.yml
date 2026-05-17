@@ -53,3 +53,44 @@ jobs:
       - run: npm test
         env:
           VAULT_ENCRYPTION_KEY: ${{ secrets.VAULT_ENCRYPTION_KEY }}
+
+  check-shellgate-secrets:
+    name: Check shellgate-secrets package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for package changes
+        id: changes
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE=${{ github.event.pull_request.base.sha }}
+          else
+            BASE=${{ github.event.before }}
+          fi
+          if git diff --name-only "$BASE" HEAD | grep -q '^packages/shellgate-secrets/src/'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify npm version is bumped
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          LOCAL_VERSION=$(node -p "require('./packages/shellgate-secrets/package.json').version")
+          NPM_VERSION=$(npm view shellgate-secrets version 2>/dev/null || echo "0.0.0")
+          if [ "$LOCAL_VERSION" = "$NPM_VERSION" ]; then
+            echo "::error::packages/shellgate-secrets/src/ has code changes but the version ($LOCAL_VERSION) still matches what's on npm."
+            echo ""
+            echo "To fix this:"
+            echo "  1. Bump the version:  cd packages/shellgate-secrets && npm version patch"
+            echo "  2. Publish to npm:    cd packages/shellgate-secrets && npm publish"
+            echo "  3. Commit and push the updated package.json"
+            echo ""
+            echo "Use 'npm version minor' or 'npm version major' instead of 'patch' for larger changes."
+            exit 1
+          else
+            echo "Version bumped: $NPM_VERSION -> $LOCAL_VERSION"
+          fi
