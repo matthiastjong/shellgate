@@ -96,6 +96,7 @@ const authTypeLabels: Record<string, string> = {
 	ssh_key: "SSH Key",
 	jwt_es256: "JWT ES256",
 	oauth2_refresh_token: "OAuth2 Refresh Token",
+	oauth2_client_credentials: "OAuth2 Client Credentials",
 };
 
 // Rename auth state
