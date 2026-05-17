@@ -1,6 +1,6 @@
 {
   "name": "shellgate-secrets",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "MCP server for blind-filling browser fields with Shellgate vault secrets via Chrome DevTools Protocol",
   "type": "module",
   "bin": {
