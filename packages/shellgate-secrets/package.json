@@ -1,0 +1,43 @@
+{
+  "name": "shellgate-secrets",
+  "version": "1.0.0",
+  "description": "MCP server for blind-filling browser fields with Shellgate vault secrets via Chrome DevTools Protocol",
+  "type": "module",
+  "bin": {
+    "shellgate-secrets": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "ws": "^8.18.0",
+    "zod": "^4.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.18.0",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist"
+  ],
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "shellgate",
+    "vault",
+    "secrets",
+    "blind-fill",
+    "chrome-devtools-protocol"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/matthiastjong/shellgate.git",
+    "directory": "packages/shellgate-secrets"
+  }
+}
