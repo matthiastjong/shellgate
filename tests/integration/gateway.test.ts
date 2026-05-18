@@ -416,4 +416,27 @@ describe("gateway proxy", () => {
 		const sentBody = await new Response(init!.body).json();
 		expect(sentBody).toEqual({ token: "abc" });
 	});
+
+	it("json_body does not send body on GET requests", async () => {
+		const { token: tokenRow } = await createTestToken();
+		const target = await createTestTarget("JsonGetAPI", "https://api.jsonget.com");
+		const storedBody = JSON.stringify({ secret_id: "abc", secret_key: "xyz" });
+		await createTestAuthMethod(target.id, { type: "json_body", credential: storedBody });
+		await grantPermission(tokenRow.id, target.id);
+
+		const fullToken = await getFullToken(tokenRow.id);
+
+		const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ ok: true }));
+
+		const request = new Request(`http://localhost/gateway/${target.slug}/data`, {
+			method: "GET",
+		});
+
+		const response = await proxyRequest(fullToken, target.slug, "data", request);
+
+		expect(response.status).toBe(200);
+		expect(fetchSpy).toHaveBeenCalledOnce();
+		const [, init] = fetchSpy.mock.calls[0];
+		expect(init!.body).toBeUndefined();
+	});
 });
