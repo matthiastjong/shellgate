@@ -50,7 +50,7 @@ audit_logs (every gateway + SSH request)
 
 - Targets have `type: "api" | "ssh"`. API targets have `baseUrl`, SSH targets have `config` (JSONB: host, port, username).
 - Cascade deletes: deleting a target removes its auth methods and permissions.
-- Auth method types: `bearer`, `basic`, `custom_header`, `ssh_key`.
+- Auth method types: `bearer`, `basic`, `custom_header`, `query_param`, `ssh_key`, `jwt_es256`, `oauth2_refresh_token`, `json_body`.
 - Webhook endpoints are linked to tokens (agents), not targets. Each endpoint has a unique slug for its public URL.
 - Webhook events expire after 7 days. Agents poll and ACK events.
 - Webhook endpoints have optional `handlingInstructions` (plain text) that agents receive in the poll response.

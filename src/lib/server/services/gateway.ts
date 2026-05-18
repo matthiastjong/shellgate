@@ -164,6 +164,58 @@ export async function proxyToTarget(
 					{ status: 500 },
 				);
 			}
+		} else if (authMethod.type === "json_body") {
+			try {
+				const storedFields = JSON.parse(authMethod.credential);
+				let agentBody: Record<string, unknown> = {};
+				if (request.method !== "GET" && request.method !== "HEAD") {
+					try {
+						const cloned = request.clone();
+						const text = await cloned.text();
+						if (text) agentBody = JSON.parse(text);
+					} catch { /* non-JSON or empty body — use empty object */ }
+				}
+				const mergedBody = JSON.stringify({ ...agentBody, ...storedFields });
+				headers.set("Content-Type", "application/json");
+
+				console.log("[gateway] →", request.method, url.toString());
+				console.log("[gateway] → headers:", Object.fromEntries(headers.entries()));
+
+				let upstreamResponse: Response;
+				try {
+					upstreamResponse = await fetch(url.toString(), {
+						method: request.method,
+						headers,
+						body: mergedBody,
+						// @ts-expect-error duplex needed for streaming body
+						duplex: "half",
+					});
+				} catch (err) {
+					console.error("[gateway] ✗ upstream request failed:", err);
+					return Response.json({ error: "upstream request failed" }, { status: 502 });
+				}
+
+				console.log("[gateway] ←", upstreamResponse.status, url.toString());
+				console.log("[gateway] ← headers:", Object.fromEntries(upstreamResponse.headers.entries()));
+
+				const responseHeaders = new Headers();
+				for (const [key, value] of upstreamResponse.headers.entries()) {
+					const lower = key.toLowerCase();
+					if (lower === "transfer-encoding" || lower === "content-encoding") continue;
+					responseHeaders.set(key, value);
+				}
+
+				const body = await upstreamResponse.arrayBuffer();
+				responseHeaders.set("Content-Length", String(body.byteLength));
+
+				return new Response(body, {
+					status: upstreamResponse.status,
+					headers: responseHeaders,
+				});
+			} catch (err) {
+				console.error("[gateway] ✗ json_body merge failed:", err);
+				return Response.json({ error: "json_body merge failed" }, { status: 500 });
+			}
 		}
 	}
 
