@@ -168,6 +168,17 @@ export const actions = {
 			if (tokenUrl) config.tokenUrl = tokenUrl;
 
 			credential = JSON.stringify(config);
+		} else if (type === "json_body") {
+			credential = data.get("credential")?.toString() ?? "";
+			if (!credential) return fail(400, { error: "JSON body is required" });
+			try {
+				const parsed = JSON.parse(credential);
+				if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+					return fail(400, { error: "JSON body must be a JSON object" });
+				}
+			} catch {
+				return fail(400, { error: "Invalid JSON" });
+			}
 		} else {
 			credential = data.get("credential")?.toString() ?? "";
 			if (!credential) return fail(400, { error: "Credential is required" });
@@ -275,6 +286,19 @@ export const actions = {
 				const tokenUrl = data.get("oauth2TokenUrl")?.toString()?.trim();
 				if (tokenUrl) config.tokenUrl = tokenUrl;
 				credential = JSON.stringify(config);
+			}
+		} else if (type === "json_body") {
+			const raw = data.get("credential")?.toString() ?? "";
+			if (raw) {
+				try {
+					const parsed = JSON.parse(raw);
+					if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+						return fail(400, { error: "JSON body must be a JSON object" });
+					}
+					credential = raw;
+				} catch {
+					return fail(400, { error: "Invalid JSON" });
+				}
 			}
 		} else {
 			const raw = data.get("credential")?.toString() ?? "";
