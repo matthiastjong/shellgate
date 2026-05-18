@@ -48,6 +48,7 @@ const optionalHint = mode === 'edit' ? ' (leave blank to keep existing)' : '';
 			<option value="query_param">Query Parameter</option>
 			<option value="jwt_es256">JWT ES256 (Apple, etc.)</option>
 			<option value="oauth2_refresh_token">OAuth2 Refresh Token (Google, etc.)</option>
+			<option value="json_body">JSON Body</option>
 		{/if}
 	</select>
 </div>
@@ -247,6 +248,19 @@ const optionalHint = mode === 'edit' ? ' (leave blank to keep existing)' : '';
 	<div class="grid gap-2">
 		<Label for="{idPrefix}-oauth2-token-url">Token URL <span class="text-muted-foreground text-xs">(optional, defaults to Google)</span></Label>
 		<Input id="{idPrefix}-oauth2-token-url" name="oauth2TokenUrl" bind:value={oauth2TokenUrl} placeholder="https://oauth2.googleapis.com/token" />
+	</div>
+{:else if authType === 'json_body'}
+	<div class="grid gap-2">
+		<Label for="{idPrefix}-credential">JSON Body{#if mode === 'edit'} <span class="text-muted-foreground text-xs">{optionalHint}</span>{/if}</Label>
+		<textarea
+			id="{idPrefix}-credential"
+			name="credential"
+			class="flex min-h-[120px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono"
+			bind:value={authCredential}
+			placeholder={'{"secret_id": "your-id", "secret_key": "your-key"}'}
+			required={mode === 'add'}
+		></textarea>
+		<p class="text-xs text-muted-foreground">Raw JSON object. These fields will be merged into the request body.</p>
 	</div>
 {:else}
 	<div class="grid gap-2">
