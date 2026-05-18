@@ -340,4 +340,80 @@ describe("gateway proxy", () => {
 		const [, init] = fetchSpy.mock.calls[0];
 		expect((init!.headers as Headers).get("X-API-Key")).toBe("legacy-key");
 	});
+
+	it("proxies request with json_body credential merged into request body", async () => {
+		const { token: tokenRow } = await createTestToken();
+		const target = await createTestTarget("GoCardlessAPI", "https://bankaccountdata.gocardless.com");
+		const storedBody = JSON.stringify({ secret_id: "my-secret-id", secret_key: "my-secret-key" });
+		await createTestAuthMethod(target.id, { type: "json_body", credential: storedBody });
+		await grantPermission(tokenRow.id, target.id);
+
+		const fullToken = await getFullToken(tokenRow.id);
+
+		const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ access: "token123" }));
+
+		const request = new Request(`http://localhost/gateway/${target.slug}/api/v2/token/new/`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({}),
+		});
+
+		const response = await proxyRequest(fullToken, target.slug, "api/v2/token/new/", request);
+
+		expect(response.status).toBe(200);
+		expect(fetchSpy).toHaveBeenCalledOnce();
+		const [, init] = fetchSpy.mock.calls[0];
+
+		const sentBody = await new Response(init!.body).json();
+		expect(sentBody).toEqual({ secret_id: "my-secret-id", secret_key: "my-secret-key" });
+		expect((init!.headers as Headers).get("Content-Type")).toBe("application/json");
+	});
+
+	it("json_body merges with agent-supplied body fields (stored wins)", async () => {
+		const { token: tokenRow } = await createTestToken();
+		const target = await createTestTarget("MergeAPI", "https://api.merge.com");
+		const storedBody = JSON.stringify({ api_key: "secret-123" });
+		await createTestAuthMethod(target.id, { type: "json_body", credential: storedBody });
+		await grantPermission(tokenRow.id, target.id);
+
+		const fullToken = await getFullToken(tokenRow.id);
+
+		const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ ok: true }));
+
+		const request = new Request(`http://localhost/gateway/${target.slug}/data`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ query: "test", api_key: "agent-tried-to-override" }),
+		});
+
+		const response = await proxyRequest(fullToken, target.slug, "data", request);
+
+		expect(response.status).toBe(200);
+		const [, init] = fetchSpy.mock.calls[0];
+		const sentBody = await new Response(init!.body).json();
+		expect(sentBody).toEqual({ query: "test", api_key: "secret-123" });
+	});
+
+	it("json_body works with empty/no agent body", async () => {
+		const { token: tokenRow } = await createTestToken();
+		const target = await createTestTarget("EmptyBodyAPI", "https://api.emptybody.com");
+		const storedBody = JSON.stringify({ token: "abc" });
+		await createTestAuthMethod(target.id, { type: "json_body", credential: storedBody });
+		await grantPermission(tokenRow.id, target.id);
+
+		const fullToken = await getFullToken(tokenRow.id);
+
+		const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ ok: true }));
+
+		const request = new Request(`http://localhost/gateway/${target.slug}/action`, {
+			method: "POST",
+		});
+
+		const response = await proxyRequest(fullToken, target.slug, "action", request);
+
+		expect(response.status).toBe(200);
+		const [, init] = fetchSpy.mock.calls[0];
+		const sentBody = await new Response(init!.body).json();
+		expect(sentBody).toEqual({ token: "abc" });
+	});
 });
