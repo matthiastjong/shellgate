@@ -175,8 +175,9 @@ export async function proxyToTarget(
 						if (text) agentBody = JSON.parse(text);
 					} catch { /* non-JSON or empty body — use empty object */ }
 				}
-				const mergedBody = JSON.stringify({ ...agentBody, ...storedFields });
-				headers.set("Content-Type", "application/json");
+				const hasBody = request.method !== "GET" && request.method !== "HEAD";
+				const mergedBody = hasBody ? JSON.stringify({ ...agentBody, ...storedFields }) : undefined;
+				if (hasBody) headers.set("Content-Type", "application/json");
 
 				console.log("[gateway] →", request.method, url.toString());
 				console.log("[gateway] → headers:", Object.fromEntries(headers.entries()));
