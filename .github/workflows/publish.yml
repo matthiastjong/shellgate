@@ -13,6 +13,8 @@ jobs:
   check-shellgate-secrets:
     name: Verify shellgate-secrets version
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
