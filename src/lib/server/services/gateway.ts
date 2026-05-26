@@ -220,6 +220,14 @@ export async function proxyToTarget(
 		}
 	}
 
+	// Buffer the request body so fetch() can set Content-Length.
+	// Streaming via ReadableStream uses chunked transfer encoding,
+	// which some upstreams (e.g. ClickHouse) do not support.
+	let upstreamBody: string | undefined;
+	if (request.method !== "GET" && request.method !== "HEAD" && request.body) {
+		upstreamBody = await request.text();
+	}
+
 	// [DEBUG] Log outgoing upstream request
 	console.log("[gateway] →", request.method, url.toString());
 	console.log("[gateway] → headers:", Object.fromEntries(headers.entries()));
@@ -229,12 +237,7 @@ export async function proxyToTarget(
 		upstreamResponse = await fetch(url.toString(), {
 			method: request.method,
 			headers,
-			body:
-				request.method !== "GET" && request.method !== "HEAD"
-					? request.body
-					: undefined,
-			// @ts-expect-error duplex needed for streaming body
-			duplex: "half",
+			body: upstreamBody,
 		});
 	} catch (err) {
 		console.error("[gateway] ✗ upstream request failed:", err);

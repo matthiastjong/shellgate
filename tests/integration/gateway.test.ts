@@ -417,6 +417,41 @@ describe("gateway proxy", () => {
 		expect(sentBody).toEqual({ token: "abc" });
 	});
 
+	it("proxies POST with plain text body (non-JSON)", async () => {
+		const { token: tokenRow } = await createTestToken();
+		const target = await createTestTarget("ClickHouseAPI", "https://clickhouse.example.com");
+		await createTestAuthMethod(target.id, { type: "basic", credential: "user:pass" });
+		await grantPermission(tokenRow.id, target.id);
+
+		const fullToken = await getFullToken(tokenRow.id);
+
+		const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+			new Response('{"1":1}\n', {
+				headers: { "Content-Type": "application/x-ndjson; charset=UTF-8" },
+			}),
+		);
+
+		const sqlQuery = "SELECT 1 FORMAT JSONEachRow";
+		const request = new Request(`http://localhost/gateway/${target.slug}/`, {
+			method: "POST",
+			headers: { "Content-Type": "text/plain" },
+			body: sqlQuery,
+		});
+
+		const response = await proxyRequest(fullToken, target.slug, "", request);
+
+		expect(response.status).toBe(200);
+		expect(fetchSpy).toHaveBeenCalledOnce();
+		const [, init] = fetchSpy.mock.calls[0];
+
+		// Body should be buffered as a string, not a ReadableStream
+		expect(typeof init!.body).toBe("string");
+		expect(init!.body).toBe(sqlQuery);
+
+		// Content-Type should be preserved as text/plain
+		expect((init!.headers as Headers).get("Content-Type")).toBe("text/plain");
+	});
+
 	it("json_body does not send body on GET requests", async () => {
 		const { token: tokenRow } = await createTestToken();
 		const target = await createTestTarget("JsonGetAPI", "https://api.jsonget.com");
