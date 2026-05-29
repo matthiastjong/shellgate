@@ -7,7 +7,10 @@ import { auditLogs } from "$lib/server/db/schema";
 import { eq, desc } from "drizzle-orm";
 
 describe("vault field value with origin validation", () => {
-	beforeEach(async () => { await truncateAll(); });
+	beforeEach(async () => {
+		process.env.VAULT_ENCRYPTION_KEY = Buffer.from("a]3Fq!9Lp@2Xw#7Yz&5Bv*8Cn$4Dm%6E").toString("base64");
+		await truncateAll();
+	});
 
 	it("returns value when origin matches allowedOrigins", async () => {
 		const { token } = await createTestToken();
