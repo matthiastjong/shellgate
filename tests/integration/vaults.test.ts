@@ -125,6 +125,53 @@ describe("vault items service", () => {
 		expect(item.allowedOrigins).toContain("https://*.ing.nl");
 	});
 
+	it("normalizes URL domains before deriving allowedOrigins", async () => {
+		const item = await createItem(vaultId, {
+			name: "Webgains",
+			domain: "https://platform.webgains.io/path",
+			fields: [],
+		});
+
+		expect(item.domain).toBe("platform.webgains.io");
+		expect(item.allowedOrigins).toEqual([
+			"https://platform.webgains.io",
+			"https://*.platform.webgains.io",
+		]);
+	});
+
+	it("updates allowedOrigins when domain changes", async () => {
+		const item = await createItem(vaultId, { name: "Login", domain: "github.com", fields: [] });
+
+		const updated = await updateItem(item.id, { domain: "https://platform.webgains.io/" });
+
+		expect(updated?.domain).toBe("platform.webgains.io");
+		expect(updated?.allowedOrigins).toEqual([
+			"https://platform.webgains.io",
+			"https://*.platform.webgains.io",
+		]);
+	});
+
+	it("clears allowedOrigins when domain is cleared", async () => {
+		const item = await createItem(vaultId, { name: "Login", domain: "github.com", fields: [] });
+
+		const updated = await updateItem(item.id, { domain: null });
+
+		expect(updated?.domain).toBeNull();
+		expect(updated?.allowedOrigins).toBeNull();
+	});
+
+	it("preserves explicit allowedOrigins when domain changes", async () => {
+		const item = await createItem(vaultId, { name: "Login", domain: "github.com", fields: [] });
+
+		const updated = await updateItem(item.id, {
+			domain: "webgains.io",
+			allowedOrigins: ["https://login.webgains.io"],
+		});
+
+		expect(updated?.domain).toBe("webgains.io");
+		expect(updated?.allowedOrigins).toEqual(["https://login.webgains.io"]);
+	});
+
 	it("deletes item and cascades to fields", async () => {
 		const item = await createItem(vaultId, {
 			name: "To Delete",

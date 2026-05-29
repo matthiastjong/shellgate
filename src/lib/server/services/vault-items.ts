@@ -8,8 +8,21 @@ function slugify(name: string): string {
 	return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
+function normalizeDomain(domain: string): string {
+	const trimmed = domain.trim();
+	if (!trimmed) return "";
+
+	try {
+		const url = new URL(trimmed.includes("://") ? trimmed : `https://${trimmed}`);
+		return url.host;
+	} catch {
+		return trimmed.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+	}
+}
+
 function deriveAllowedOrigins(domain: string): string[] {
-	return [`https://${domain}`, `https://*.${domain}`];
+	const normalizedDomain = normalizeDomain(domain);
+	return [`https://${normalizedDomain}`, `https://*.${normalizedDomain}`];
 }
 
 type FieldInput = { name: string; value: string; sensitive?: boolean };
@@ -19,12 +32,13 @@ export async function createItem(
 	data: { name: string; domain?: string; description?: string; allowedOrigins?: string[]; fields?: FieldInput[] },
 ) {
 	const slug = slugify(data.name);
-	const allowedOrigins = data.allowedOrigins ?? (data.domain ? deriveAllowedOrigins(data.domain) : null);
+	const domain = data.domain ? normalizeDomain(data.domain) : null;
+	const allowedOrigins = data.allowedOrigins ?? (domain ? deriveAllowedOrigins(domain) : null);
 
 	let item;
 	try {
 		[item] = await db.insert(vaultItems).values({
-			vaultId, name: data.name, slug, domain: data.domain ?? null,
+			vaultId, name: data.name, slug, domain,
 			description: data.description ?? null, allowedOrigins,
 		}).returning();
 	} catch (err: unknown) {
@@ -74,7 +88,15 @@ export async function updateItem(
 	id: string,
 	data: { name?: string; domain?: string | null; description?: string | null; allowedOrigins?: string[] | null },
 ) {
-	const [row] = await db.update(vaultItems).set({ ...data, updatedAt: new Date() })
+	const updates = { ...data };
+
+	if ("domain" in updates) {
+		const domain = updates.domain ? normalizeDomain(updates.domain) : null;
+		updates.domain = domain;
+		updates.allowedOrigins ??= domain ? deriveAllowedOrigins(domain) : null;
+	}
+
+	const [row] = await db.update(vaultItems).set({ ...updates, updatedAt: new Date() })
 		.where(eq(vaultItems.id, id)).returning();
 	return row ?? null;
 }
