@@ -7,6 +7,15 @@ import { hasPermission } from "./permissions";
 import { signES256JWT } from "../utils/jwt";
 import { getOAuth2AccessToken } from "../utils/oauth2";
 
+function redactHeaders(headers: Headers) {
+	const result: Record<string, string> = {};
+	for (const [key, value] of headers.entries()) {
+		const lower = key.toLowerCase();
+		result[key] = lower === "authorization" || lower === "proxy-authorization" ? "[REDACTED]" : value;
+	}
+	return result;
+}
+
 /**
  * Resolve and validate a target for gateway proxying.
  * Returns the target if valid, or a Response error.
@@ -180,7 +189,7 @@ export async function proxyToTarget(
 				if (hasBody) headers.set("Content-Type", "application/json");
 
 				console.log("[gateway] →", request.method, url.toString());
-				console.log("[gateway] → headers:", Object.fromEntries(headers.entries()));
+				console.log("[gateway] → headers:", redactHeaders(headers));
 
 				let upstreamResponse: Response;
 				try {
@@ -230,7 +239,7 @@ export async function proxyToTarget(
 
 	// [DEBUG] Log outgoing upstream request
 	console.log("[gateway] →", request.method, url.toString());
-	console.log("[gateway] → headers:", Object.fromEntries(headers.entries()));
+	console.log("[gateway] → headers:", redactHeaders(headers));
 
 	let upstreamResponse: Response;
 	try {

@@ -326,4 +326,108 @@ describe("MCP tools", () => {
 			expect(result.next_action).toContain("approved: true");
 		});
 	});
+
+	describe("api_download", () => {
+		it("downloads an authenticated image response as base64", async () => {
+			const { token: tokenRow } = await createTestToken();
+			const target = await createTestTarget("Linear Uploads", "https://uploads.linear.app");
+			await createTestAuthMethod(target.id, { credential: "lin-api-token" });
+			await grantPermission(tokenRow.id, target.id);
+
+			const fullToken = await getFullToken(tokenRow.id);
+			const pngBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+			const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+				new Response(pngBytes, {
+					status: 200,
+					headers: { "content-type": "image/png" },
+				}),
+			);
+
+			const handler = createMcpToolHandler(fullToken);
+			const result = await handler("api_download", {
+				target: target.slug,
+				path: "/a6d3e145/image-id",
+			}) as { contentType: string; filename: string; byteLength: number; base64: string };
+
+			expect(result.contentType).toBe("image/png");
+			expect(result.filename).toBe("download.png");
+			expect(result.byteLength).toBe(4);
+			expect(result.base64).toBe(pngBytes.toString("base64"));
+
+			const [url, init] = fetchSpy.mock.calls[0];
+			expect(url).toBe("https://uploads.linear.app/a6d3e145/image-id");
+			expect((init!.headers as Headers).get("Authorization")).toBe("Bearer lin-api-token");
+		});
+
+		it("rejects non-image responses", async () => {
+			const { token: tokenRow } = await createTestToken();
+			const target = await createTestTarget("Linear Uploads", "https://uploads.linear.app");
+			await createTestAuthMethod(target.id);
+			await grantPermission(tokenRow.id, target.id);
+
+			const fullToken = await getFullToken(tokenRow.id);
+			vi.spyOn(globalThis, "fetch").mockResolvedValue(
+				new Response(JSON.stringify({ error: "unauthorized" }), {
+					status: 200,
+					headers: { "content-type": "application/json" },
+				}),
+			);
+
+			const handler = createMcpToolHandler(fullToken);
+			const result = await handler("api_download", {
+				target: target.slug,
+				path: "/not-an-image",
+			}) as { error: string; contentType: string };
+
+			expect(result.error).toBe("not_image");
+			expect(result.contentType).toBe("application/json");
+		});
+
+		it("rejects image responses larger than maxBytes", async () => {
+			const { token: tokenRow } = await createTestToken();
+			const target = await createTestTarget("Linear Uploads", "https://uploads.linear.app");
+			await createTestAuthMethod(target.id);
+			await grantPermission(tokenRow.id, target.id);
+
+			const fullToken = await getFullToken(tokenRow.id);
+			vi.spyOn(globalThis, "fetch").mockResolvedValue(
+				new Response(Buffer.from([1, 2, 3, 4]), {
+					status: 200,
+					headers: { "content-type": "image/jpeg" },
+				}),
+			);
+
+			const handler = createMcpToolHandler(fullToken);
+			const result = await handler("api_download", {
+				target: target.slug,
+				path: "/large",
+				maxBytes: 3,
+			}) as { error: string; maxBytes: number; contentLength: number };
+
+			expect(result.error).toBe("too_large");
+			expect(result.maxBytes).toBe(3);
+			expect(result.contentLength).toBe(4);
+		});
+
+		it("maps upstream 401/403 responses to unauthorized", async () => {
+			const { token: tokenRow } = await createTestToken();
+			const target = await createTestTarget("Linear Uploads", "https://uploads.linear.app");
+			await createTestAuthMethod(target.id);
+			await grantPermission(tokenRow.id, target.id);
+
+			const fullToken = await getFullToken(tokenRow.id);
+			vi.spyOn(globalThis, "fetch").mockResolvedValue(
+				new Response("unauthorized", { status: 401 }),
+			);
+
+			const handler = createMcpToolHandler(fullToken);
+			const result = await handler("api_download", {
+				target: target.slug,
+				path: "/private",
+			}) as { error: string; status: number };
+
+			expect(result.error).toBe("unauthorized");
+			expect(result.status).toBe(401);
+		});
+	});
 });
