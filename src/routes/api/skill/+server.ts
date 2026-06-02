@@ -36,6 +36,19 @@ curl -s -H "Authorization: Bearer $SHELLGATE_API_KEY" \\
   -d '{"model": "gpt-4", "messages": [...]}'
 \`\`\`
 
+### Authenticated Image Downloads
+
+When Linear issue descriptions or comments contain \`https://uploads.linear.app/...\` image URLs, do not call those URLs directly. Use a Shellgate target configured like this:
+
+\`\`\`text
+slug: linear-uploads
+name: Linear Uploads
+baseUrl: https://uploads.linear.app
+auth: Bearer
+\`\`\`
+
+Download only the path part through Shellgate, save the binary response locally or read the MCP resource returned by \`api_download\`, and inspect the image before drawing conclusions from the Linear ticket. Accept only \`image/png\`, \`image/jpeg\`, and \`image/webp\`, keep downloads at or below 20 MB, and never print or log image bytes/base64 as text.
+
 ### SSH Targets
 For targets with type \`ssh\`, execute commands on remote servers:
 

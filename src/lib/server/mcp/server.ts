@@ -1,9 +1,12 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import type { Token } from "$lib/server/db/schema";
 import { discover } from "./tools/discover";
 import { apiRequest } from "./tools/api-request";
 import type { ApiRequestArgs } from "./tools/api-request";
+import { apiDownload, readDownloadedImageResource } from "./tools/api-download";
+import type { ApiDownloadArgs } from "./tools/api-download";
 import { sshExec } from "./tools/ssh-exec";
 import type { SshExecArgs } from "./tools/ssh-exec";
 import { webhookPoll, webhookAck } from "./tools/webhooks";
@@ -18,6 +21,8 @@ Shellgate manages organization-wide skills shared across all agents — these ar
 
 Shellgate also provides a wiki for compiled organizational knowledge. Call wiki_list_pages to browse available pages. Use wiki tools for factual knowledge ("what do we know?"), memories for behavioral guidance ("how should I act?"), and skills for procedures ("what steps to follow?").
 
+When Linear issue descriptions or comments contain \`https://uploads.linear.app/...\` image URLs, do not call those URLs directly. Use the \`linear-uploads\` target with \`api_download\`, read the returned MCP resource as an image/blob, inspect it with vision tooling, and include the visual content in your ticket analysis before drawing conclusions. Do not print, log, comment, or otherwise expose image bytes/base64 as text.
+
 IMPORTANT — Wiki workflow: Proactively store company knowledge in the wiki when you encounter valuable factual information. BEFORE creating or updating any wiki page, you MUST first call org_skill_read for the relevant wiki skill (wiki-create-page, wiki-update-page, or wiki-compile-research) and follow its instructions. These skills define required structure, namespace conventions, source attribution, and validation steps (including wiki_lint_page). Never write to the wiki without reading the skill first.
 
 Call vault_search when you need credentials for browser automation — it returns handles for blind-fill, not secret values.`;
@@ -27,7 +32,23 @@ export function createMcpServer() {
 		{ name: "shellgate", version: "1.0.0" },
 		{ instructions: INSTRUCTIONS }
 	);
+	server.registerResource(
+		"downloaded_image",
+		new ResourceTemplate("shellgate-download://{id}", { list: undefined }),
+		{
+			title: "Downloaded Image",
+			description: "Temporary binary image downloaded through Shellgate api_download",
+		},
+		(uri) => readDownloadedImageResource(uri.toString())
+	);
 	return server;
+}
+
+function asToolResult(result: unknown) {
+	if (result && typeof result === "object" && "content" in result) {
+		return result as CallToolResult;
+	}
+	return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 }
 
 export function registerTools(server: McpServer, token: Token) {
@@ -50,6 +71,21 @@ export function registerTools(server: McpServer, token: Token) {
 		async (args) => {
 			const result = await apiRequest(token, args);
 			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+		}
+	);
+
+	server.tool(
+		"api_download",
+		"Download an image response from an API target through Shellgate and return a temporary MCP resource link. Use for authenticated binary images such as Linear uploads. Only image/png, image/jpeg, and image/webp are accepted; image bytes/base64 are not returned as text.",
+		{
+			target: z.string().describe("Target slug"),
+			path: z.string().describe("Path appended to target's baseUrl"),
+			maxBytes: z.number().optional().describe("Maximum response size in bytes, capped at 20 MB"),
+			approved: z.preprocess(val => val === "true" || val === true, z.boolean()).optional().describe("Set to true after user approves a guarded request"),
+		},
+		async (args) => {
+			const result = await apiDownload(token, args);
+			return asToolResult(result);
 		}
 	);
 
@@ -296,6 +332,8 @@ export function createMcpToolHandler(token: TokenLike): ToolHandler {
 				return discover(t);
 			case "api_request":
 				return apiRequest(t, args as unknown as ApiRequestArgs);
+			case "api_download":
+				return apiDownload(t, args as unknown as ApiDownloadArgs);
 			case "ssh_exec":
 				return sshExec(t, args as unknown as SshExecArgs);
 			case "webhook_poll":
