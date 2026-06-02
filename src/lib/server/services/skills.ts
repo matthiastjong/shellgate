@@ -9,6 +9,7 @@ export async function listSkills() {
 		.select({
 			slug: skills.slug,
 			description: skills.description,
+			last_used_at: skills.lastUsedAt,
 		})
 		.from(skills)
 		.orderBy(skills.slug);
@@ -16,6 +17,7 @@ export async function listSkills() {
 	const builtIn = getBuiltInSkills().map((s) => ({
 		slug: s.slug,
 		description: s.description,
+		last_used_at: null,
 		builtIn: true,
 	}));
 
@@ -36,6 +38,7 @@ export async function getSkill(slug: string) {
 			builtIn: true,
 			createdAt: new Date(0),
 			updatedAt: new Date(0),
+			lastUsedAt: null,
 		};
 	}
 
@@ -45,6 +48,15 @@ export async function getSkill(slug: string) {
 		.where(eq(skills.slug, slug))
 		.limit(1);
 	return row ? { ...row, builtIn: false } : null;
+}
+
+export async function markSkillUsed(slug: string) {
+	const [row] = await db
+		.update(skills)
+		.set({ lastUsedAt: new Date() })
+		.where(eq(skills.slug, slug))
+		.returning({ lastUsedAt: skills.lastUsedAt });
+	return row?.lastUsedAt ?? null;
 }
 
 export async function createSkill(contentMd: string) {

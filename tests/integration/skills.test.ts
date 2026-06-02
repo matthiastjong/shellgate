@@ -54,7 +54,7 @@ describe("skills service", () => {
 		await expect(createSkill(validSkillMd)).rejects.toThrow();
 	});
 
-	it("lists skills with slug and description only", async () => {
+	it("lists skills with slug, description and last_used_at only", async () => {
 		const { createSkill, listSkills } = await import("$lib/server/services/skills");
 		await createSkill(validSkillMd);
 		await createSkill(anotherSkillMd);
@@ -66,6 +66,7 @@ describe("skills service", () => {
 		expect(dbSkills).toHaveLength(2);
 		expect(list[0]).toHaveProperty("slug");
 		expect(list[0]).toHaveProperty("description");
+		expect(list[0]).toHaveProperty("last_used_at");
 		expect(list[0]).not.toHaveProperty("contentMd");
 	});
 
@@ -77,6 +78,18 @@ describe("skills service", () => {
 		expect(skill).not.toBeNull();
 		expect(skill!.slug).toBe("deploy-hotfix");
 		expect(skill!.contentMd).toBe(validSkillMd);
+	});
+
+	it("tracks last_used_at when a skill is marked as used", async () => {
+		const { createSkill, getSkill, markSkillUsed } = await import("$lib/server/services/skills");
+		await createSkill(validSkillMd);
+
+		expect((await getSkill("deploy-hotfix"))!.lastUsedAt).toBeNull();
+
+		const lastUsedAt = await markSkillUsed("deploy-hotfix");
+
+		expect(lastUsedAt).toBeInstanceOf(Date);
+		expect((await getSkill("deploy-hotfix"))!.lastUsedAt).toBeInstanceOf(Date);
 	});
 
 	it("returns null for non-existent skill", async () => {
