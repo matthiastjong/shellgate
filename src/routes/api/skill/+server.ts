@@ -47,7 +47,7 @@ baseUrl: https://uploads.linear.app
 auth: Bearer
 \`\`\`
 
-Download only the path part through Shellgate, save the binary response locally, and inspect the image before drawing conclusions from the Linear ticket. Accept only \`image/png\`, \`image/jpeg\`, and \`image/webp\`, and keep downloads at or below 20 MB.
+Download only the path part through Shellgate, save the binary response locally or read the MCP resource returned by \`api_download\`, and inspect the image before drawing conclusions from the Linear ticket. Accept only \`image/png\`, \`image/jpeg\`, and \`image/webp\`, keep downloads at or below 20 MB, and never print or log image bytes/base64 as text.
 
 ### SSH Targets
 For targets with type \`ssh\`, execute commands on remote servers:

@@ -230,7 +230,7 @@ Shellgate exposes all agent-facing functionality as an [MCP (Model Context Proto
 |---|---|
 | `discover` | List accessible targets, webhooks, and org skills |
 | `api_request` | Proxy HTTP requests with automatic credential injection |
-| `api_download` | Download authenticated image responses as base64 with content-type and size checks |
+| `api_download` | Download authenticated image responses as temporary MCP resources with content-type and size checks |
 | `ssh_exec` | Execute SSH commands with guard protection |
 | `webhook_poll` | Poll for incoming webhook events |
 | `webhook_ack` | Acknowledge processed webhook events |

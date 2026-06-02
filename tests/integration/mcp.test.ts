@@ -328,7 +328,7 @@ describe("MCP tools", () => {
 	});
 
 	describe("api_download", () => {
-		it("downloads an authenticated image response as base64", async () => {
+		it("downloads an authenticated image response as a temporary resource link", async () => {
 			const { token: tokenRow } = await createTestToken();
 			const target = await createTestTarget("Linear Uploads", "https://uploads.linear.app");
 			await createTestAuthMethod(target.id, { credential: "lin-api-token" });
@@ -347,12 +347,33 @@ describe("MCP tools", () => {
 			const result = await handler("api_download", {
 				target: target.slug,
 				path: "/a6d3e145/image-id",
-			}) as { contentType: string; filename: string; byteLength: number; base64: string };
+			}) as {
+				content: [
+					{ type: "text"; text: string },
+					{ type: "resource_link"; uri: string; name: string; mimeType: string; size: number },
+				];
+			};
 
-			expect(result.contentType).toBe("image/png");
-			expect(result.filename).toBe("download.png");
-			expect(result.byteLength).toBe(4);
-			expect(result.base64).toBe(pngBytes.toString("base64"));
+			const metadata = JSON.parse(result.content[0].text) as {
+				contentType: string;
+				filename: string;
+				byteLength: number;
+				uri: string;
+			};
+
+			expect(metadata.contentType).toBe("image/png");
+			expect(metadata.filename).toBe("download.png");
+			expect(metadata.byteLength).toBe(4);
+			expect(metadata.uri).toMatch(/^shellgate-download:\/\//);
+			expect(result.content[0].text).not.toContain("base64");
+			expect(result.content[0].text).not.toContain(pngBytes.toString("base64"));
+			expect(result.content[1]).toMatchObject({
+				type: "resource_link",
+				uri: metadata.uri,
+				name: "download.png",
+				mimeType: "image/png",
+				size: 4,
+			});
 
 			const [url, init] = fetchSpy.mock.calls[0];
 			expect(url).toBe("https://uploads.linear.app/a6d3e145/image-id");

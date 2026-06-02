@@ -2,10 +2,22 @@ import type { Token } from "$lib/server/db/schema";
 import { resolveGatewayTarget, proxyToTarget } from "$lib/server/services/gateway";
 import { normalizeApiRequest, checkRequest } from "$lib/server/guard";
 import { logRequest } from "$lib/server/services/audit";
+import { randomUUID } from "node:crypto";
 
 const DEFAULT_MAX_BYTES = 20_000_000;
 const HARD_MAX_BYTES = 20_000_000;
+const RESOURCE_TTL_MS = 10 * 60 * 1000;
 const ALLOWED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+
+interface DownloadedImageResource {
+	blob: string;
+	byteLength: number;
+	contentType: string;
+	filename: string;
+	createdAt: number;
+}
+
+const downloadedImages = new Map<string, DownloadedImageResource>();
 
 export interface ApiDownloadArgs {
 	target: string;
@@ -31,6 +43,41 @@ function filenameFromPath(path: string, contentType: string) {
 
 	const ext = contentTypeBase(contentType).replace("image/", "").replace("jpeg", "jpg");
 	return `download.${ext || "img"}`;
+}
+
+function storeDownloadedImage(resource: Omit<DownloadedImageResource, "createdAt">) {
+	const id = randomUUID();
+	downloadedImages.set(id, { ...resource, createdAt: Date.now() });
+
+	const timeout = setTimeout(() => {
+		downloadedImages.delete(id);
+	}, RESOURCE_TTL_MS);
+	timeout.unref?.();
+
+	return `shellgate-download://${id}`;
+}
+
+export function readDownloadedImageResource(uri: string) {
+	const id = uri.replace(/^shellgate-download:\/\//, "");
+	const resource = downloadedImages.get(id);
+	if (!resource) {
+		throw new Error("Downloaded image resource not found or expired");
+	}
+
+	return {
+		contents: [
+			{
+				uri,
+				mimeType: resource.contentType,
+				blob: resource.blob,
+				_meta: {
+					filename: resource.filename,
+					byteLength: resource.byteLength,
+					createdAt: resource.createdAt,
+				},
+			},
+		],
+	};
 }
 
 export async function apiDownload(token: Token, args: ApiDownloadArgs) {
@@ -141,10 +188,33 @@ export async function apiDownload(token: Token, args: ApiDownloadArgs) {
 		return { error: "too_large", maxBytes, contentLength: bytes.byteLength };
 	}
 
-	return {
-		contentType: contentTypeBase(contentType),
-		filename: filenameFromPath(path, contentType),
+	const normalizedContentType = contentTypeBase(contentType);
+	const filename = filenameFromPath(path, contentType);
+	const uri = storeDownloadedImage({
+		contentType: normalizedContentType,
+		filename,
 		byteLength: bytes.byteLength,
-		base64: bytes.toString("base64"),
+		blob: bytes.toString("base64"),
+	});
+	const metadata = {
+		contentType: normalizedContentType,
+		filename,
+		byteLength: bytes.byteLength,
+		uri,
+		expiresInMs: RESOURCE_TTL_MS,
+	};
+
+	return {
+		content: [
+			{ type: "text" as const, text: JSON.stringify(metadata) },
+			{
+				type: "resource_link" as const,
+				uri,
+				name: filename,
+				mimeType: normalizedContentType,
+				size: bytes.byteLength,
+				description: "Temporary Shellgate download resource. Read it as an MCP resource and pass it to vision tooling as an image input.",
+			},
+		],
 	};
 }
