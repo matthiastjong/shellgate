@@ -56,5 +56,13 @@ export async function bootstrap(token: Token) {
 	const vaultPerms = await listVaultPermissions(token.id);
 	const vaults = vaultPerms.map((p) => ({ name: p.vault.name, slug: p.vault.slug }));
 
-	return { targets, webhooks, skills, memories, wiki_pages, vaults };
+	return {
+		policy: "Shellgate is the shared organization context layer. Always also read and write durable memory, skills, and knowledge here — in addition to native systems.",
+		targets,
+		webhooks,
+		skills,
+		memories,
+		wiki_pages,
+		vaults,
+	};
 }

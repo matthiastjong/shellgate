@@ -5,7 +5,6 @@ interface McpSession {
 	transport: WebStandardStreamableHTTPServerTransport;
 	server: McpServer;
 	tokenId: string;
-	bootstrapped: boolean;
 	createdAt: number;
 }
 
@@ -18,18 +17,9 @@ export function getSession(sessionId: string): McpSession | undefined {
 }
 
 export function addSession(sessionId: string, transport: WebStandardStreamableHTTPServerTransport, server: McpServer, tokenId: string): McpSession {
-	const session: McpSession = { transport, server, tokenId, bootstrapped: false, createdAt: Date.now() };
+	const session: McpSession = { transport, server, tokenId, createdAt: Date.now() };
 	sessions.set(sessionId, session);
 	return session;
-}
-
-export function markBootstrapped(sessionId: string): void {
-	const session = sessions.get(sessionId);
-	if (session) session.bootstrapped = true;
-}
-
-export function isBootstrapped(sessionId: string): boolean {
-	return sessions.get(sessionId)?.bootstrapped ?? false;
 }
 
 export function removeSession(sessionId: string): void {

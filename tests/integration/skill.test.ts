@@ -117,21 +117,20 @@ describe("install script generation", () => {
 			expect(script).toContain("SHELLGATE_API_KEY");
 		});
 
-		it("installs skill file", () => {
+		it("registers MCP server", () => {
 			const script = generateOpenClawScript(BASE, TOKEN);
-			expect(script).toContain(".openclaw/skills/shellgate/SKILL.md");
+			expect(script).toContain("/mcp");
+			expect(script).toContain("openclaw.json");
 		});
 
-		it("restarts openclaw gateway", () => {
+		it("cleans up old skill-based config", () => {
 			const script = generateOpenClawScript(BASE, TOKEN);
-			expect(script).toContain("openclaw gateway restart");
+			expect(script).toContain("skills/shellgate");
 		});
 
-		it("verifies connection before installing", () => {
+		it("verifies connection", () => {
 			const script = generateOpenClawScript(BASE, TOKEN);
-			const verifyIdx = script.indexOf("/verify-connection");
-			const skillIdx = script.indexOf("/api/skill");
-			expect(verifyIdx).toBeLessThan(skillIdx);
+			expect(script).toContain("/verify-connection");
 		});
 	});
 });

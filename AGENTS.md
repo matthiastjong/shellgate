@@ -71,6 +71,7 @@ These are NOT behind dashboard auth — they use bearer token auth (`requireBear
 | `GET /api/skill` | Returns OpenClaw skill YAML |
 | `POST /api/install/openclaw` | OpenClaw integration installer |
 | `POST /api/install/claude-code` | Claude Code integration installer |
+| `POST /api/install/codex` | Codex CLI integration installer |
 | `POST /webhooks/incoming/[slug]` | Receive webhook from external service |
 | `GET /webhooks/poll` | Poll pending webhook events for this token |
 | `POST /webhooks/ack` | Acknowledge processed webhook events |
@@ -123,9 +124,7 @@ Shellgate exposes all agent-facing functionality as an MCP server at `POST /mcp`
 
 **Auth:** Same bearer token as REST endpoints. Passed via `Authorization` header.
 
-**Session gating:** All tools except `bootstrap` (and its alias `discover`) are blocked until `bootstrap` has been called. The server uses stateful sessions — clients that support MCP session headers get automatic enforcement.
-
-**Instructions:** On initialize, the server sends instructions telling the agent to call `bootstrap` as its mandatory first tool call.
+**Bootstrap:** The `bootstrap` tool returns all organization context (targets, skills, memories, wiki pages, vaults). Agents should call it at session start or rely on context from their SessionStart hook.
 
 ## Testing
 
