@@ -18,6 +18,12 @@ export const POST: RequestHandler = async ({ request }) => {
 				headers: { "Content-Type": "application/json" },
 			});
 		}
+		if (session.tokenId !== token.id) {
+			return new Response(JSON.stringify({ jsonrpc: "2.0", error: { code: -32000, message: "Session not found" } }), {
+				status: 404,
+				headers: { "Content-Type": "application/json" },
+			});
+		}
 		return session.transport.handleRequest(request);
 	}
 
@@ -34,7 +40,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		sessionIdGenerator: () => crypto.randomUUID(),
 		onsessioninitialized: (id) => {
 			sessionRef.id = id;
-			addSession(id, transport, server);
+			addSession(id, transport, server, token.id);
 		},
 	});
 

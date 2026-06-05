@@ -4,6 +4,7 @@ import type { WebStandardStreamableHTTPServerTransport } from "@modelcontextprot
 interface McpSession {
 	transport: WebStandardStreamableHTTPServerTransport;
 	server: McpServer;
+	tokenId: string;
 	bootstrapped: boolean;
 	createdAt: number;
 }
@@ -16,8 +17,8 @@ export function getSession(sessionId: string): McpSession | undefined {
 	return sessions.get(sessionId);
 }
 
-export function addSession(sessionId: string, transport: WebStandardStreamableHTTPServerTransport, server: McpServer): McpSession {
-	const session: McpSession = { transport, server, bootstrapped: false, createdAt: Date.now() };
+export function addSession(sessionId: string, transport: WebStandardStreamableHTTPServerTransport, server: McpServer, tokenId: string): McpSession {
+	const session: McpSession = { transport, server, tokenId, bootstrapped: false, createdAt: Date.now() };
 	sessions.set(sessionId, session);
 	return session;
 }
