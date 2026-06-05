@@ -24,12 +24,16 @@ export const POST: RequestHandler = async ({ request }) => {
 	// New session — create server + transport
 	cleanupStaleSessions();
 
+	// Mutable ref so tool handlers see the session ID after initialize
+	const sessionRef = { id: undefined as string | undefined };
+
 	const server = createMcpServer();
-	registerTools(server, token);
+	registerTools(server, token, sessionRef);
 
 	const transport = new WebStandardStreamableHTTPServerTransport({
 		sessionIdGenerator: () => crypto.randomUUID(),
 		onsessioninitialized: (id) => {
+			sessionRef.id = id;
 			addSession(id, transport, server);
 		},
 	});
