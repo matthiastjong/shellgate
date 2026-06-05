@@ -92,6 +92,19 @@ describe("bootstrap MCP tool", () => {
 		expect(result.memories[0].summary).toBe("Org-wide memory");
 	});
 
+	it("includes a policy string in the response", async () => {
+		const { token } = await createTestToken();
+		const fullToken = await getFullToken(token.id);
+		const handler = createMcpToolHandler(fullToken);
+		const result = await handler("bootstrap", {}) as {
+			policy: string;
+		};
+
+		expect(result.policy).toEqual(expect.any(String));
+		expect(result.policy.length).toBeGreaterThan(0);
+		expect(result.policy).toContain("Shellgate");
+	});
+
 	it("discover is an alias for bootstrap", async () => {
 		const { token } = await createTestToken();
 		const fullToken = await getFullToken(token.id);
