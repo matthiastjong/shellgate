@@ -2,16 +2,53 @@ import type { RequestHandler } from "@sveltejs/kit";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { requireBearer } from "$lib/server/api-auth";
 import { createMcpServer, registerTools } from "$lib/server/mcp/server";
+import { getSession, addSession, removeSession, cleanupStaleSessions } from "$lib/server/mcp/sessions";
 
 export const POST: RequestHandler = async ({ request }) => {
 	const token = await requireBearer(request);
 
+	const sessionId = request.headers.get("mcp-session-id");
+
+	// Existing session — reuse transport
+	if (sessionId) {
+		const session = getSession(sessionId);
+		if (!session) {
+			return new Response(JSON.stringify({ jsonrpc: "2.0", error: { code: -32000, message: "Session not found" } }), {
+				status: 404,
+				headers: { "Content-Type": "application/json" },
+			});
+		}
+		if (session.tokenId !== token.id) {
+			return new Response(JSON.stringify({ jsonrpc: "2.0", error: { code: -32000, message: "Session not found" } }), {
+				status: 404,
+				headers: { "Content-Type": "application/json" },
+			});
+		}
+		return session.transport.handleRequest(request);
+	}
+
+	// New session — create server + transport
+	cleanupStaleSessions();
+
+	// Mutable ref so tool handlers see the session ID after initialize
+	const sessionRef = { id: undefined as string | undefined };
+
 	const server = createMcpServer();
-	registerTools(server, token);
+	registerTools(server, token, sessionRef);
 
 	const transport = new WebStandardStreamableHTTPServerTransport({
-		sessionIdGenerator: undefined,
+		sessionIdGenerator: () => crypto.randomUUID(),
+		onsessioninitialized: (id) => {
+			sessionRef.id = id;
+			addSession(id, transport, server, token.id);
+		},
 	});
+
+	transport.onclose = () => {
+		if (transport.sessionId) {
+			removeSession(transport.sessionId);
+		}
+	};
 
 	await server.connect(transport);
 
@@ -25,6 +62,15 @@ export const GET: RequestHandler = async () => {
 	});
 };
 
-export const DELETE: RequestHandler = async () => {
+export const DELETE: RequestHandler = async ({ request }) => {
+	const sessionId = request.headers.get("mcp-session-id");
+	if (sessionId) {
+		const session = getSession(sessionId);
+		if (session) {
+			await session.transport.handleRequest(request);
+			removeSession(sessionId);
+			return new Response(null, { status: 200 });
+		}
+	}
 	return new Response(null, { status: 405, headers: { Allow: "POST" } });
 };

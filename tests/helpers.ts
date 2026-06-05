@@ -68,6 +68,48 @@ export async function grantVaultPermission(tokenId: string, vaultId: string) {
 	return addVaultPermission(tokenId, vaultId);
 }
 
+export async function createTestMemory(
+	tokenId: string,
+	overrides: {
+		summary?: string;
+		content?: string;
+		visibility?: string;
+		userIdentifier?: string;
+	} = {},
+) {
+	const { addMemory } = await import("$lib/server/services/memories");
+	return addMemory({
+		tokenId,
+		summary: overrides.summary ?? "Test memory",
+		content: overrides.content ?? "Test memory content",
+		visibility: (overrides.visibility ?? "org") as "org" | "user" | "token",
+		userIdentifier: overrides.userIdentifier ?? null,
+		metadata: {},
+	});
+}
+
+export async function createTestWikiPage(
+	overrides: {
+		namespace?: string;
+		slug?: string;
+		title?: string;
+		summary?: string;
+		body?: string;
+	} = {},
+) {
+	const { upsertWikiPage } = await import("$lib/server/services/wiki");
+	return upsertWikiPage({
+		namespace: overrides.namespace ?? "general",
+		slug: overrides.slug ?? "test-page",
+		title: overrides.title ?? "Test Page",
+		summary: overrides.summary ?? "A test wiki page",
+		body: overrides.body ?? "Test wiki page body content.",
+		tags: [],
+		sources: [],
+		updatedBy: "test",
+	});
+}
+
 export async function truncateAll() {
 	await db.delete(wikiPages);
 	await db.delete(memories);

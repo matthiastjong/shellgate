@@ -14,6 +14,7 @@ src/routes/(app)/           ← Dashboard pages (call services directly, no HTTP
 src/routes/gateway/         ← Agent-facing: HTTP proxy to upstream APIs
 src/routes/ssh/             ← Agent-facing: SSH command execution
 src/routes/discovery/       ← Agent-facing: list accessible targets
+src/routes/bootstrap/       ← Agent-facing: full session-start context (REST)
 ```
 
 ### Key services
@@ -61,6 +62,7 @@ These are NOT behind dashboard auth — they use bearer token auth (`requireBear
 
 | Route | Purpose |
 |---|---|
+| `GET /bootstrap` | Full session-start context: targets, skills, webhooks, memories, wiki pages |
 | `GET /discovery` | List targets accessible to this token |
 | `ALL /gateway/[target]/[...path]` | Proxy HTTP to upstream API, inject stored credentials |
 | `POST /ssh/[target]/exec` | Execute command on SSH target, return stdout/stderr/exitCode |
@@ -117,11 +119,13 @@ Behind session auth (cookie-based):
 
 Shellgate exposes all agent-facing functionality as an MCP server at `POST /mcp` using Streamable HTTP transport. Claude Code connects via `mcpServers` config in `~/.claude/settings.json`.
 
-**Tools:** `discover`, `api_request`, `ssh_exec`, `webhook_poll`, `webhook_ack`, `skill_list`, `skill_read`, `skill_upsert`, `skill_delete`
+**Tools:** `bootstrap`, `discover` (alias), `api_request`, `api_download`, `ssh_exec`, `webhook_poll`, `webhook_ack`, `org_skill_list`, `org_skill_read`, `org_skill_upsert`, `org_skill_delete`, `memory_list`, `memory_read`, `memory_add`, `memory_delete`, `wiki_list_pages`, `wiki_read_page`, `wiki_upsert_page`, `wiki_delete_page`, `wiki_lint_page`, `vault_search`
 
 **Auth:** Same bearer token as REST endpoints. Passed via `Authorization` header.
 
-**Instructions:** On initialize, the server sends instructions telling the agent to call `discover` and `skill_list` at session start.
+**Session gating:** All tools except `bootstrap` (and its alias `discover`) are blocked until `bootstrap` has been called. The server uses stateful sessions — clients that support MCP session headers get automatic enforcement.
+
+**Instructions:** On initialize, the server sends instructions telling the agent to call `bootstrap` as its mandatory first tool call.
 
 ## Testing
 
@@ -173,6 +177,10 @@ Shellgate uses **runtime migrations** — not `drizzle-kit push`.
 - `npm run db:reset` — reset DB and re-run all migrations
 
 **Important:** Never use `drizzle-kit push` in production. Always generate and commit migration files.
+
+## Bootstrap prompt
+
+When adding new agent-facing features or data types to Shellgate, always check whether the `/bootstrap` endpoint response should be updated to include the new data. The bootstrap endpoint provides the complete session-start context for agents — if agents need to know about it at session start, it belongs in the bootstrap response.
 
 ## Code patterns
 
