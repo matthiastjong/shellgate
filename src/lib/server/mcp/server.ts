@@ -3,7 +3,6 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import type { Token } from "$lib/server/db/schema";
 import { bootstrap } from "./tools/bootstrap";
-import { markBootstrapped, isBootstrapped } from "$lib/server/mcp/sessions";
 import { apiRequest } from "./tools/api-request";
 import type { ApiRequestArgs } from "./tools/api-request";
 import { apiDownload, readDownloadedImageResource } from "./tools/api-download";
@@ -16,17 +15,29 @@ import { memoryList, memoryRead, memoryAdd, memoryDelete } from "./tools/memorie
 import { wikiListPages, wikiReadPage, wikiUpsertPage, wikiDeletePage, wikiLintPage } from "./tools/wiki";
 import { vaultSearch } from "./tools/vaults";
 
-const INSTRUCTIONS = `MANDATORY: Call \`bootstrap\` as your FIRST tool call in every session. All other tools are blocked until bootstrap has been called. Bootstrap returns targets, skills, webhooks, memories, wiki pages, and vaults in a single response.
+const INSTRUCTIONS = `Shellgate is your shared organization context layer. It complements — does not replace — your native memory, skill, and knowledge systems. Always read and write Shellgate for durable organizational information.
 
-After bootstrap, scan the returned memory summaries and call memory_read for any memories relevant to the current task. Call org_skill_read only when you need a specific skill's full instructions. Call wiki_read_page on demand for background knowledge.
+At session start, call \`bootstrap\` (or use the context injected by your SessionStart hook) to load targets, skills, memories, wiki pages, and webhooks.
 
-Shellgate manages organization-wide skills shared across all agents — these are different from local Claude Code skills. Use org_skill_* tools for shared organization skills.
+Memory:
+- Before relying on persistent knowledge, check Shellgate memory via memory_list.
+- When you learn durable information (preferences, decisions, context), write it to Shellgate via memory_add in addition to any native memory.
+- Scan memory summaries from bootstrap and call memory_read for relevant entries.
 
-The wiki stores compiled organizational knowledge. Use wiki tools for factual knowledge ("what do we know?"), memories for behavioral guidance ("how should I act?"), and skills for procedures ("what steps to follow?").
+Skills:
+- Before performing organization-specific procedures, check org_skill_list.
+- Load full skill instructions via org_skill_read when needed.
+- Share reusable procedures via org_skill_upsert.
+- Organization skills are different from local/native skills. Use org_skill_* MCP tools, not native skill systems.
 
-When Linear issue descriptions or comments contain \`https://uploads.linear.app/...\` image URLs, do not call those URLs directly. Use the \`linear-uploads\` target with \`api_download\`, read the returned MCP resource as an image/blob, inspect it with vision tooling, and include the visual content in your ticket analysis before drawing conclusions. Do not print, log, comment, or otherwise expose image bytes/base64 as text.
+Wiki:
+- Consult wiki pages for project conventions and organizational knowledge.
+- When creating or updating durable documentation, write to Shellgate wiki.
+- Before creating/updating wiki pages, read the relevant wiki skill (wiki-create-page, wiki-update-page, or wiki-compile-research) via org_skill_read.
 
-IMPORTANT — Wiki workflow: Proactively store company knowledge in the wiki when you encounter valuable factual information. BEFORE creating or updating any wiki page, you MUST first call org_skill_read for the relevant wiki skill (wiki-create-page, wiki-update-page, or wiki-compile-research) and follow its instructions. These skills define required structure, namespace conventions, source attribution, and validation steps (including wiki_lint_page). Never write to the wiki without reading the skill first.
+If native context and Shellgate disagree, treat Shellgate as the shared organizational record and surface the conflict to the user.
+
+When Linear issue descriptions contain \`https://uploads.linear.app/...\` image URLs, use the \`linear-uploads\` target with \`api_download\` to fetch them. Do not expose image bytes as text.
 
 Call vault_search when you need credentials for browser automation — it returns handles for blind-fill, not secret values.`;
 
@@ -54,30 +65,18 @@ function asToolResult(result: unknown) {
 	return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 }
 
-function withBootstrapGate(sessionRef: { id: string | undefined } | undefined, handler: () => Promise<CallToolResult>): Promise<CallToolResult> {
-	if (sessionRef?.id && !isBootstrapped(sessionRef.id)) {
-		return Promise.resolve({
-			content: [{ type: "text" as const, text: "ERROR: You must call `bootstrap` as your first tool call before using any other Shellgate tool." }],
-			isError: true,
-		});
-	}
-	return handler();
-}
-
-export function registerTools(server: McpServer, token: Token, sessionRef?: { id: string | undefined }) {
+export function registerTools(server: McpServer, token: Token) {
 	server.tool(
 		"bootstrap",
-		"MANDATORY first call. Returns all targets, skills, webhooks, memories, wiki pages, and vaults for this session. All other tools are blocked until this is called.",
+		"Returns all targets, skills, webhooks, memories, wiki pages, and vaults. Call at session start if not already provided by a SessionStart hook.",
 		async () => {
 			const result = await bootstrap(token);
-			if (sessionRef?.id) markBootstrapped(sessionRef.id);
 			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 		}
 	);
 
-	server.tool("discover", "Alias for bootstrap. Prefer calling bootstrap instead.", async () => {
+	server.tool("discover", "Alias for bootstrap — returns targets, skills, webhooks, memories, wiki pages, and vaults.", async () => {
 		const result = await bootstrap(token);
-		if (sessionRef?.id) markBootstrapped(sessionRef.id);
 		return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 	});
 
@@ -93,10 +92,8 @@ export function registerTools(server: McpServer, token: Token, sessionRef?: { id
 			approved: z.preprocess(val => val === "true" || val === true, z.boolean()).optional().describe("Set to true after user approves a guarded request"),
 		},
 		async (args) => {
-			return withBootstrapGate(sessionRef, async () => {
-				const result = await apiRequest(token, args);
-				return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
-			});
+			const result = await apiRequest(token, args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 		}
 	);
 
@@ -110,10 +107,8 @@ export function registerTools(server: McpServer, token: Token, sessionRef?: { id
 			approved: z.preprocess(val => val === "true" || val === true, z.boolean()).optional().describe("Set to true after user approves a guarded request"),
 		},
 		async (args) => {
-			return withBootstrapGate(sessionRef, async () => {
-				const result = await apiDownload(token, args);
-				return asToolResult(result);
-			});
+			const result = await apiDownload(token, args);
+			return asToolResult(result);
 		}
 	);
 
@@ -127,18 +122,14 @@ export function registerTools(server: McpServer, token: Token, sessionRef?: { id
 			approved: z.preprocess(val => val === "true" || val === true, z.boolean()).optional().describe("Set to true after user approves a guarded request"),
 		},
 		async (args) => {
-			return withBootstrapGate(sessionRef, async () => {
-				const result = await sshExec(token, args);
-				return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
-			});
+			const result = await sshExec(token, args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 		}
 	);
 
 	server.tool("webhook_poll", "Poll for pending webhook events", async () => {
-		return withBootstrapGate(sessionRef, async () => {
-			const result = await webhookPoll(token);
-			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
-		});
+		const result = await webhookPoll(token);
+		return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 	});
 
 	server.tool(
@@ -146,18 +137,14 @@ export function registerTools(server: McpServer, token: Token, sessionRef?: { id
 		"Acknowledge processed webhook events",
 		{ eventIds: z.array(z.string()).describe("Event IDs to acknowledge") },
 		async (args) => {
-			return withBootstrapGate(sessionRef, async () => {
-				const result = await webhookAck(token, args);
-				return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
-			});
+			const result = await webhookAck(token, args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 		}
 	);
 
 	server.tool("org_skill_list", "List all organization-wide skills shared across Shellgate agents (slug and description)", async () => {
-		return withBootstrapGate(sessionRef, async () => {
-			const result = await skillList();
-			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
-		});
+		const result = await skillList();
+		return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 	});
 
 	server.tool(
@@ -165,10 +152,8 @@ export function registerTools(server: McpServer, token: Token, sessionRef?: { id
 		"Read the full content of a shared organization skill from Shellgate",
 		{ slug: z.string().describe("Skill slug") },
 		async (args) => {
-			return withBootstrapGate(sessionRef, async () => {
-				const result = await skillRead(args);
-				return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
-			});
+			const result = await skillRead(args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 		}
 	);
 
@@ -177,10 +162,8 @@ export function registerTools(server: McpServer, token: Token, sessionRef?: { id
 		"Create or update a shared organization skill in Shellgate. Content must be full markdown with YAML frontmatter (name, description). These skills are shared across all agents.",
 		{ content: z.string().describe("Full skill markdown with YAML frontmatter") },
 		async (args) => {
-			return withBootstrapGate(sessionRef, async () => {
-				const result = await skillUpsert(args);
-				return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
-			});
+			const result = await skillUpsert(args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 		}
 	);
 
@@ -189,10 +172,8 @@ export function registerTools(server: McpServer, token: Token, sessionRef?: { id
 		"Delete a shared organization skill from Shellgate",
 		{ slug: z.string().describe("Skill slug") },
 		async (args) => {
-			return withBootstrapGate(sessionRef, async () => {
-				const result = await skillDelete(args);
-				return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
-			});
+			const result = await skillDelete(args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 		}
 	);
 
@@ -206,10 +187,8 @@ You see: all org memories, user memories matching your user, and your own token 
 			user: z.string().optional().describe("Filter by user identifier"),
 		},
 		async (args) => {
-			return withBootstrapGate(sessionRef, async () => {
-				const result = await memoryList(token, args);
-				return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
-			});
+			const result = await memoryList(token, args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 		}
 	);
 
@@ -220,10 +199,8 @@ You see: all org memories, user memories matching your user, and your own token 
 			id: z.string().describe("Memory ID"),
 		},
 		async (args) => {
-			return withBootstrapGate(sessionRef, async () => {
-				const result = await memoryRead(token, args);
-				return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
-			});
+			const result = await memoryRead(token, args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 		}
 	);
 
@@ -251,10 +228,8 @@ When in doubt, prefer 'user' over 'org' — easier to promote later than to clea
 			metadata: z.record(z.string(), z.unknown()).optional().describe("Arbitrary key-value metadata"),
 		},
 		async (args) => {
-			return withBootstrapGate(sessionRef, async () => {
-				const result = await memoryAdd(token, args);
-				return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
-			});
+			const result = await memoryAdd(token, args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 		}
 	);
 
@@ -265,10 +240,8 @@ When in doubt, prefer 'user' over 'org' — easier to promote later than to clea
 			id: z.string().describe("Memory ID to delete"),
 		},
 		async (args) => {
-			return withBootstrapGate(sessionRef, async () => {
-				const result = await memoryDelete(token, args);
-				return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
-			});
+			const result = await memoryDelete(token, args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 		}
 	);
 
@@ -281,10 +254,8 @@ When in doubt, prefer 'user' over 'org' — easier to promote later than to clea
 			tag: z.string().optional().describe("Filter by tag"),
 		},
 		async (args) => {
-			return withBootstrapGate(sessionRef, async () => {
-				const result = await wikiListPages(args);
-				return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
-			});
+			const result = await wikiListPages(args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 		}
 	);
 
@@ -296,10 +267,8 @@ When in doubt, prefer 'user' over 'org' — easier to promote later than to clea
 			slug: z.string().describe("Page slug"),
 		},
 		async (args) => {
-			return withBootstrapGate(sessionRef, async () => {
-				const result = await wikiReadPage(args);
-				return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
-			});
+			const result = await wikiReadPage(args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 		}
 	);
 
@@ -323,10 +292,8 @@ When in doubt, prefer 'user' over 'org' — easier to promote later than to clea
 			expectedVersion: z.number().optional().describe("Expected current version for optimistic concurrency"),
 		},
 		async (args) => {
-			return withBootstrapGate(sessionRef, async () => {
-				const result = await wikiUpsertPage(token, args);
-				return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
-			});
+			const result = await wikiUpsertPage(token, args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 		}
 	);
 
@@ -338,10 +305,8 @@ When in doubt, prefer 'user' over 'org' — easier to promote later than to clea
 			slug: z.string().describe("Page slug"),
 		},
 		async (args) => {
-			return withBootstrapGate(sessionRef, async () => {
-				const result = await wikiDeletePage(args);
-				return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
-			});
+			const result = await wikiDeletePage(args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 		}
 	);
 
@@ -361,10 +326,8 @@ When in doubt, prefer 'user' over 'org' — easier to promote later than to clea
 			})).optional().describe("Sources for direct content lint"),
 		},
 		async (args) => {
-			return withBootstrapGate(sessionRef, async () => {
-				const result = await wikiLintPage(args);
-				return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
-			});
+			const result = await wikiLintPage(args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 		}
 	);
 
@@ -375,10 +338,8 @@ When in doubt, prefer 'user' over 'org' — easier to promote later than to clea
 			query: z.string().describe("Search query — matches against item name, domain, and description"),
 		},
 		async (args) => {
-			return withBootstrapGate(sessionRef, async () => {
-				const result = await vaultSearch(token, args);
-				return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
-			});
+			const result = await vaultSearch(token, args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 		}
 	);
 }

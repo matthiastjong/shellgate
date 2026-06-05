@@ -34,7 +34,7 @@ export const POST: RequestHandler = async ({ request }) => {
 	const sessionRef = { id: undefined as string | undefined };
 
 	const server = createMcpServer();
-	registerTools(server, token, sessionRef);
+	registerTools(server, token);
 
 	const transport = new WebStandardStreamableHTTPServerTransport({
 		sessionIdGenerator: () => crypto.randomUUID(),
