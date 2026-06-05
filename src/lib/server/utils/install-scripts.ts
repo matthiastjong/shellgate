@@ -72,20 +72,24 @@ mkdir -p ~/.claude/shellgate
 
 cat > ~/.claude/shellgate/format.js << 'JSEOF'
 const d=JSON.parse(require("fs").readFileSync(0,"utf8"));
-const t=d.targets||[], s=d.skills||[], w=d.webhooks||[];
-const lines=["Shellgate context:"];
+const t=d.targets||[], s=d.skills||[], w=d.webhooks||[], m=d.memories||[], wp=d.wiki_pages||[];
+const lines=[];
+if(d.policy) lines.push(d.policy);
+lines.push("Shellgate context:");
 if(t.length) lines.push("Targets: "+t.map(x=>x.slug+" ("+x.type+")").join(", "));
 if(s.length) lines.push("Org skills (fetch via org_skill_read MCP tool, NOT via Skill tool): "+s.map(x=>x.slug+" - "+(x.description||"")).join("; "));
 if(w.length) lines.push("Webhooks: "+w.map(x=>x.name).join(", "));
+if(m.length) lines.push("Memories: "+m.length+" entries (scan summaries via memory_list, call memory_read for relevant ones)");
+if(wp.length) lines.push("Wiki: "+wp.length+" pages available (call wiki_read_page on demand)");
 lines.push("IMPORTANT: Org skills are NOT local skills. Do NOT use the Skill tool for them. Use the shellgate org_skill_read MCP tool to load org skills, and shellgate api_request for external API calls.");
 process.stdout.write(lines.join("\\n")+"\\n");
 JSEOF
 
 cat > ~/.claude/shellgate/discover.sh << 'SHEOF'
 #!/bin/bash
-curl -sf -H "Authorization: Bearer $SHELLGATE_API_KEY" "$SHELLGATE_URL/discovery" 2>/dev/null \
+curl -sf -H "Authorization: Bearer $SHELLGATE_API_KEY" "$SHELLGATE_URL/bootstrap" 2>/dev/null \
   | node ~/.claude/shellgate/format.js 2>/dev/null \
-  || echo "Shellgate: could not fetch discovery (server may be offline)"
+  || echo "Shellgate: could not fetch context (server may be offline)"
 SHEOF
 chmod +x ~/.claude/shellgate/discover.sh
 
@@ -132,73 +136,94 @@ export function generateHermesScript(baseUrl: string, token: string): string {
 	return `#!/bin/bash
 set -e
 
-export SHELLGATE_URL="${baseUrl}"
-export SHELLGATE_API_KEY="${token}"
+SHELLGATE_URL="${baseUrl}"
+SHELLGATE_API_KEY="${token}"
 
-echo "Verifying connection..."
-VERIFY=$(curl -sf -H "Authorization: Bearer $SHELLGATE_API_KEY" "$SHELLGATE_URL/verify-connection" 2>&1) || {
-  echo "❌ Invalid token or Shellgate unreachable"
+# Validate API key format
+if [[ "$SHELLGATE_API_KEY" != sg_* ]]; then
+  echo "Invalid API key: must start with sg_"
   exit 1
-}
+fi
 
-# Add environment variables to Hermes .env
+# Verify connection
+echo "Verifying connection..."
+if ! curl -sf -H "Authorization: Bearer $SHELLGATE_API_KEY" "$SHELLGATE_URL/verify-connection" > /dev/null 2>&1; then
+  echo "Warning: Could not verify connection to Shellgate at $SHELLGATE_URL"
+  echo "Continuing with setup — verify your Shellgate instance is running."
+fi
+
+# Clean up old skill-based config
+if [ -d ~/.hermes/skills/shellgate ]; then
+  rm -rf ~/.hermes/skills/shellgate
+  echo "Removed old skill directory"
+fi
+
+# Register MCP server
+if command -v hermes &> /dev/null; then
+  hermes mcp remove shellgate 2>/dev/null || true
+  hermes mcp add shellgate "$SHELLGATE_URL/mcp" \\
+    --transport http \\
+    --header "Authorization: Bearer $SHELLGATE_API_KEY"
+  echo "MCP server registered"
+else
+  echo "Warning: hermes CLI not found. Add MCP server manually."
+fi
+
+# Create discovery helper scripts
+mkdir -p ~/.hermes/shellgate
+
+cat > ~/.hermes/shellgate/format.js << 'JSEOF'
+const d=JSON.parse(require("fs").readFileSync(0,"utf8"));
+const t=d.targets||[], s=d.skills||[], w=d.webhooks||[], m=d.memories||[], wp=d.wiki_pages||[];
+const lines=[];
+if(d.policy) lines.push(d.policy);
+lines.push("Shellgate context:");
+if(t.length) lines.push("Targets: "+t.map(x=>x.slug+" ("+x.type+")").join(", "));
+if(s.length) lines.push("Org skills (fetch via org_skill_read MCP tool, NOT via Skill tool): "+s.map(x=>x.slug+" - "+(x.description||"")).join("; "));
+if(w.length) lines.push("Webhooks: "+w.map(x=>x.name).join(", "));
+if(m.length) lines.push("Memories: "+m.length+" entries (scan summaries via memory_list, call memory_read for relevant ones)");
+if(wp.length) lines.push("Wiki: "+wp.length+" pages available (call wiki_read_page on demand)");
+lines.push("IMPORTANT: Org skills are NOT local skills. Use the shellgate org_skill_read MCP tool to load them.");
+process.stdout.write(lines.join("\\n")+"\\n");
+JSEOF
+
+cat > ~/.hermes/shellgate/discover.sh << 'SHEOF'
+#!/bin/bash
+curl -sf -H "Authorization: Bearer $SHELLGATE_API_KEY" "$SHELLGATE_URL/bootstrap" 2>/dev/null \\
+  | node ~/.hermes/shellgate/format.js 2>/dev/null \\
+  || echo "Shellgate: could not fetch context (server may be offline)"
+SHEOF
+chmod +x ~/.hermes/shellgate/discover.sh
+
+# Add env vars to .env
 mkdir -p ~/.hermes
 touch ~/.hermes/.env
-
 if [ -f ~/.hermes/.env ]; then
   sed -i.bak '/^SHELLGATE_URL=/d;/^SHELLGATE_API_KEY=/d' ~/.hermes/.env
   rm -f ~/.hermes/.env.bak
 fi
-
 echo "SHELLGATE_URL=$SHELLGATE_URL" >> ~/.hermes/.env
 echo "SHELLGATE_API_KEY=$SHELLGATE_API_KEY" >> ~/.hermes/.env
 
-# Install skill (download template and inject hardcoded values)
-mkdir -p ~/.hermes/skills/shellgate
-curl -sf -H "Authorization: Bearer $SHELLGATE_API_KEY" \\
-  "$SHELLGATE_URL/api/skill" | \\
-  sed "s|\\$SHELLGATE_URL|$SHELLGATE_URL|g; s|\\$SHELLGATE_API_KEY|$SHELLGATE_API_KEY|g; s|Use environment variable \\\`SHELLGATE_URL\\\`|$SHELLGATE_URL|g; s|Use environment variable \\\`SHELLGATE_API_KEY\\\` as Bearer token|Bearer token (embedded in curl commands below)|g" \\
-  > ~/.hermes/skills/shellgate/SKILL.md
-
-# Restart gateway so the new skill is picked up
-if command -v hermes &> /dev/null; then
-  echo "Restarting Hermes gateway..."
-  hermes gateway restart > /dev/null 2>&1 || true
+# Add on_session_start hook to cli-config.yaml
+if [ -f ~/.hermes/cli-config.yaml ]; then
+  # Remove existing shellgate hook block if present
+  sed -i.bak '/# shellgate-hook-start/,/# shellgate-hook-end/d' ~/.hermes/cli-config.yaml
+  rm -f ~/.hermes/cli-config.yaml.bak
 fi
-
-# Webhook polling setup
-echo ""
-read -p "Set up webhook polling? (y/N): " SETUP_WEBHOOKS < /dev/tty
-if [ "\$SETUP_WEBHOOKS" = "y" ] || [ "\$SETUP_WEBHOOKS" = "Y" ]; then
-  read -p "Polling interval in minutes [5]: " POLL_INTERVAL < /dev/tty
-  POLL_INTERVAL=\${POLL_INTERVAL:-5}
-  read -p "Telegram chat ID for notifications (leave empty to skip): " TELEGRAM_ID < /dev/tty
-
-  DELIVER_FLAG=""
-  if [ -n "\$TELEGRAM_ID" ]; then
-    DELIVER_FLAG="--deliver telegram:\$TELEGRAM_ID"
-  fi
-
-  # Remove all existing shellgate-webhooks cron jobs
-  if command -v jq &> /dev/null; then
-    hermes cron list --json 2>/dev/null | jq -r 'if type == "array" then .[] else .jobs[]? // empty end | select(.name == "shellgate-webhooks") | .id' | while read -r JOB_ID; do
-      hermes cron remove "\$JOB_ID" > /dev/null 2>&1
-    done
-  fi
-  hermes cron create "every \${POLL_INTERVAL}m" "Poll Shellgate webhooks using your shellgate skill. If no events, respond with [SILENT] and nothing else." --name shellgate-webhooks --skill shellgate \$DELIVER_FLAG > /dev/null 2>&1 && echo "   Webhook polling: enabled (every \${POLL_INTERVAL}m)" || echo "   Webhook polling: skipped (set up manually with: hermes cron create)"
-fi
-
-PROMPT="Use the Shellgate skill to find out which targets you have access to"
-WIDTH=\$(( \${#PROMPT} + 4 ))
-BORDER=\$(printf '─%.0s' \$(seq 1 \$(( WIDTH - 2 ))))
+cat >> ~/.hermes/cli-config.yaml << 'HOOKEOF'
+# shellgate-hook-start
+hooks:
+  on_session_start:
+    - command: "bash ~/.hermes/shellgate/discover.sh"
+# shellgate-hook-end
+HOOKEOF
 
 echo ""
-echo "🐚 Shellgate → Hermes connected"
+echo "Shellgate → Hermes connected (MCP)"
+echo "   URL: $SHELLGATE_URL/mcp"
 echo ""
-echo "Try it out, ask your agent:"
-echo "╭\${BORDER}╮"
-echo "│ \${PROMPT} │"
-echo "╰\${BORDER}╯"
+echo "Restart Hermes to connect to the Shellgate MCP server."
 `;
 }
 
@@ -206,73 +231,180 @@ export function generateOpenClawScript(baseUrl: string, token: string): string {
 	return `#!/bin/bash
 set -e
 
-export SHELLGATE_URL="${baseUrl}"
-export SHELLGATE_API_KEY="${token}"
+SHELLGATE_URL="${baseUrl}"
+SHELLGATE_API_KEY="${token}"
 
-# Verify token is valid before installing
-echo "Verifying connection..."
-VERIFY=$(curl -sf -H "Authorization: Bearer $SHELLGATE_API_KEY" "$SHELLGATE_URL/verify-connection" 2>&1) || {
-  echo "❌ Invalid token or Shellgate unreachable"
+# Validate API key format
+if [[ "$SHELLGATE_API_KEY" != sg_* ]]; then
+  echo "Invalid API key: must start with sg_"
   exit 1
-}
+fi
 
-# Add environment variables to global OpenClaw .env
+# Verify connection
+echo "Verifying connection..."
+if ! curl -sf -H "Authorization: Bearer $SHELLGATE_API_KEY" "$SHELLGATE_URL/verify-connection" > /dev/null 2>&1; then
+  echo "Warning: Could not verify connection to Shellgate at $SHELLGATE_URL"
+  echo "Continuing with setup — verify your Shellgate instance is running."
+fi
+
+# Clean up old skill-based config
+if [ -d ~/.openclaw/skills/shellgate ]; then
+  rm -rf ~/.openclaw/skills/shellgate
+  echo "Removed old skill directory"
+fi
+
+# Add MCP server to openclaw.json
+CONFIG_PATH="\${OPENCLAW_CONFIG_PATH:-\$HOME/.openclaw/openclaw.json}"
+mkdir -p "\$(dirname "\$CONFIG_PATH")"
+
+if [ -f "\$CONFIG_PATH" ]; then
+  node -e '
+const fs = require("fs");
+const p = process.argv[1];
+const s = JSON.parse(fs.readFileSync(p, "utf8"));
+if (!s.mcp) s.mcp = {};
+if (!s.mcp.servers) s.mcp.servers = {};
+s.mcp.servers.shellgate = {
+  url: process.env.SHELLGATE_URL + "/mcp",
+  transport: "http",
+  headers: { "Authorization": "Bearer " + process.env.SHELLGATE_API_KEY }
+};
+fs.writeFileSync(p, JSON.stringify(s, null, 2));
+' "\$CONFIG_PATH"
+else
+  cat > "\$CONFIG_PATH" << JSONEOF
+{
+  "mcp": {
+    "servers": {
+      "shellgate": {
+        "url": "\$SHELLGATE_URL/mcp",
+        "transport": "http",
+        "headers": {
+          "Authorization": "Bearer \$SHELLGATE_API_KEY"
+        }
+      }
+    }
+  }
+}
+JSONEOF
+fi
+echo "MCP server added to \$CONFIG_PATH"
+
+# Add env vars
 mkdir -p ~/.openclaw
 touch ~/.openclaw/.env
-
-# Remove any existing SHELLGATE_ entries to avoid duplicates
 if [ -f ~/.openclaw/.env ]; then
   sed -i.bak '/^SHELLGATE_URL=/d;/^SHELLGATE_API_KEY=/d' ~/.openclaw/.env
   rm -f ~/.openclaw/.env.bak
 fi
+echo "SHELLGATE_URL=\$SHELLGATE_URL" >> ~/.openclaw/.env
+echo "SHELLGATE_API_KEY=\$SHELLGATE_API_KEY" >> ~/.openclaw/.env
 
-echo "SHELLGATE_URL=$SHELLGATE_URL" >> ~/.openclaw/.env
-echo "SHELLGATE_API_KEY=$SHELLGATE_API_KEY" >> ~/.openclaw/.env
+echo ""
+echo "Shellgate → OpenClaw connected (MCP)"
+echo "   URL: \$SHELLGATE_URL/mcp"
+echo ""
+echo "Note: OpenClaw does not yet support SessionStart hooks."
+echo "The agent will discover Shellgate via MCP instructions."
+echo "Call 'bootstrap' as the first Shellgate tool in each session."
+echo ""
+echo "Restart OpenClaw to connect to the Shellgate MCP server."
+`;
+}
 
-# Install skill (download template and inject hardcoded values)
-mkdir -p ~/.openclaw/skills/shellgate
-curl -sf -H "Authorization: Bearer $SHELLGATE_API_KEY" \\
-  "$SHELLGATE_URL/api/skill" | \\
-  sed "s|\\$SHELLGATE_URL|$SHELLGATE_URL|g; s|\\$SHELLGATE_API_KEY|$SHELLGATE_API_KEY|g; s|Use environment variable \\\`SHELLGATE_URL\\\`|$SHELLGATE_URL|g; s|Use environment variable \\\`SHELLGATE_API_KEY\\\` as Bearer token|Bearer token (embedded in curl commands below)|g" \\
-  > ~/.openclaw/skills/shellgate/SKILL.md
+export function generateCodexScript(baseUrl: string, token: string): string {
+	return `#!/bin/bash
+set -e
 
-# Restart gateway so the new skill is picked up
-if command -v openclaw &> /dev/null; then
-  echo "Restarting OpenClaw gateway..."
-  openclaw gateway restart > /dev/null 2>&1 || true
+SHELLGATE_URL="${baseUrl}"
+SHELLGATE_API_KEY="${token}"
+
+# Validate API key format
+if [[ "$SHELLGATE_API_KEY" != sg_* ]]; then
+  echo "Invalid API key: must start with sg_"
+  exit 1
 fi
 
-# Webhook polling setup
-echo ""
-read -p "Set up webhook polling? (y/N): " SETUP_WEBHOOKS < /dev/tty
-if [ "\$SETUP_WEBHOOKS" = "y" ] || [ "\$SETUP_WEBHOOKS" = "Y" ]; then
-  read -p "Polling interval in minutes [5]: " POLL_INTERVAL < /dev/tty
-  POLL_INTERVAL=\${POLL_INTERVAL:-5}
-  read -p "Telegram chat ID for notifications: " TELEGRAM_ID < /dev/tty
-
-  if [ -z "\$TELEGRAM_ID" ]; then
-    echo "   Webhook polling: skipped (Telegram chat ID required)"
-  else
-    # Remove all existing shellgate-webhooks cron jobs
-    if command -v jq &> /dev/null; then
-      openclaw cron list --json 2>/dev/null | jq -r 'if type == "array" then .[] else .jobs[]? // empty end | select(.name == "shellgate-webhooks") | .id' | while read -r JOB_ID; do
-        openclaw cron remove "\$JOB_ID" > /dev/null 2>&1
-      done
-    fi
-    openclaw cron add --name shellgate-webhooks --every "\${POLL_INTERVAL}m" --session isolated --light-context --announce --channel telegram --to "\$TELEGRAM_ID" --message "Poll Shellgate webhooks using your shellgate skill. If no events, respond with NO_REPLY and nothing else." > /dev/null 2>&1 && echo "   Webhook polling: enabled (every \${POLL_INTERVAL}m → Telegram)" || echo "   Webhook polling: skipped (set up manually with: openclaw cron add)"
-  fi
+# Verify connection
+echo "Verifying connection..."
+if ! curl -sf -H "Authorization: Bearer $SHELLGATE_API_KEY" "$SHELLGATE_URL/verify-connection" > /dev/null 2>&1; then
+  echo "Warning: Could not verify connection to Shellgate at $SHELLGATE_URL"
+  echo "Continuing with setup — verify your Shellgate instance is running."
 fi
 
-PROMPT="Use the Shellgate skill to find out which targets you have access to"
-WIDTH=\$(( \${#PROMPT} + 4 ))
-BORDER=\$(printf '─%.0s' \$(seq 1 \$(( WIDTH - 2 ))))
+# Register MCP server via Codex CLI
+if command -v codex &> /dev/null; then
+  codex mcp remove shellgate 2>/dev/null || true
+  codex mcp add shellgate \\
+    --transport http \\
+    --url "$SHELLGATE_URL/mcp" \\
+    --header "Authorization: Bearer $SHELLGATE_API_KEY"
+  echo "MCP server registered"
+else
+  echo "Warning: codex CLI not found. Add MCP server manually to ~/.codex/config.toml"
+fi
+
+# Create discovery helper scripts
+mkdir -p ~/.codex/shellgate
+
+cat > ~/.codex/shellgate/format.js << 'JSEOF'
+const d=JSON.parse(require("fs").readFileSync(0,"utf8"));
+const t=d.targets||[], s=d.skills||[], w=d.webhooks||[], m=d.memories||[], wp=d.wiki_pages||[];
+const lines=[];
+if(d.policy) lines.push(d.policy);
+lines.push("Shellgate context:");
+if(t.length) lines.push("Targets: "+t.map(x=>x.slug+" ("+x.type+")").join(", "));
+if(s.length) lines.push("Org skills (fetch via org_skill_read MCP tool): "+s.map(x=>x.slug+" - "+(x.description||"")).join("; "));
+if(w.length) lines.push("Webhooks: "+w.map(x=>x.name).join(", "));
+if(m.length) lines.push("Memories: "+m.length+" entries (scan summaries via memory_list, call memory_read for relevant ones)");
+if(wp.length) lines.push("Wiki: "+wp.length+" pages available (call wiki_read_page on demand)");
+lines.push("IMPORTANT: Org skills are shared organization skills. Use the shellgate org_skill_read MCP tool to load them.");
+process.stdout.write(lines.join("\\n")+"\\n");
+JSEOF
+
+cat > ~/.codex/shellgate/discover.sh << 'SHEOF'
+#!/bin/bash
+curl -sf -H "Authorization: Bearer $SHELLGATE_API_KEY" "$SHELLGATE_URL/bootstrap" 2>/dev/null \\
+  | node ~/.codex/shellgate/format.js 2>/dev/null \\
+  || echo "Shellgate: could not fetch context (server may be offline)"
+SHEOF
+chmod +x ~/.codex/shellgate/discover.sh
+
+# Add env vars
+CODEX_HOME="\${CODEX_HOME:-\$HOME/.codex}"
+mkdir -p "\$CODEX_HOME"
+
+if [ -f "\$CODEX_HOME/.env" ]; then
+  sed -i.bak '/^SHELLGATE_URL=/d;/^SHELLGATE_API_KEY=/d' "\$CODEX_HOME/.env"
+  rm -f "\$CODEX_HOME/.env.bak"
+fi
+echo "SHELLGATE_URL=\$SHELLGATE_URL" >> "\$CODEX_HOME/.env"
+echo "SHELLGATE_API_KEY=\$SHELLGATE_API_KEY" >> "\$CODEX_HOME/.env"
+
+# Add SessionStart hook
+HOOKS_FILE="\$CODEX_HOME/hooks.json"
+node -e '
+const fs = require("fs");
+const p = process.argv[1];
+let hooks = [];
+if (fs.existsSync(p)) {
+  try { hooks = JSON.parse(fs.readFileSync(p, "utf8")); } catch {}
+  if (!Array.isArray(hooks)) hooks = hooks.hooks || [];
+}
+hooks = hooks.filter(h => !h.command || !h.command.includes("shellgate"));
+hooks.push({
+  event: "SessionStart",
+  matcher: "startup|resume",
+  command: "bash ~/.codex/shellgate/discover.sh",
+  statusMessage: "Loading Shellgate context..."
+});
+fs.writeFileSync(p, JSON.stringify(hooks, null, 2));
+' "\$HOOKS_FILE"
 
 echo ""
-echo "🐚 Shellgate → OpenClaw connected"
+echo "Shellgate MCP server registered in Codex CLI"
+echo "   URL: \$SHELLGATE_URL/mcp"
 echo ""
-echo "Try it out, ask your agent:"
-echo "╭\${BORDER}╮"
-echo "│ \${PROMPT} │"
-echo "╰\${BORDER}╯"
+echo "Restart Codex CLI to connect to the Shellgate MCP server."
 `;
 }
