@@ -197,6 +197,7 @@ export const skills = pgTable("skills", {
 	updatedAt: timestamp("updated_at", { withTimezone: true })
 		.notNull()
 		.defaultNow(),
+	lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
 });
 
 export type Skill = typeof skills.$inferSelect;

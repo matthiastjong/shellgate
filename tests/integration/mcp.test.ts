@@ -190,7 +190,7 @@ describe("MCP tools", () => {
 			await createSkill("---\nname: test-skill\ndescription: A test skill\n---\n# Test\nSome content.");
 
 			const handler = createMcpToolHandler(token);
-			const result = await handler("org_skill_list", {}) as Array<{ slug: string; description: string; builtIn: boolean }>;
+			const result = await handler("org_skill_list", {}) as Array<{ slug: string; description: string; last_used_at: Date | null; builtIn: boolean }>;
 
 			expect(Array.isArray(result)).toBe(true);
 			// Includes built-in skills + 1 DB skill
@@ -198,6 +198,7 @@ describe("MCP tools", () => {
 			expect(dbSkills).toHaveLength(1);
 			expect(dbSkills[0].slug).toBe("test-skill");
 			expect(dbSkills[0].description).toBe("A test skill");
+			expect(dbSkills[0].last_used_at).toBeNull();
 		});
 	});
 
@@ -208,12 +209,17 @@ describe("MCP tools", () => {
 			await createSkill(content);
 
 			const handler = createMcpToolHandler(token);
-			const result = await handler("org_skill_read", { slug: "my-skill" }) as { slug: string; description: string; content: string; version: number };
+			const result = await handler("org_skill_read", { slug: "my-skill" }) as { slug: string; description: string; content: string; version: number; last_used_at: string | null };
 
 			expect(result.slug).toBe("my-skill");
 			expect(result.description).toBe("My skill description");
 			expect(result.content).toBe(content);
 			expect(result.version).toBe(1);
+			expect(result.last_used_at).toEqual(expect.any(String));
+
+			const list = await handler("org_skill_list", {}) as Array<{ slug: string; last_used_at: Date | null; builtIn: boolean }>;
+			const skill = list.find((s) => s.slug === "my-skill" && !s.builtIn);
+			expect(skill?.last_used_at).toBeInstanceOf(Date);
 		});
 
 		it("returns error for nonexistent slug", async () => {

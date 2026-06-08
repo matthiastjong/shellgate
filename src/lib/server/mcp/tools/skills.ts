@@ -1,4 +1,4 @@
-import { listSkills, getSkill, createSkill, updateSkill, deleteSkill } from "$lib/server/services/skills";
+import { listSkills, getSkill, createSkill, updateSkill, deleteSkill, markSkillUsed } from "$lib/server/services/skills";
 import { parseSkillMd } from "$lib/server/utils/skill-parser";
 import { isBuiltInSkill } from "$lib/server/built-in-skills";
 
@@ -9,11 +9,13 @@ export async function skillList() {
 export async function skillRead(args: { slug: string }) {
 	const skill = await getSkill(args.slug);
 	if (!skill) return { error: `Skill "${args.slug}" not found` };
+	const lastUsedAt = skill.builtIn ? skill.lastUsedAt : await markSkillUsed(skill.slug);
 	return {
 		slug: skill.slug,
 		description: skill.description,
 		content: skill.contentMd,
 		version: skill.version,
+		last_used_at: lastUsedAt?.toISOString() ?? null,
 	};
 }
 

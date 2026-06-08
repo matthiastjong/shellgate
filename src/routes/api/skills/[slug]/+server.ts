@@ -1,18 +1,20 @@
 import { json, error } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
 import { requireBearerOrAdmin } from "$lib/server/api-auth";
-import { getSkill, updateSkill, deleteSkill } from "$lib/server/services/skills";
+import { getSkill, updateSkill, deleteSkill, markSkillUsed } from "$lib/server/services/skills";
 
 export const GET: RequestHandler = async ({ request, params }) => {
 	await requireBearerOrAdmin(request);
 	const skill = await getSkill(params.slug);
 	if (!skill) throw error(404, "Skill not found");
+	const lastUsedAt = skill.builtIn ? skill.lastUsedAt : await markSkillUsed(skill.slug);
 
 	return json({
 		slug: skill.slug,
 		description: skill.description,
 		content: skill.contentMd,
 		version: skill.version,
+		last_used_at: lastUsedAt?.toISOString() ?? null,
 	});
 };
 
