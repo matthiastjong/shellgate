@@ -55,8 +55,17 @@ Existing `token_permissions` model — no changes needed. A token gets access to
 ### Schema changes
 
 - Add `email` column to `targets` table (nullable, required when type = `email`)
-- Add `imap_smtp` to auth method type enum
+- Extend `targets.type` TypeScript union from `"api" | "ssh"` to `"api" | "ssh" | "email"`
+- Create `EmailConfig` type and update `config` column type to `SshConfig | EmailConfig | null`
+- Add `"imap_smtp"` to `VALID_TYPES` in `auth-methods.ts` + new `credentialHint` branch
+- Add `"mail"` to audit log `type` union in schema and `audit.ts` service
 - Migration file generated via `npm run db:generate`
+
+### Dependencies
+
+```bash
+npm install imapflow nodemailer @types/nodemailer
+```
 
 ## Routes
 
@@ -160,7 +169,7 @@ New route tree `src/routes/mail/[target]/` using the same auth flow as gateway r
 
 ### Approval flow for send
 
-`mail_send` uses the same approval pattern as guarded `api_request` calls. First call returns `{ "status": "approval_required", "reason": "About to send email to klant@example.com" }`. Agent must re-call with `approved: true` after user confirms.
+`mail_send` hardcodes an approval requirement (does NOT use the guard engine, which is designed for HTTP proxy requests). First call always returns `{ "status": "approval_required", "reason": "About to send email to klant@example.com" }`. Agent must re-call with `approved: true` after user confirms.
 
 ## MCP Tools
 
@@ -271,16 +280,36 @@ Email targets appear in the existing `targets` array with the `email` field incl
 ```json
 {
   "targets": [
-    { "slug": "linear-api", "type": "api", "description": "Linear API" },
-    { "slug": "deal-nl-server", "type": "ssh", "description": "Deal.nl server" },
-    { "slug": "info-at-deal", "type": "email", "email": "info@deal.nl", "description": "Hoofdmailbox Deal.nl" }
+    { "slug": "linear-api", "type": "api", "name": "Linear API" },
+    { "slug": "deal-nl-server", "type": "ssh", "name": "Deal.nl server" },
+    { "slug": "info-at-deal", "type": "email", "email": "info@deal.nl", "name": "Hoofdmailbox Deal.nl" }
   ]
 }
 ```
 
-No config or credentials exposed in bootstrap. Agents see slug, type, email address, and description.
+No config or credentials exposed in bootstrap. Agents see slug, type, name, and email address (for email targets only).
 
 The SessionStart hook picks up email targets automatically — no separate changes needed.
+
+### Auth bypass
+
+`hooks.server.ts` must add `/mail/` to the list of path prefixes that skip dashboard session auth (alongside `/api/`, `/gateway/`, `/ssh/`, `/discovery/`).
+
+## Files to Modify
+
+| File | Change |
+|---|---|
+| `src/lib/server/db/schema.ts` | Add `email` column, extend type union, add `EmailConfig` type, extend audit type |
+| `src/lib/server/services/auth-methods.ts` | Add `imap_smtp` to `VALID_TYPES`, new `credentialHint` branch |
+| `src/lib/server/services/audit.ts` | Extend type union with `"mail"` |
+| `src/lib/server/services/mail.ts` | **New** — all IMAP/SMTP logic |
+| `src/routes/mail/[target]/` | **New** — all mail route handlers |
+| `src/lib/server/mcp/server.ts` | Register 8 new mail tools |
+| `src/lib/server/mcp/tools/mail-*.ts` | **New** — MCP tool handlers |
+| `src/routes/bootstrap/` | Include `email` field for email targets |
+| `src/hooks.server.ts` | Add `/mail/` to auth bypass list |
+| `src/routes/(app)/targets/` | Tabbed view, email target form, test connection |
+| `package.json` | Add `imapflow`, `nodemailer`, `@types/nodemailer` |
 
 ## Out of Scope (V1)
 
