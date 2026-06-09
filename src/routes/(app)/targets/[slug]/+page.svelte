@@ -18,6 +18,8 @@ import PlusIcon from "@lucide/svelte/icons/plus";
 import StarIcon from "@lucide/svelte/icons/star";
 import CopyIcon from "@lucide/svelte/icons/copy";
 import CheckIcon from "@lucide/svelte/icons/check";
+import CircleCheckIcon from "@lucide/svelte/icons/circle-check";
+import CircleXIcon from "@lucide/svelte/icons/circle-x";
 import EllipsisIcon from "@lucide/svelte/icons/ellipsis";
 import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
 import KeyIcon from "@lucide/svelte/icons/key";
@@ -25,13 +27,17 @@ import AuthMethodFields from "$lib/components/auth-method-fields.svelte";
 import type { PageData } from "./$types";
 
 
+type SshConfig = { host: string; port: number; username: string };
+type EmailConfig = { imap: { host: string; port: number; secure: boolean }; smtp: { host: string; port: number; secure: boolean } };
+
 type Target = {
 	id: string;
 	name: string;
 	slug: string;
 	type: string;
 	baseUrl: string | null;
-	config: { host: string; port: number; username: string } | null;
+	config: SshConfig | EmailConfig | null;
+	email: string | null;
 	enabled: boolean;
 	createdAt: string | Date;
 	updatedAt: string | Date;
@@ -67,7 +73,7 @@ let copied = $state(false);
 // Sheet state
 let sheetOpen = $state(false);
 let sheetMode = $state<
-	"rename" | "baseUrl" | "connection" | "addAuth" | "renameAuth" | "editAuth"
+	"rename" | "baseUrl" | "connection" | "addAuth" | "renameAuth" | "editAuth" | "emailConfig"
 >("rename");
 let sheetSubmitting = $state(false);
 
@@ -110,6 +116,19 @@ let editAuthType = $state("bearer");
 // Delete confirmation
 let confirmDeleteAuthId = $state<string | null>(null);
 
+// Email config edit state
+let editEmailAddress = $state("");
+let editImapHost = $state("");
+let editImapPort = $state("993");
+let editImapSecure = $state(true);
+let editSmtpHost = $state("");
+let editSmtpPort = $state("587");
+let editSmtpSecure = $state(false);
+
+// Test connection state
+let testConnectionSubmitting = $state(false);
+let testResult = $state<{ imap: boolean; smtp: boolean; error?: string } | null>(null);
+
 // View credential dialog
 let viewCredentialOpen = $state(false);
 let viewCredentialLabel = $state("");
@@ -148,11 +167,38 @@ function openBaseUrlSheet() {
 
 function openConnectionSheet() {
 	sheetMode = "connection";
-	editHost = target.config?.host ?? "";
-	editPort = String(target.config?.port ?? 22);
-	editUsername = target.config?.username ?? "";
+	const sshCfg = getSshConfig(target.config);
+	editHost = sshCfg?.host ?? "";
+	editPort = String(sshCfg?.port ?? 22);
+	editUsername = sshCfg?.username ?? "";
 	sheetSubmitting = false;
 	sheetOpen = true;
+}
+
+function openEmailConfigSheet() {
+	sheetMode = "emailConfig";
+	const emailCfg = getEmailConfig(target.config);
+	editEmailAddress = target.email ?? "";
+	editImapHost = emailCfg?.imap.host ?? "";
+	editImapPort = String(emailCfg?.imap.port ?? 993);
+	editImapSecure = emailCfg?.imap.secure ?? true;
+	editSmtpHost = emailCfg?.smtp.host ?? "";
+	editSmtpPort = String(emailCfg?.smtp.port ?? 587);
+	editSmtpSecure = emailCfg?.smtp.secure ?? false;
+	sheetSubmitting = false;
+	sheetOpen = true;
+}
+
+function getSshConfig(config: Target['config']): SshConfig | null {
+	if (!config) return null;
+	if ('host' in config && 'username' in config) return config as SshConfig;
+	return null;
+}
+
+function getEmailConfig(config: Target['config']): EmailConfig | null {
+	if (!config) return null;
+	if ('imap' in config && 'smtp' in config) return config as EmailConfig;
+	return null;
 }
 
 function openAddAuthSheet() {
@@ -415,6 +461,78 @@ async function copyToClipboard(text: string) {
 					</Button>
 				</div>
 			</form>
+		{:else if sheetMode === 'emailConfig'}
+			<Sheet.Header>
+				<Sheet.Title>Update Email Config</Sheet.Title>
+				<Sheet.Description>Change the IMAP/SMTP connection settings for this target.</Sheet.Description>
+			</Sheet.Header>
+			<form
+				method="POST"
+				action="?/updateEmailConfig"
+				use:enhance={() => {
+					sheetSubmitting = true;
+					return async ({ result, update }) => {
+						sheetSubmitting = false;
+						if (result.type === 'success' && result.data?.updated) {
+							const { emailConfig } = result.data as { emailConfig: { email: string | null; config: unknown } };
+							localTarget = { ...target, email: emailConfig.email, config: emailConfig.config as Target['config'] };
+							sheetOpen = false;
+							toast.success('Email config updated');
+						} else if (result.type === 'failure') {
+							toast.error((result.data?.error as string) ?? 'Failed to update');
+						}
+						await update({ reset: false, invalidateAll: false });
+					};
+				}}
+			>
+				<input type="hidden" name="id" value={target.id} />
+				<div class="grid gap-4 px-4">
+					<div class="grid gap-2">
+						<Label for="edit-email-address">Email Address</Label>
+						<Input id="edit-email-address" name="email" type="email" bind:value={editEmailAddress} placeholder="me@example.com" required />
+					</div>
+					<div class="space-y-2">
+						<p class="text-sm font-medium">IMAP</p>
+						<div class="grid grid-cols-[1fr_80px] gap-2">
+							<div class="grid gap-2">
+								<Label for="edit-imap-host" class="text-xs text-muted-foreground">Host</Label>
+								<Input id="edit-imap-host" name="imap_host" bind:value={editImapHost} placeholder="imap.example.com" required />
+							</div>
+							<div class="grid gap-2">
+								<Label for="edit-imap-port" class="text-xs text-muted-foreground">Port</Label>
+								<Input id="edit-imap-port" name="imap_port" type="number" bind:value={editImapPort} min="1" max="65535" />
+							</div>
+						</div>
+						<div class="flex items-center gap-2">
+							<Checkbox id="edit-imap-secure" name="imap_secure" checked={editImapSecure} onCheckedChange={(v) => (editImapSecure = v === true)} />
+							<Label for="edit-imap-secure" class="text-sm font-normal">Use TLS/SSL</Label>
+						</div>
+					</div>
+					<div class="space-y-2">
+						<p class="text-sm font-medium">SMTP</p>
+						<div class="grid grid-cols-[1fr_80px] gap-2">
+							<div class="grid gap-2">
+								<Label for="edit-smtp-host" class="text-xs text-muted-foreground">Host</Label>
+								<Input id="edit-smtp-host" name="smtp_host" bind:value={editSmtpHost} placeholder="smtp.example.com" required />
+							</div>
+							<div class="grid gap-2">
+								<Label for="edit-smtp-port" class="text-xs text-muted-foreground">Port</Label>
+								<Input id="edit-smtp-port" name="smtp_port" type="number" bind:value={editSmtpPort} min="1" max="65535" />
+							</div>
+						</div>
+						<div class="flex items-center gap-2">
+							<Checkbox id="edit-smtp-secure" name="smtp_secure" checked={editSmtpSecure} onCheckedChange={(v) => (editSmtpSecure = v === true)} />
+							<Label for="edit-smtp-secure" class="text-sm font-normal">Use TLS/SSL</Label>
+						</div>
+					</div>
+					<Button type="submit" disabled={sheetSubmitting || !editEmailAddress.trim() || !editImapHost.trim() || !editSmtpHost.trim()}>
+						{#if sheetSubmitting}
+							<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
+						{/if}
+						Save
+					</Button>
+				</div>
+			</form>
 		{:else if sheetMode === 'editAuth'}
 			<Sheet.Header>
 				<Sheet.Title>Edit Auth Method</Sheet.Title>
@@ -506,14 +624,38 @@ async function copyToClipboard(text: string) {
 						<dt class="text-muted-foreground text-sm">Type</dt>
 						<dd><Badge variant="outline">{target.type}</Badge></dd>
 					</div>
-					{#if target.type === 'ssh' && target.config}
+					{#if target.type === 'ssh'}
+					{@const sshCfg = getSshConfig(target.config)}
 					<div>
 						<dt class="text-muted-foreground text-sm">Connection</dt>
 						<dd class="flex items-center gap-2">
-							<code class="text-sm font-mono">{target.config.username}@{target.config.host}:{target.config.port}</code>
+							{#if sshCfg}
+								<code class="text-sm font-mono">{sshCfg.username}@{sshCfg.host}:{sshCfg.port}</code>
+							{:else}
+								<span class="text-muted-foreground">&mdash;</span>
+							{/if}
 							<Button variant="ghost" size="sm" class="h-6 text-xs" onclick={openConnectionSheet}>Edit</Button>
 						</dd>
 					</div>
+				{:else if target.type === 'email'}
+					{@const emailCfg = getEmailConfig(target.config)}
+					<div>
+						<dt class="text-muted-foreground text-sm">Email Address</dt>
+						<dd class="flex items-center gap-2">
+							<code class="text-sm font-mono">{target.email ?? '—'}</code>
+							<Button variant="ghost" size="sm" class="h-6 text-xs" onclick={openEmailConfigSheet}>Edit</Button>
+						</dd>
+					</div>
+					{#if emailCfg}
+					<div>
+						<dt class="text-muted-foreground text-sm">IMAP</dt>
+						<dd><code class="text-sm font-mono">{emailCfg.imap.host}:{emailCfg.imap.port}{emailCfg.imap.secure ? ' (TLS)' : ''}</code></dd>
+					</div>
+					<div>
+						<dt class="text-muted-foreground text-sm">SMTP</dt>
+						<dd><code class="text-sm font-mono">{emailCfg.smtp.host}:{emailCfg.smtp.port}{emailCfg.smtp.secure ? ' (TLS)' : ''}</code></dd>
+					</div>
+					{/if}
 				{:else}
 					<div>
 						<dt class="text-muted-foreground text-sm">Base URL</dt>
@@ -785,51 +927,113 @@ async function copyToClipboard(text: string) {
 			</div>
 		</div>
 
-		<!-- Right column: Quick Start -->
-		<div class="sticky top-4 self-start">
-			<Card.Root>
-				<Card.Header>
-					<Card.Title class="text-sm font-medium">Quick Start</Card.Title>
-				</Card.Header>
-				<Card.Content>
-					<div class="rounded-lg border bg-muted/50 p-3">
-						<div class="flex items-start justify-between gap-2">
-							{#if target.type === 'ssh'}
-								<pre class="break-all font-mono text-xs whitespace-pre-wrap">{`curl -X POST ${gatewayUrl}/ssh/${target.slug}/exec \
+		<!-- Right column: Quick Start + Test Connection -->
+		<div class="sticky top-4 flex flex-col gap-4 self-start">
+			{#if target.type !== 'email'}
+				<Card.Root>
+					<Card.Header>
+						<Card.Title class="text-sm font-medium">Quick Start</Card.Title>
+					</Card.Header>
+					<Card.Content>
+						<div class="rounded-lg border bg-muted/50 p-3">
+							<div class="flex items-start justify-between gap-2">
+								{#if target.type === 'ssh'}
+									<pre class="break-all font-mono text-xs whitespace-pre-wrap">{`curl -X POST ${gatewayUrl}/ssh/${target.slug}/exec \
   -H "Authorization: Bearer <your-shellgate-token>" \
   -H "Content-Type: application/json" \
   -d '{"command": "whoami"}'`}</pre>
-							{:else}
-								<pre class="break-all font-mono text-xs whitespace-pre-wrap">{`curl ${gatewayUrl}/gateway/${target.slug}/health \
-  -H "Authorization: Bearer <your-shellgate-token>"`}</pre>
-							{/if}
-							<Button
-								variant="ghost"
-								size="icon"
-								class="size-7 shrink-0"
-								onclick={() => {
-									if (target.type === 'ssh') {
-										copyToClipboard(`curl -X POST ${gatewayUrl}/ssh/${target.slug}/exec \\\n  -H "Authorization: Bearer <your-shellgate-token>" \\\n  -H "Content-Type: application/json" \\\n  -d '{"command": "whoami"}'`);
-									} else {
-										copyToClipboard(`curl ${gatewayUrl}/gateway/${target.slug}/health \\\n  -H "Authorization: Bearer <your-shellgate-token>"`);
-									}
-								}}
-							>
-								{#if copied}
-									<CheckIcon class="size-3.5" />
 								{:else}
-									<CopyIcon class="size-3.5" />
+									<pre class="break-all font-mono text-xs whitespace-pre-wrap">{`curl ${gatewayUrl}/gateway/${target.slug}/health \
+  -H "Authorization: Bearer <your-shellgate-token>"`}</pre>
 								{/if}
-							</Button>
+								<Button
+									variant="ghost"
+									size="icon"
+									class="size-7 shrink-0"
+									onclick={() => {
+										if (target.type === 'ssh') {
+											copyToClipboard(`curl -X POST ${gatewayUrl}/ssh/${target.slug}/exec \\\n  -H "Authorization: Bearer <your-shellgate-token>" \\\n  -H "Content-Type: application/json" \\\n  -d '{"command": "whoami"}'`);
+										} else {
+											copyToClipboard(`curl ${gatewayUrl}/gateway/${target.slug}/health \\\n  -H "Authorization: Bearer <your-shellgate-token>"`);
+										}
+									}}
+								>
+									{#if copied}
+										<CheckIcon class="size-3.5" />
+									{:else}
+										<CopyIcon class="size-3.5" />
+									{/if}
+								</Button>
+							</div>
 						</div>
-					</div>
-					{#if target.type === 'ssh'}
-						<p class="text-muted-foreground mt-2 text-xs">Replace <code class="font-mono">whoami</code> with any command. Add <code class="font-mono">"timeout": 30</code> for a custom timeout (max 60s).</p>
-					{:else}
-						<p class="text-muted-foreground mt-2 text-xs">Replace <code class="font-mono">/health</code> with any path your target API supports.</p>
-					{/if}
-				</Card.Content>
-			</Card.Root>
+						{#if target.type === 'ssh'}
+							<p class="text-muted-foreground mt-2 text-xs">Replace <code class="font-mono">whoami</code> with any command. Add <code class="font-mono">"timeout": 30</code> for a custom timeout (max 60s).</p>
+						{:else}
+							<p class="text-muted-foreground mt-2 text-xs">Replace <code class="font-mono">/health</code> with any path your target API supports.</p>
+						{/if}
+					</Card.Content>
+				</Card.Root>
+			{/if}
+
+			{#if target.type === 'email'}
+				<Card.Root>
+					<Card.Header>
+						<Card.Title class="text-sm font-medium">Test Connection</Card.Title>
+					</Card.Header>
+					<Card.Content class="flex flex-col gap-4">
+						<p class="text-muted-foreground text-xs">Verify that Shellgate can connect to the IMAP and SMTP servers using the stored credentials.</p>
+						<form
+							method="POST"
+							action="?/testConnection"
+							use:enhance={() => {
+								testConnectionSubmitting = true;
+								testResult = null;
+								return async ({ result, update }) => {
+									testConnectionSubmitting = false;
+									if (result.type === 'success' && result.data?.testResult) {
+										testResult = result.data.testResult as { imap: boolean; smtp: boolean; error?: string };
+									} else if (result.type === 'failure') {
+										toast.error((result.data?.error as string) ?? 'Test failed');
+									}
+									await update({ reset: false, invalidateAll: false });
+								};
+							}}
+						>
+							<Button type="submit" class="w-full" disabled={testConnectionSubmitting}>
+								{#if testConnectionSubmitting}
+									<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
+								{/if}
+								Test Connection
+							</Button>
+						</form>
+						{#if testResult}
+							<div class="space-y-2">
+								<div class="flex items-center gap-2">
+									{#if testResult.imap}
+										<CircleCheckIcon class="size-4 text-green-600 dark:text-green-400" />
+										<span class="text-sm text-green-700 dark:text-green-300">IMAP connected</span>
+									{:else}
+										<CircleXIcon class="size-4 text-destructive" />
+										<span class="text-sm text-destructive">IMAP failed</span>
+									{/if}
+								</div>
+								<div class="flex items-center gap-2">
+									{#if testResult.smtp}
+										<CircleCheckIcon class="size-4 text-green-600 dark:text-green-400" />
+										<span class="text-sm text-green-700 dark:text-green-300">SMTP connected</span>
+									{:else}
+										<CircleXIcon class="size-4 text-destructive" />
+										<span class="text-sm text-destructive">SMTP failed</span>
+									{/if}
+								</div>
+								{#if testResult.error}
+									<p class="text-xs text-destructive mt-1">{testResult.error}</p>
+								{/if}
+							</div>
+						{/if}
+					</Card.Content>
+				</Card.Root>
+			{/if}
 		</div>
 	</div>
 </div>

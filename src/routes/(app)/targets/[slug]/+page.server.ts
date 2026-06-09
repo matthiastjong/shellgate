@@ -3,9 +3,11 @@ import { eq } from "drizzle-orm";
 import { db } from "$lib/server/db";
 import { tokenPermissions, tokens } from "$lib/server/db/schema";
 import { getTargetBySlug, updateTarget } from "$lib/server/services/targets";
-import { listAuthMethods, createAuthMethod, updateAuthMethod, deleteAuthMethod, getAuthMethodCredential } from "$lib/server/services/auth-methods";
+import { listAuthMethods, createAuthMethod, updateAuthMethod, deleteAuthMethod, getAuthMethodCredential, getDefaultAuthMethod } from "$lib/server/services/auth-methods";
 import { listTokens } from "$lib/server/services/tokens";
 import { addPermission } from "$lib/server/services/permissions";
+import { testConnection as mailTestConnection } from "$lib/server/services/mail";
+import type { EmailConfig } from "$lib/server/db/schema";
 import type { Actions, PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async ({ params }) => {
@@ -356,5 +358,57 @@ export const actions = {
 		const result = await getAuthMethodCredential(target.id, id);
 		if (!result) return fail(404, { error: "Auth method not found" });
 		return { revealedCredential: { id, credential: result.credential } };
+	},
+
+	updateEmailConfig: async ({ request }) => {
+		const data = await request.formData();
+		const id = data.get("id")?.toString() ?? "";
+		const email = data.get("email")?.toString()?.trim() ?? "";
+		const imap_host = data.get("imap_host")?.toString()?.trim() ?? "";
+		const imap_port = parseInt(data.get("imap_port")?.toString() ?? "993", 10) || 993;
+		const imap_secure = data.get("imap_secure") === "on";
+		const smtp_host = data.get("smtp_host")?.toString()?.trim() ?? "";
+		const smtp_port = parseInt(data.get("smtp_port")?.toString() ?? "587", 10) || 587;
+		const smtp_secure = data.get("smtp_secure") === "on";
+
+		if (!email) return fail(400, { error: "Email address is required" });
+		if (!imap_host) return fail(400, { error: "IMAP host is required" });
+		if (!smtp_host) return fail(400, { error: "SMTP host is required" });
+
+		try {
+			const updated = await updateTarget(id, {
+				email,
+				config: {
+					imap: { host: imap_host, port: imap_port, secure: imap_secure },
+					smtp: { host: smtp_host, port: smtp_port, secure: smtp_secure },
+				},
+			});
+			if (!updated) return fail(404, { error: "Target not found" });
+			return { updated: true, emailConfig: { email: updated.email, config: updated.config } };
+		} catch (err) {
+			return fail(400, { error: err instanceof Error ? err.message : "Failed to update email config" });
+		}
+	},
+
+	testConnection: async ({ params }) => {
+		const target = await getTargetBySlug(params.slug);
+		if (!target) return fail(404, { error: "Target not found" });
+		if (target.type !== "email") return fail(400, { error: "Target is not an email target" });
+
+		const config = target.config as EmailConfig | null;
+		if (!config) return fail(400, { error: "Email config not set" });
+
+		const defaultAuth = await getDefaultAuthMethod(target.id);
+		if (!defaultAuth) return fail(400, { error: "No default auth method set — add credentials first" });
+
+		const credentialResult = await getAuthMethodCredential(target.id, defaultAuth.id);
+		if (!credentialResult) return fail(400, { error: "Could not retrieve credentials" });
+
+		try {
+			const testResult = await mailTestConnection(config, credentialResult.credential);
+			return { testResult };
+		} catch (err) {
+			return { testResult: { imap: false, smtp: false, error: err instanceof Error ? err.message : String(err) } };
+		}
 	},
 } satisfies Actions;
