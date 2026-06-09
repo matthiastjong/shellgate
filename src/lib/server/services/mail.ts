@@ -419,7 +419,7 @@ export async function createDraft(
 		const draftsPath = draftsMailbox?.path ?? "Drafts";
 
 		const result = await client.append(draftsPath, rawMessage, ["\\Draft", "\\Seen"]);
-		return { uid: result?.uid ?? null };
+		return { uid: (result && typeof result === "object" && "uid" in result) ? (result as { uid: number }).uid : null };
 	} finally {
 		await client.logout();
 	}
