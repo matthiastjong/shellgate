@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "../db";
 import { targetAuthMethods } from "../db/schema";
 
-const VALID_TYPES = ["bearer", "basic", "custom_header", "query_param", "ssh_key", "jwt_es256", "oauth2_refresh_token", "json_body"];
+const VALID_TYPES = ["bearer", "basic", "custom_header", "query_param", "ssh_key", "jwt_es256", "oauth2_refresh_token", "json_body", "imap_smtp"];
 
 export function computeCredentialHint(credential: string, type?: string): string {
 	if (type === "custom_header") {
@@ -50,6 +50,15 @@ export function computeCredentialHint(credential: string, type?: string): string
 			return `keys: ${keys.join(", ")}`;
 		} catch {
 			return "JSON Body (invalid)";
+		}
+	}
+	if (type === "imap_smtp") {
+		try {
+			const config = JSON.parse(credential);
+			if (config.username) return `IMAP/SMTP ••• ${config.username}`;
+			return "IMAP/SMTP credentials";
+		} catch {
+			return "IMAP/SMTP credentials";
 		}
 	}
 	if (credential.length < 10) return "••••••••";
