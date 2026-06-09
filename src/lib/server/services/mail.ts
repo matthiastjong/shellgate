@@ -170,7 +170,6 @@ export async function search(
 				Object.keys(criteria).length > 0 ? criteria : { all: true };
 
 			const result = await client.search(searchCriteria, { uid: true });
-			// search() returns number[] | false
 			const uids: number[] = result === false ? [] : result;
 
 			if (uids.length === 0) return [];
@@ -178,11 +177,17 @@ export async function search(
 			// Take the most recent `limit` UIDs (largest UIDs = newest)
 			const slicedUids = uids.slice(-limit);
 
+			// Build UID range string — some IMAP servers reject array-based fetch
+			const uidRange = slicedUids.length === 1
+				? String(slicedUids[0])
+				: `${slicedUids[0]}:${slicedUids[slicedUids.length - 1]}`;
+
 			const results: MessageSummary[] = [];
 
 			for await (const msg of client.fetch(
-				slicedUids,
+				uidRange,
 				{ uid: true, envelope: true, flags: true, bodyStructure: true },
+				{ uid: true },
 			)) {
 				const env = msg.envelope;
 				const hasAttachments = hasAttachmentInStructure(msg.bodyStructure);
