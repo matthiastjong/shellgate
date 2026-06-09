@@ -1,7 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { db } from "../db";
 import { targets } from "../db/schema";
-import type { SshConfig } from "../db/schema";
+import type { SshConfig, EmailConfig } from "../db/schema";
 import { isUniqueViolation } from "../utils/db-error";
 import { validateBaseUrl } from "../utils/url";
 
@@ -66,21 +66,57 @@ function validateSshConfig(config: unknown): SshConfig {
 	return { host, port, username };
 }
 
+function validateEmailConfig(config: unknown): EmailConfig {
+	if (!config || typeof config !== "object") {
+		throw new Error("email config is required for email targets");
+	}
+	const c = config as Record<string, unknown>;
+
+	// Validate imap
+	if (!c.imap || typeof c.imap !== "object") {
+		throw new Error("imap config is required for email targets");
+	}
+	const imap = c.imap as Record<string, unknown>;
+	const imapHost = typeof imap.host === "string" ? imap.host.trim() : "";
+	if (!imapHost) throw new Error("imap.host is required for email targets");
+	const imapPort = typeof imap.port === "number" ? imap.port : 993;
+	if (imapPort < 1 || imapPort > 65535) throw new Error("imap.port must be between 1 and 65535");
+	const imapSecure = typeof imap.secure === "boolean" ? imap.secure : true;
+
+	// Validate smtp
+	if (!c.smtp || typeof c.smtp !== "object") {
+		throw new Error("smtp config is required for email targets");
+	}
+	const smtp = c.smtp as Record<string, unknown>;
+	const smtpHost = typeof smtp.host === "string" ? smtp.host.trim() : "";
+	if (!smtpHost) throw new Error("smtp.host is required for email targets");
+	const smtpPort = typeof smtp.port === "number" ? smtp.port : 993;
+	if (smtpPort < 1 || smtpPort > 65535) throw new Error("smtp.port must be between 1 and 65535");
+	const smtpSecure = typeof smtp.secure === "boolean" ? smtp.secure : true;
+
+	return {
+		imap: { host: imapHost, port: imapPort, secure: imapSecure },
+		smtp: { host: smtpHost, port: smtpPort, secure: smtpSecure },
+	};
+}
+
 export async function createTarget(data: {
 	name: string;
-	type: "api" | "ssh";
+	type: "api" | "ssh" | "email";
 	base_url?: string | null;
-	config?: SshConfig | null;
+	config?: SshConfig | EmailConfig | null;
+	email?: string | null;
 }) {
 	const name = data.name.trim();
 	if (!name) throw new Error("name is required");
 
-	if (data.type !== "api" && data.type !== "ssh") {
-		throw new Error("type must be 'api' or 'ssh'");
+	if (data.type !== "api" && data.type !== "ssh" && data.type !== "email") {
+		throw new Error("type must be 'api', 'ssh', or 'email'");
 	}
 
 	let baseUrl: string | null = null;
-	let config: SshConfig | null = null;
+	let config: SshConfig | EmailConfig | null = null;
+	let email: string | null = null;
 
 	if (data.type === "api") {
 		baseUrl = data.base_url ?? "";
@@ -89,6 +125,11 @@ export async function createTarget(data: {
 		if (urlError) throw new Error(urlError);
 	} else if (data.type === "ssh") {
 		config = validateSshConfig(data.config);
+	} else if (data.type === "email") {
+		config = validateEmailConfig(data.config);
+		const emailVal = typeof data.email === "string" ? data.email.trim() : "";
+		if (!emailVal) throw new Error("email is required for email targets");
+		email = emailVal;
 	}
 
 	const slug = slugify(name);
@@ -97,7 +138,7 @@ export async function createTarget(data: {
 	try {
 		const [row] = await db
 			.insert(targets)
-			.values({ name, slug, type: data.type, baseUrl, config })
+			.values({ name, slug, type: data.type, baseUrl, config, email })
 			.returning();
 		return row;
 	} catch (err: unknown) {
@@ -112,9 +153,10 @@ export async function updateTarget(
 	id: string,
 	data: {
 		name?: string;
-		type?: "api" | "ssh";
+		type?: "api" | "ssh" | "email";
 		base_url?: string | null;
-		config?: SshConfig | null;
+		config?: SshConfig | EmailConfig | null;
+		email?: string | null;
 		enabled?: boolean;
 	},
 ) {
@@ -138,8 +180,8 @@ export async function updateTarget(
 	}
 
 	if (data.type !== undefined) {
-		if (data.type !== "api" && data.type !== "ssh") {
-			throw new Error("type must be 'api' or 'ssh'");
+		if (data.type !== "api" && data.type !== "ssh" && data.type !== "email") {
+			throw new Error("type must be 'api', 'ssh', or 'email'");
 		}
 		updates.type = data.type;
 	}
@@ -160,7 +202,23 @@ export async function updateTarget(
 		if (data.config === null) {
 			updates.config = null;
 		} else {
-			updates.config = validateSshConfig(data.config);
+			// Determine config type: if config has imap/smtp keys it's EmailConfig
+			const c = data.config as Record<string, unknown>;
+			if ("imap" in c || "smtp" in c) {
+				updates.config = validateEmailConfig(data.config);
+			} else {
+				updates.config = validateSshConfig(data.config);
+			}
+		}
+	}
+
+	if (data.email !== undefined) {
+		if (data.email === null) {
+			updates.email = null;
+		} else {
+			const emailVal = data.email.trim();
+			if (!emailVal) throw new Error("email must be a non-empty string or null");
+			updates.email = emailVal;
 		}
 	}
 
