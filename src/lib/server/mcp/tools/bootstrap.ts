@@ -23,6 +23,9 @@ export async function bootstrap(token: Token) {
 						proxy: `/gateway/${target.slug}`,
 						baseUrl: target.baseUrl,
 					}),
+					...(target.type === "email" && {
+						email: target.email,
+					}),
 				};
 			}),
 		)

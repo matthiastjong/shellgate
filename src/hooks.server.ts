@@ -28,6 +28,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		pathname.startsWith("/api/") ||
 		pathname.startsWith("/gateway/") ||
 		pathname.startsWith("/ssh/") ||
+		pathname.startsWith("/mail/") ||
 		pathname.startsWith("/discovery") ||
 		pathname.startsWith("/bootstrap") ||
 		pathname.startsWith("/webhooks/") ||

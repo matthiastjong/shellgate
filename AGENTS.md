@@ -21,12 +21,13 @@ src/routes/bootstrap/       ← Agent-facing: full session-start context (REST)
 
 | Service | Purpose |
 |---|---|
-| `targets` | CRUD for API and SSH targets |
+| `targets` | CRUD for API, SSH, and email targets |
 | `tokens` | API key generation, hashing, revocation |
 | `permissions` | Token ↔ target access control |
-| `auth-methods` | Credentials stored per target (bearer, basic, custom_header, ssh_key) |
+| `auth-methods` | Credentials stored per target (bearer, basic, custom_header, ssh_key, imap_smtp) |
 | `gateway` | Proxy logic: resolve target, inject auth, forward request |
 | `ssh` | SSH command execution via `ssh2` |
+| `mail` | Email operations via ImapFlow (IMAP) + Nodemailer (SMTP) |
 | `audit` | Request logging to `audit_logs` table |
 | `users` | Dashboard user management (email + password) |
 | `webhook-endpoints` | CRUD for incoming webhook endpoint registrations |
@@ -46,12 +47,12 @@ tokens ──── webhook_endpoints (one token can have multiple endpoints)
               └── webhook_events (pending/delivered/expired)
 
 users (dashboard login)
-audit_logs (every gateway + SSH request)
+audit_logs (every gateway + SSH + mail request)
 ```
 
-- Targets have `type: "api" | "ssh"`. API targets have `baseUrl`, SSH targets have `config` (JSONB: host, port, username).
+- Targets have `type: "api" | "ssh" | "email"`. API targets have `baseUrl`, SSH targets have `config` (JSONB: host, port, username), email targets have `config` (JSONB: imap + smtp server settings) and `email` (mailbox address).
 - Cascade deletes: deleting a target removes its auth methods and permissions.
-- Auth method types: `bearer`, `basic`, `custom_header`, `query_param`, `ssh_key`, `jwt_es256`, `oauth2_refresh_token`, `json_body`.
+- Auth method types: `bearer`, `basic`, `custom_header`, `query_param`, `ssh_key`, `jwt_es256`, `oauth2_refresh_token`, `json_body`, `imap_smtp`.
 - Webhook endpoints are linked to tokens (agents), not targets. Each endpoint has a unique slug for its public URL.
 - Webhook events expire after 7 days. Agents poll and ACK events.
 - Webhook endpoints have optional `handlingInstructions` (plain text) that agents receive in the poll response.
@@ -66,6 +67,14 @@ These are NOT behind dashboard auth — they use bearer token auth (`requireBear
 | `GET /discovery` | List targets accessible to this token |
 | `ALL /gateway/[target]/[...path]` | Proxy HTTP to upstream API, inject stored credentials |
 | `POST /ssh/[target]/exec` | Execute command on SSH target, return stdout/stderr/exitCode |
+| `POST /mail/[target]/search` | Search emails in a mailbox |
+| `GET /mail/[target]/message/[id]` | Read full email by UID |
+| `GET /mail/[target]/message/[id]/attachment/[partId]` | Download email attachment |
+| `POST /mail/[target]/send` | Send email (requires approval) |
+| `POST /mail/[target]/draft` | Create draft email |
+| `GET /mail/[target]/folders` | List mailbox folders |
+| `POST /mail/[target]/move` | Move email to folder |
+| `POST /mail/[target]/flag` | Set/unset email flags |
 | `GET /health` | Health check |
 | `GET /verify-connection` | Connection verification for agent setup |
 | `GET /api/skill` | Returns OpenClaw skill YAML |
@@ -85,7 +94,7 @@ Behind session auth (cookie-based):
 | Route | Purpose |
 |---|---|
 | `/` | Dashboard overview (stats) |
-| `/targets` | Manage API + SSH targets |
+| `/targets` | Manage API + SSH + email targets |
 | `/targets/[slug]` | Target detail + auth methods |
 | `/api-keys` | Manage agent tokens + permissions |
 | `/api-keys/[id]` | Token detail |
@@ -116,11 +125,20 @@ Behind session auth (cookie-based):
 5. Connect via `ssh2`, execute, return `{ stdout, stderr, exitCode, durationMs }`
 6. Log to `audit_logs`
 
+### Mail operations
+1. Same auth + permission flow as gateway
+2. Validate target type is `email`, has IMAP/SMTP config
+3. Require default auth method with type `imap_smtp`
+4. Connect via ImapFlow (IMAP) or Nodemailer (SMTP) per request
+5. Execute operation (search, read, send, draft, folders, move, flag, attachment)
+6. `mail_send` requires explicit approval (hardcoded, not via guard engine)
+7. Log to `audit_logs` with type `mail`
+
 ### MCP Server
 
 Shellgate exposes all agent-facing functionality as an MCP server at `POST /mcp` using Streamable HTTP transport. Claude Code connects via `mcpServers` config in `~/.claude/settings.json`.
 
-**Tools:** `bootstrap`, `discover` (alias), `api_request`, `api_download`, `ssh_exec`, `webhook_poll`, `webhook_ack`, `org_skill_list`, `org_skill_read`, `org_skill_upsert`, `org_skill_delete`, `memory_list`, `memory_read`, `memory_add`, `memory_delete`, `wiki_list_pages`, `wiki_read_page`, `wiki_upsert_page`, `wiki_delete_page`, `wiki_lint_page`, `vault_search`
+**Tools:** `bootstrap`, `discover` (alias), `api_request`, `api_download`, `ssh_exec`, `mail_search`, `mail_read`, `mail_attachment`, `mail_send`, `mail_draft`, `mail_folders`, `mail_move`, `mail_flag`, `webhook_poll`, `webhook_ack`, `org_skill_list`, `org_skill_read`, `org_skill_upsert`, `org_skill_delete`, `memory_list`, `memory_read`, `memory_add`, `memory_delete`, `wiki_list_pages`, `wiki_read_page`, `wiki_upsert_page`, `wiki_delete_page`, `wiki_lint_page`, `vault_search`
 
 **Auth:** Same bearer token as REST endpoints. Passed via `Authorization` header.
 
@@ -187,7 +205,7 @@ When adding new agent-facing features or data types to Shellgate, always check w
 - **Forms** use `use:enhance` with `invalidateAll: false` + local state updates.
 - **Dates** from Drizzle are `string | Date` — handle both in components. Use `formatDate` for SSR-safe rendering.
 - **DB** uses lazy proxy pattern — setting `DATABASE_URL` before first access is sufficient.
-- **Hooks** (`hooks.server.ts`) run migrations on startup and handle auth routing (skip auth for `/api/`, `/gateway/`, `/ssh/`, `/discovery`).
+- **Hooks** (`hooks.server.ts`) run migrations on startup and handle auth routing (skip auth for `/api/`, `/gateway/`, `/ssh/`, `/mail/`, `/discovery`).
 - **Onboarding flow**: no users → `/setup`, no tokens → `/onboarding`.
 
 ## Stack

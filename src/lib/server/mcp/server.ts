@@ -14,6 +14,7 @@ import { skillList, skillRead, skillUpsert, skillDelete } from "./tools/skills";
 import { memoryList, memoryRead, memoryAdd, memoryDelete } from "./tools/memories";
 import { wikiListPages, wikiReadPage, wikiUpsertPage, wikiDeletePage, wikiLintPage } from "./tools/wiki";
 import { vaultSearch } from "./tools/vaults";
+import { mailSearch, mailRead, mailAttachment, mailSend, mailDraft, mailFolders, mailMove, mailFlag } from "./tools/mail";
 
 const INSTRUCTIONS = `Shellgate is your shared organization context layer. It complements — does not replace — your native memory, skill, and knowledge systems. Always read and write Shellgate for durable organizational information.
 
@@ -342,6 +343,129 @@ When in doubt, prefer 'user' over 'org' — easier to promote later than to clea
 			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 		}
 	);
+
+	server.tool(
+		"mail_search",
+		"Search emails in a mailbox. Returns message list with uid, from, to, subject, date, flags.",
+		{
+			target: z.string().describe("Email target slug"),
+			folder: z.string().optional().describe("Folder (default: INBOX)"),
+			query: z.record(z.string(), z.string()).optional().describe("Search criteria: from, to, subject, since, before, text"),
+			limit: z.number().optional().describe("Max results (default: 20)"),
+		},
+		async (args) => {
+			const result = await mailSearch(token, args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+		}
+	);
+
+	server.tool(
+		"mail_read",
+		"Read a full email message by UID. Returns from, to, cc, subject, date, text, html, flags, and attachment metadata.",
+		{
+			target: z.string().describe("Email target slug"),
+			uid: z.number().describe("Message UID"),
+			folder: z.string().optional().describe("Folder (default: INBOX)"),
+		},
+		async (args) => {
+			const result = await mailRead(token, args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+		}
+	);
+
+	server.tool(
+		"mail_attachment",
+		"Download an email attachment by UID and part ID. Returns base64-encoded content.",
+		{
+			target: z.string().describe("Email target slug"),
+			uid: z.number().describe("Message UID"),
+			partId: z.number().describe("Attachment part ID (1-based)"),
+			folder: z.string().optional().describe("Folder (default: INBOX)"),
+		},
+		async (args) => {
+			const result = await mailAttachment(token, args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+		}
+	);
+
+	server.tool(
+		"mail_send",
+		"Send an email. Requires approval — first call returns approval_required, re-call with approved: true after user confirms.",
+		{
+			target: z.string().describe("Email target slug"),
+			to: z.union([z.string(), z.array(z.string())]).describe("Recipient(s)"),
+			cc: z.union([z.string(), z.array(z.string())]).optional().describe("CC recipient(s)"),
+			bcc: z.union([z.string(), z.array(z.string())]).optional().describe("BCC recipient(s)"),
+			subject: z.string().describe("Email subject"),
+			text: z.string().optional().describe("Plain text body"),
+			html: z.string().optional().describe("HTML body"),
+			inReplyTo: z.string().optional().describe("Message-ID of the email being replied to"),
+			approved: z.preprocess(val => val === "true" || val === true, z.boolean()).optional().describe("Set to true after user explicitly approves sending"),
+		},
+		async (args) => {
+			const result = await mailSend(token, args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+		}
+	);
+
+	server.tool(
+		"mail_draft",
+		"Create a draft email in the Drafts folder.",
+		{
+			target: z.string().describe("Email target slug"),
+			to: z.union([z.string(), z.array(z.string())]).optional().describe("Recipient(s)"),
+			subject: z.string().optional().describe("Email subject"),
+			text: z.string().optional().describe("Plain text body"),
+			html: z.string().optional().describe("HTML body"),
+		},
+		async (args) => {
+			const result = await mailDraft(token, args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+		}
+	);
+
+	server.tool(
+		"mail_folders",
+		"List all folders/labels in the mailbox.",
+		{
+			target: z.string().describe("Email target slug"),
+		},
+		async (args) => {
+			const result = await mailFolders(token, args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+		}
+	);
+
+	server.tool(
+		"mail_move",
+		"Move an email to a different folder.",
+		{
+			target: z.string().describe("Email target slug"),
+			uid: z.number().describe("Message UID"),
+			from: z.string().describe("Source folder"),
+			to: z.string().describe("Destination folder"),
+		},
+		async (args) => {
+			const result = await mailMove(token, args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+		}
+	);
+
+	server.tool(
+		"mail_flag",
+		"Set or unset flags on an email (e.g. \\\\Seen, \\\\Flagged).",
+		{
+			target: z.string().describe("Email target slug"),
+			uid: z.number().describe("Message UID"),
+			folder: z.string().optional().describe("Folder (default: INBOX)"),
+			add: z.array(z.string()).optional().describe("Flags to add (e.g. [\"\\\\Seen\", \"\\\\Flagged\"])"),
+			remove: z.array(z.string()).optional().describe("Flags to remove"),
+		},
+		async (args) => {
+			const result = await mailFlag(token, args);
+			return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+		}
+	);
 }
 
 type ToolHandler = (name: string, args: Record<string, unknown>) => Promise<unknown>;
@@ -393,6 +517,22 @@ export function createMcpToolHandler(token: TokenLike): ToolHandler {
 				return wikiLintPage(args as unknown as { namespace?: string; slug?: string; title?: string; body?: string; sources?: Array<{ type: string; title?: string; uri?: string; retrievedAt?: string }> });
 			case "vault_search":
 				return vaultSearch(t, args as unknown as { query: string });
+			case "mail_search":
+				return mailSearch(t, args as unknown as { target: string; folder?: string; query?: Record<string, string>; limit?: number });
+			case "mail_read":
+				return mailRead(t, args as unknown as { target: string; uid: number; folder?: string });
+			case "mail_attachment":
+				return mailAttachment(t, args as unknown as { target: string; uid: number; partId: number; folder?: string });
+			case "mail_send":
+				return mailSend(t, args as unknown as { target: string; to: string | string[]; cc?: string | string[]; bcc?: string | string[]; subject: string; text?: string; html?: string; inReplyTo?: string; approved?: boolean });
+			case "mail_draft":
+				return mailDraft(t, args as unknown as { target: string; to?: string | string[]; subject?: string; text?: string; html?: string });
+			case "mail_folders":
+				return mailFolders(t, args as unknown as { target: string });
+			case "mail_move":
+				return mailMove(t, args as unknown as { target: string; uid: number; from: string; to: string });
+			case "mail_flag":
+				return mailFlag(t, args as unknown as { target: string; uid: number; folder?: string; add?: string[]; remove?: string[] });
 			default:
 				throw new Error(`Unknown tool: ${name}`);
 		}

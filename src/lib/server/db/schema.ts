@@ -36,13 +36,19 @@ export type SshConfig = {
 	username: string;
 };
 
+export type EmailConfig = {
+	imap: { host: string; port: number; secure: boolean };
+	smtp: { host: string; port: number; secure: boolean };
+};
+
 export const targets = pgTable("targets", {
 	id: uuid("id").primaryKey().defaultRandom(),
 	name: varchar("name", { length: 255 }).notNull(),
 	slug: varchar("slug", { length: 255 }).notNull().unique(),
-	type: text("type").notNull().$type<"api" | "ssh">(),
+	type: text("type").notNull().$type<"api" | "ssh" | "email">(),
 	baseUrl: text("base_url"),
-	config: jsonb("config").$type<SshConfig>(),
+	config: jsonb("config").$type<SshConfig | EmailConfig>(),
+	email: varchar("email", { length: 255 }),
 	enabled: boolean("enabled").notNull().default(true),
 	createdAt: timestamp("created_at", { withTimezone: true })
 		.notNull()
@@ -116,7 +122,7 @@ export const auditLogs = pgTable(
 			onDelete: "set null",
 		}),
 		targetSlug: varchar("target_slug", { length: 255 }),
-		type: text("type").notNull().$type<"gateway" | "ssh" | "vault">(),
+		type: text("type").notNull().$type<"gateway" | "ssh" | "vault" | "mail">(),
 		method: text("method"),
 		path: text("path"),
 		statusCode: integer("status_code"),
