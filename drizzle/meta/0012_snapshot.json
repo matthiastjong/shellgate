@@ -1,6 +1,6 @@
 {
-  "id": "f9751289-acf8-4f8c-a3ec-9be178570abd",
-  "prevId": "5f3c8c75-a843-439a-be44-0dd1de71de5e",
+  "id": "1ec4e5c2-e32f-4723-bef2-57c380ca2d1e",
+  "prevId": "f9751289-acf8-4f8c-a3ec-9be178570abd",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -237,12 +237,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "last_used_at": {
-          "name": "last_used_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -362,6 +356,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "last_used_at": {
+          "name": "last_used_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
@@ -503,6 +503,12 @@
         "config": {
           "name": "config",
           "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false
         },
