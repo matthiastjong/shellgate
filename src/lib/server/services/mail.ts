@@ -371,8 +371,8 @@ export async function send(
 // ---------------------------------------------------------------------------
 
 export interface DraftParams {
-	to: string | string[];
-	subject: string;
+	to?: string | string[];
+	subject?: string;
 	text?: string;
 	html?: string;
 }
@@ -381,7 +381,7 @@ export async function createDraft(
 	config: EmailConfig,
 	credential: string,
 	params: DraftParams,
-): Promise<void> {
+): Promise<{ uid: number | null }> {
 	const cred = parseCredential(credential);
 
 	// Build raw MIME message with stream transport
@@ -418,7 +418,8 @@ export async function createDraft(
 		);
 		const draftsPath = draftsMailbox?.path ?? "Drafts";
 
-		await client.append(draftsPath, rawMessage, ["\\Draft", "\\Seen"]);
+		const result = await client.append(draftsPath, rawMessage, ["\\Draft", "\\Seen"]);
+		return { uid: result?.uid ?? null };
 	} finally {
 		await client.logout();
 	}
