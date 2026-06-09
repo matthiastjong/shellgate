@@ -22,7 +22,7 @@ export const actions = {
 	create: async ({ request }) => {
 		const data = await request.formData();
 		const name = data.get("name")?.toString()?.trim() ?? "";
-		const type = (data.get("type")?.toString() ?? "api") as "api" | "ssh";
+		const type = (data.get("type")?.toString() ?? "api") as "api" | "ssh" | "email";
 		if (!name) return fail(400, { error: "Name is required" });
 
 		if (type === "ssh") {
@@ -33,6 +33,31 @@ export const actions = {
 			if (!username) return fail(400, { error: "Username is required" });
 			try {
 				const target = await createTarget({ name, type: "ssh", config: { host, port, username } });
+				return { created: { ...target, enabled: target.enabled !== false } };
+			} catch (err) {
+				return fail(400, { error: err instanceof Error ? err.message : "Failed to create target" });
+			}
+		} else if (type === "email") {
+			const email = data.get("email")?.toString()?.trim() ?? "";
+			const imap_host = data.get("imap_host")?.toString()?.trim() ?? "";
+			const imap_port = parseInt(data.get("imap_port")?.toString() ?? "993", 10) || 993;
+			const imap_secure = data.get("imap_secure") === "on";
+			const smtp_host = data.get("smtp_host")?.toString()?.trim() ?? "";
+			const smtp_port = parseInt(data.get("smtp_port")?.toString() ?? "587", 10) || 587;
+			const smtp_secure = data.get("smtp_secure") === "on";
+			if (!email) return fail(400, { error: "Email address is required" });
+			if (!imap_host) return fail(400, { error: "IMAP host is required" });
+			if (!smtp_host) return fail(400, { error: "SMTP host is required" });
+			try {
+				const target = await createTarget({
+					name,
+					type: "email",
+					email,
+					config: {
+						imap: { host: imap_host, port: imap_port, secure: imap_secure },
+						smtp: { host: smtp_host, port: smtp_port, secure: smtp_secure },
+					},
+				});
 				return { created: { ...target, enabled: target.enabled !== false } };
 			} catch (err) {
 				return fail(400, { error: err instanceof Error ? err.message : "Failed to create target" });
@@ -100,6 +125,11 @@ export const actions = {
 			if (tokenUrl) config.tokenUrl = tokenUrl;
 
 			credential = JSON.stringify(config);
+		} else if (type === "imap_smtp") {
+			const username = data.get("credential1")?.toString() ?? "";
+			const password = data.get("credential2")?.toString() ?? "";
+			if (!username || !password) return fail(400, { error: "Username and password are required" });
+			credential = JSON.stringify({ username, password });
 		} else {
 			credential = data.get("credential")?.toString() ?? "";
 			if (!credential) return fail(400, { error: "Credential is required" });

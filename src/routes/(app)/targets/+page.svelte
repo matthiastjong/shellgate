@@ -10,6 +10,7 @@ import * as Dialog from "$lib/components/ui/dialog/index.js";
 import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
 import * as Breadcrumb from "$lib/components/ui/breadcrumb/index.js";
 import * as Card from "$lib/components/ui/card/index.js";
+import * as Tabs from "$lib/components/ui/tabs/index.js";
 import { Input } from "$lib/components/ui/input/index.js";
 import { Label } from "$lib/components/ui/label/index.js";
 import { Checkbox } from "$lib/components/ui/checkbox/index.js";
@@ -17,6 +18,7 @@ import PlusIcon from "@lucide/svelte/icons/plus";
 import ServerIcon from "@lucide/svelte/icons/server";
 import GlobeIcon from "@lucide/svelte/icons/globe";
 import MonitorIcon from "@lucide/svelte/icons/monitor";
+import MailIcon from "@lucide/svelte/icons/mail";
 import CheckIcon from "@lucide/svelte/icons/check";
 import CopyIcon from "@lucide/svelte/icons/copy";
 import EllipsisIcon from "@lucide/svelte/icons/ellipsis";
@@ -33,7 +35,8 @@ type Target = {
 	slug: string;
 	type: string;
 	baseUrl: string | null;
-	config: { host: string; port: number; username: string } | null;
+	config: { host: string; port: number; username: string } | { imap: { host: string; port: number; secure: boolean }; smtp: { host: string; port: number; secure: boolean } } | null;
+	email: string | null;
 	enabled: boolean;
 	authMethodCount: number;
 	createdAt: string | Date;
@@ -47,6 +50,12 @@ let localTargets = $state<Target[] | null>(null);
 let targetList = $derived<Target[]>(localTargets ?? (data.targets as Target[]));
 let confirmDeleteId = $state<string | null>(null);
 
+// Tab state
+let activeTab = $state("api");
+let apiTargets = $derived(targetList.filter((t) => t.type === "api"));
+let sshTargets = $derived(targetList.filter((t) => t.type === "ssh"));
+let emailTargets = $derived(targetList.filter((t) => t.type === "email"));
+
 // Create dialog state
 let createOpen = $state(false);
 let createStep = $state(0);
@@ -59,6 +68,18 @@ let copied = $state(false);
 let selectedTokenIds = $state<Set<string>>(new Set());
 let grantAccessSubmitting = $state(false);
 
+// Email create form state
+let emailName = $state('');
+let emailAddress = $state('');
+let emailImapHost = $state('');
+let emailImapPort = $state('993');
+let emailImapSecure = $state(true);
+let emailSmtpHost = $state('');
+let emailSmtpPort = $state('587');
+let emailSmtpSecure = $state(false);
+let emailCredUsername = $state('');
+let emailCredPassword = $state('');
+
 function resetCreateState() {
 	createStep = 0;
 	createSubmitting = false;
@@ -69,6 +90,16 @@ function resetCreateState() {
 	copied = false;
 	selectedTokenIds = new Set();
 	grantAccessSubmitting = false;
+	emailName = '';
+	emailAddress = '';
+	emailImapHost = '';
+	emailImapPort = '993';
+	emailImapSecure = true;
+	emailSmtpHost = '';
+	emailSmtpPort = '587';
+	emailSmtpSecure = false;
+	emailCredUsername = '';
+	emailCredPassword = '';
 }
 
 function updateTargetList(updater: (targets: Target[]) => Target[]) {
@@ -88,6 +119,12 @@ async function copyToClipboard(text: string) {
 	copied = true;
 	setTimeout(() => (copied = false), 2000);
 }
+
+function getSshConfig(config: Target['config']): { host: string; port: number; username: string } | null {
+	if (!config) return null;
+	if ('host' in config && 'username' in config) return config as { host: string; port: number; username: string };
+	return null;
+}
 </script>
 
 <!-- Multi-step Create Dialog -->
@@ -98,7 +135,7 @@ async function copyToClipboard(text: string) {
 				<Dialog.Title>Create Target</Dialog.Title>
 				<Dialog.Description>Choose the type of target to create.</Dialog.Description>
 			</Dialog.Header>
-			<div class="grid grid-cols-2 gap-4 py-4">
+			<div class="grid grid-cols-3 gap-4 py-4">
 				<button
 					type="button"
 					class="flex flex-col items-center gap-3 rounded-lg border-2 border-transparent bg-muted/50 p-6 text-center transition-colors hover:border-primary hover:bg-muted"
@@ -119,6 +156,17 @@ async function copyToClipboard(text: string) {
 					<div>
 						<p class="font-semibold">Server</p>
 						<p class="text-muted-foreground text-xs">Execute commands via SSH</p>
+					</div>
+				</button>
+				<button
+					type="button"
+					class="flex flex-col items-center gap-3 rounded-lg border-2 border-transparent bg-muted/50 p-6 text-center transition-colors hover:border-primary hover:bg-muted"
+					onclick={() => (createStep = 9)}
+				>
+					<MailIcon class="size-8 text-primary" />
+					<div>
+						<p class="font-semibold">Email</p>
+						<p class="text-muted-foreground text-xs">Read and send email via IMAP/SMTP</p>
 					</div>
 				</button>
 			</div>
@@ -379,10 +427,142 @@ async function copyToClipboard(text: string) {
 					</div>
 				</div>
 			</form>
+		{:else if createStep === 9}
+			<Dialog.Header>
+				<Dialog.Title>Email Target Details</Dialog.Title>
+				<Dialog.Description>Configure the IMAP/SMTP connection for your email target.</Dialog.Description>
+			</Dialog.Header>
+			<form
+				method="POST"
+				action="?/create"
+				use:enhance={() => {
+					createSubmitting = true;
+					return async ({ result, update }) => {
+						createSubmitting = false;
+						if (result.type === 'success' && result.data?.created) {
+							const created = result.data.created as Target;
+							createdTarget = created;
+							updateTargetList((targets) => [...targets, created]);
+							createStep = 10;
+						} else if (result.type === 'failure') {
+							toast.error((result.data?.error as string) ?? 'Failed to create target');
+						}
+						await update({ reset: true, invalidateAll: false });
+					};
+				}}
+			>
+				<input type="hidden" name="type" value="email" />
+				<div class="grid gap-4 py-4">
+					<div class="grid gap-2">
+						<Label for="create-email-name">Name</Label>
+						<Input id="create-email-name" name="name" placeholder="e.g. Work Email" bind:value={emailName} required />
+					</div>
+					<div class="grid gap-2">
+						<Label for="create-email-address">Email Address</Label>
+						<Input id="create-email-address" name="email" type="email" placeholder="e.g. me@example.com" bind:value={emailAddress} required />
+					</div>
+					<div class="space-y-2">
+						<p class="text-sm font-medium">IMAP</p>
+						<div class="grid grid-cols-[1fr_80px] gap-2">
+							<div class="grid gap-2">
+								<Label for="create-imap-host" class="text-xs text-muted-foreground">Host</Label>
+								<Input id="create-imap-host" name="imap_host" placeholder="imap.example.com" bind:value={emailImapHost} required />
+							</div>
+							<div class="grid gap-2">
+								<Label for="create-imap-port" class="text-xs text-muted-foreground">Port</Label>
+								<Input id="create-imap-port" name="imap_port" type="number" bind:value={emailImapPort} min="1" max="65535" />
+							</div>
+						</div>
+						<div class="flex items-center gap-2">
+							<Checkbox id="create-imap-secure" name="imap_secure" checked={emailImapSecure} onCheckedChange={(v) => (emailImapSecure = v === true)} />
+							<Label for="create-imap-secure" class="text-sm font-normal">Use TLS/SSL</Label>
+						</div>
+					</div>
+					<div class="space-y-2">
+						<p class="text-sm font-medium">SMTP</p>
+						<div class="grid grid-cols-[1fr_80px] gap-2">
+							<div class="grid gap-2">
+								<Label for="create-smtp-host" class="text-xs text-muted-foreground">Host</Label>
+								<Input id="create-smtp-host" name="smtp_host" placeholder="smtp.example.com" bind:value={emailSmtpHost} required />
+							</div>
+							<div class="grid gap-2">
+								<Label for="create-smtp-port" class="text-xs text-muted-foreground">Port</Label>
+								<Input id="create-smtp-port" name="smtp_port" type="number" bind:value={emailSmtpPort} min="1" max="65535" />
+							</div>
+						</div>
+						<div class="flex items-center gap-2">
+							<Checkbox id="create-smtp-secure" name="smtp_secure" checked={emailSmtpSecure} onCheckedChange={(v) => (emailSmtpSecure = v === true)} />
+							<Label for="create-smtp-secure" class="text-sm font-normal">Use TLS/SSL</Label>
+						</div>
+					</div>
+					<div class="flex gap-2">
+						<Button variant="outline" type="button" onclick={() => (createStep = 0)}>Back</Button>
+						<Button type="submit" class="flex-1" disabled={createSubmitting}>
+							{#if createSubmitting}
+								<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
+							{/if}
+							Create Target
+						</Button>
+					</div>
+				</div>
+			</form>
+		{:else if createStep === 10}
+			<Dialog.Header>
+				<Dialog.Title>Add Email Credentials</Dialog.Title>
+				<Dialog.Description>Add IMAP/SMTP login credentials for {createdTarget?.name ?? 'your email target'}.</Dialog.Description>
+			</Dialog.Header>
+			<form
+				method="POST"
+				action="?/addAuthMethod"
+				use:enhance={() => {
+					authSubmitting = true;
+					return async ({ result, update }) => {
+						authSubmitting = false;
+						if (result.type === 'success' && result.data?.authMethodAdded) {
+							if (createdTarget) {
+								updateTargetList((targets) => targets.map((t) =>
+									t.id === createdTarget!.id ? { ...t, authMethodCount: t.authMethodCount + 1 } : t
+								));
+							}
+							createStep = (data.activeTokens as Token[]).length > 0 ? 7 : 8;
+						} else if (result.type === 'failure') {
+							toast.error((result.data?.error as string) ?? 'Failed to add credentials');
+						}
+						await update({ reset: true, invalidateAll: false });
+					};
+				}}
+			>
+				<input type="hidden" name="slug" value={createdTarget?.slug ?? ''} />
+				<input type="hidden" name="type" value="imap_smtp" />
+				<input type="hidden" name="isDefault" value="on" />
+				<div class="grid gap-4 py-4">
+					<div class="grid gap-2">
+						<Label for="email-cred-label">Label</Label>
+						<Input id="email-cred-label" name="label" placeholder="e.g. Main Account" value="Main Account" required />
+					</div>
+					<div class="grid gap-2">
+						<Label for="email-cred-username">Username / Email</Label>
+						<Input id="email-cred-username" name="credential1" type="email" placeholder="me@example.com" bind:value={emailCredUsername} required />
+					</div>
+					<div class="grid gap-2">
+						<Label for="email-cred-password">Password / App Password</Label>
+						<Input id="email-cred-password" name="credential2" type="password" placeholder="••••••••" bind:value={emailCredPassword} required />
+					</div>
+					<div class="flex gap-2">
+						<Button variant="ghost" type="button" onclick={() => (createStep = (data.activeTokens as Token[]).length > 0 ? 7 : 8)}>Skip for now</Button>
+						<Button type="submit" class="flex-1" disabled={authSubmitting}>
+							{#if authSubmitting}
+								<LoaderCircleIcon class="mr-2 size-4 animate-spin" />
+							{/if}
+							Add Credentials
+						</Button>
+					</div>
+				</div>
+			</form>
 		{:else if createStep === 8}
 			<Dialog.Header>
 				<Dialog.Title>Target Ready</Dialog.Title>
-				<Dialog.Description>Your {createdTarget?.type === 'ssh' ? 'SSH target' : 'target'} is ready!</Dialog.Description>
+				<Dialog.Description>Your {createdTarget?.type === 'ssh' ? 'SSH target' : createdTarget?.type === 'email' ? 'email target' : 'target'} is ready!</Dialog.Description>
 			</Dialog.Header>
 			<div class="flex flex-col items-center gap-4 py-6">
 				<div class="flex size-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
@@ -410,6 +590,8 @@ async function copyToClipboard(text: string) {
 							</Button>
 						</div>
 					</div>
+				{:else if createdTarget?.type === 'email'}
+					<p class="text-center text-sm text-muted-foreground">Your email target is ready! You can now read and send emails via the MCP tools.</p>
 				{:else}
 					<p class="text-center text-sm text-muted-foreground">Your target is ready! You can proxy requests using:</p>
 					<div class="w-full rounded-lg border bg-muted/50 p-3">
@@ -482,133 +664,189 @@ async function copyToClipboard(text: string) {
 			</Button>
 		</div>
 	{:else}
-		<div class="rounded-lg border">
-			<Table.Root>
-				<Table.Header>
-					<Table.Row>
-						<Table.Head>Name</Table.Head>
-						<Table.Head>Type</Table.Head>
-						<Table.Head>Connection</Table.Head>
-						<Table.Head>Auth Methods</Table.Head>
-						<Table.Head>Status</Table.Head>
-						<Table.Head class="w-12"><span class="sr-only">Actions</span></Table.Head>
-					</Table.Row>
-				</Table.Header>
-				<Table.Body>
-					{#each targetList as target (target.id)}
-						{#if confirmDeleteId === target.id}
-							<Table.Row class="bg-red-50 dark:bg-red-950/30">
-								<Table.Cell colspan={6}>
-									<div class="flex items-center justify-between gap-4 py-1">
-										<p class="text-sm">
-											Delete this target? This action cannot be undone.
-										</p>
-										<div class="flex shrink-0 gap-2">
-											<Button variant="outline" size="sm" onclick={() => (confirmDeleteId = null)}>Cancel</Button>
-											<form
-												method="POST"
-												action="?/delete"
-												use:enhance={() => {
-													return async ({ result, update }) => {
-														if (result.type === 'success' && result.data?.deleted) {
-															const deletedId = result.data.deleted as string;
-															updateTargetList((targets) => targets.filter((t) => t.id !== deletedId));
-															confirmDeleteId = null;
-															toast.success('Target deleted');
-														} else if (result.type === 'failure') {
-															toast.error((result.data?.error as string) ?? 'Failed to delete target');
-														}
-														await update({ reset: false, invalidateAll: false });
-													};
-												}}
-											>
-												<input type="hidden" name="id" value={target.id} />
-												<Button type="submit" variant="destructive" size="sm">Yes, delete</Button>
-											</form>
-										</div>
-									</div>
-								</Table.Cell>
-							</Table.Row>
-						{:else}
-							<Table.Row>
-								<Table.Cell class="font-medium">
-									<a href="/targets/{target.slug}" class="hover:underline">{target.name}</a>
-								</Table.Cell>
-								<Table.Cell>
-									<Badge variant="outline">{target.type}</Badge>
-								</Table.Cell>
-								<Table.Cell>
-									{#if target.type === 'ssh' && target.config}
-										<code class="text-muted-foreground text-xs font-mono">{target.config.username}@{target.config.host}:{target.config.port}</code>
-									{:else if target.baseUrl}
-										<code class="text-muted-foreground text-xs font-mono">{target.baseUrl}</code>
+		{#snippet tabTable(targets: Target[])}
+
+				{#if targets.length === 0}
+					<div class="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed py-12 mt-4">
+						<p class="text-muted-foreground text-sm">No targets of this type yet.</p>
+						<Button variant="outline" size="sm" onclick={() => (createOpen = true)}>
+							<PlusIcon class="mr-2 size-4" />
+							Create Target
+						</Button>
+					</div>
+				{:else}
+					<div class="rounded-lg border mt-4">
+						<Table.Root>
+							<Table.Header>
+								<Table.Row>
+									<Table.Head>Name</Table.Head>
+									<Table.Head>Type</Table.Head>
+									<Table.Head>Connection</Table.Head>
+									<Table.Head>Auth Methods</Table.Head>
+									<Table.Head>Status</Table.Head>
+									<Table.Head class="w-12"><span class="sr-only">Actions</span></Table.Head>
+								</Table.Row>
+							</Table.Header>
+							<Table.Body>
+								{#each targets as target (target.id)}
+									{#if confirmDeleteId === target.id}
+										<Table.Row class="bg-red-50 dark:bg-red-950/30">
+											<Table.Cell colspan={6}>
+												<div class="flex items-center justify-between gap-4 py-1">
+													<p class="text-sm">
+														Delete this target? This action cannot be undone.
+													</p>
+													<div class="flex shrink-0 gap-2">
+														<Button variant="outline" size="sm" onclick={() => (confirmDeleteId = null)}>Cancel</Button>
+														<form
+															method="POST"
+															action="?/delete"
+															use:enhance={() => {
+																return async ({ result, update }) => {
+																	if (result.type === 'success' && result.data?.deleted) {
+																		const deletedId = result.data.deleted as string;
+																		updateTargetList((targets) => targets.filter((t) => t.id !== deletedId));
+																		confirmDeleteId = null;
+																		toast.success('Target deleted');
+																	} else if (result.type === 'failure') {
+																		toast.error((result.data?.error as string) ?? 'Failed to delete target');
+																	}
+																	await update({ reset: false, invalidateAll: false });
+																};
+															}}
+														>
+															<input type="hidden" name="id" value={target.id} />
+															<Button type="submit" variant="destructive" size="sm">Yes, delete</Button>
+														</form>
+													</div>
+												</div>
+											</Table.Cell>
+										</Table.Row>
 									{:else}
-										<span class="text-muted-foreground">&mdash;</span>
+										<Table.Row>
+											<Table.Cell class="font-medium">
+												<a href="/targets/{target.slug}" class="hover:underline">{target.name}</a>
+											</Table.Cell>
+											<Table.Cell>
+												<Badge variant="outline">{target.type}</Badge>
+											</Table.Cell>
+											<Table.Cell>
+												{#if target.type === 'ssh'}
+													{@const sshCfg = getSshConfig(target.config)}
+													{#if sshCfg}
+														<code class="text-muted-foreground text-xs font-mono">{sshCfg.username}@{sshCfg.host}:{sshCfg.port}</code>
+													{:else}
+														<span class="text-muted-foreground">&mdash;</span>
+													{/if}
+												{:else if target.type === 'email'}
+													{#if target.email}
+														<code class="text-muted-foreground text-xs font-mono">{target.email}</code>
+													{:else}
+														<span class="text-muted-foreground">&mdash;</span>
+													{/if}
+												{:else if target.baseUrl}
+													<code class="text-muted-foreground text-xs font-mono">{target.baseUrl}</code>
+												{:else}
+													<span class="text-muted-foreground">&mdash;</span>
+												{/if}
+											</Table.Cell>
+											<Table.Cell class="text-muted-foreground text-sm">{target.authMethodCount}</Table.Cell>
+											<Table.Cell>
+												{#if target.enabled !== false}
+													<Badge class="border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300">Active</Badge>
+												{:else}
+													<Badge variant="secondary">Disabled</Badge>
+												{/if}
+											</Table.Cell>
+											<Table.Cell>
+												<form
+													method="POST"
+													action="?/toggle"
+													class="hidden"
+													id="toggle-form-{target.id}"
+													use:enhance={() => {
+														return async ({ result, update }) => {
+															if (result.type === 'success' && result.data?.toggled) {
+																const { id, enabled } = result.data.toggled as { id: string; enabled: boolean };
+																updateTargetList((targets) => targets.map((t) => (t.id === id ? { ...t, enabled } : t)));
+																toast.success(enabled ? 'Target enabled' : 'Target disabled');
+															} else if (result.type === 'failure') {
+																toast.error((result.data?.error as string) ?? 'Failed to toggle');
+															}
+															await update({ reset: false, invalidateAll: false });
+														};
+													}}
+												>
+													<input type="hidden" name="id" value={target.id} />
+													<input type="hidden" name="enabled" value={target.enabled !== false ? 'false' : 'true'} />
+												</form>
+												<DropdownMenu.Root>
+													<DropdownMenu.Trigger>
+														{#snippet child({ props })}
+															<Button variant="ghost" size="icon" class="size-8" {...props}>
+																<EllipsisIcon class="size-4" />
+																<span class="sr-only">Actions</span>
+															</Button>
+														{/snippet}
+													</DropdownMenu.Trigger>
+													<DropdownMenu.Content align="end">
+														<DropdownMenu.Item onclick={() => goto(`/targets/${target.slug}`)}>Edit</DropdownMenu.Item>
+														<DropdownMenu.Item
+															onclick={() => {
+																(document.getElementById(`toggle-form-${target.id}`) as HTMLFormElement)?.requestSubmit();
+															}}
+														>
+															{target.enabled !== false ? 'Disable' : 'Enable'}
+														</DropdownMenu.Item>
+														<DropdownMenu.Separator />
+														<DropdownMenu.Item
+															class="text-destructive"
+															onclick={() => (confirmDeleteId = target.id)}
+														>
+															Delete
+														</DropdownMenu.Item>
+													</DropdownMenu.Content>
+												</DropdownMenu.Root>
+											</Table.Cell>
+										</Table.Row>
 									{/if}
-								</Table.Cell>
-								<Table.Cell class="text-muted-foreground text-sm">{target.authMethodCount}</Table.Cell>
-								<Table.Cell>
-									{#if target.enabled !== false}
-										<Badge class="border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-300">Active</Badge>
-									{:else}
-										<Badge variant="secondary">Disabled</Badge>
-									{/if}
-								</Table.Cell>
-								<Table.Cell>
-									<form
-										method="POST"
-										action="?/toggle"
-										class="hidden"
-										id="toggle-form-{target.id}"
-										use:enhance={() => {
-											return async ({ result, update }) => {
-												if (result.type === 'success' && result.data?.toggled) {
-													const { id, enabled } = result.data.toggled as { id: string; enabled: boolean };
-													updateTargetList((targets) => targets.map((t) => (t.id === id ? { ...t, enabled } : t)));
-													toast.success(enabled ? 'Target enabled' : 'Target disabled');
-												} else if (result.type === 'failure') {
-													toast.error((result.data?.error as string) ?? 'Failed to toggle');
-												}
-												await update({ reset: false, invalidateAll: false });
-											};
-										}}
-									>
-										<input type="hidden" name="id" value={target.id} />
-										<input type="hidden" name="enabled" value={target.enabled !== false ? 'false' : 'true'} />
-									</form>
-									<DropdownMenu.Root>
-										<DropdownMenu.Trigger>
-											{#snippet child({ props })}
-												<Button variant="ghost" size="icon" class="size-8" {...props}>
-													<EllipsisIcon class="size-4" />
-													<span class="sr-only">Actions</span>
-												</Button>
-											{/snippet}
-										</DropdownMenu.Trigger>
-										<DropdownMenu.Content align="end">
-											<DropdownMenu.Item onclick={() => goto(`/targets/${target.slug}`)}>Edit</DropdownMenu.Item>
-											<DropdownMenu.Item
-												onclick={() => {
-													(document.getElementById(`toggle-form-${target.id}`) as HTMLFormElement)?.requestSubmit();
-												}}
-											>
-												{target.enabled !== false ? 'Disable' : 'Enable'}
-											</DropdownMenu.Item>
-											<DropdownMenu.Separator />
-											<DropdownMenu.Item
-												class="text-destructive"
-												onclick={() => (confirmDeleteId = target.id)}
-											>
-												Delete
-											</DropdownMenu.Item>
-										</DropdownMenu.Content>
-									</DropdownMenu.Root>
-								</Table.Cell>
-							</Table.Row>
-						{/if}
-					{/each}
-				</Table.Body>
-			</Table.Root>
-		</div>
+								{/each}
+							</Table.Body>
+						</Table.Root>
+					</div>
+				{/if}
+		{/snippet}
+
+		<Tabs.Root value={activeTab} onValueChange={(v) => (activeTab = v)}>
+			<Tabs.List>
+				<Tabs.Trigger value="api">
+					API
+					{#if apiTargets.length > 0}
+						<Badge variant="secondary" class="ml-1.5 text-xs">{apiTargets.length}</Badge>
+					{/if}
+				</Tabs.Trigger>
+				<Tabs.Trigger value="ssh">
+					SSH
+					{#if sshTargets.length > 0}
+						<Badge variant="secondary" class="ml-1.5 text-xs">{sshTargets.length}</Badge>
+					{/if}
+				</Tabs.Trigger>
+				<Tabs.Trigger value="email">
+					Email
+					{#if emailTargets.length > 0}
+						<Badge variant="secondary" class="ml-1.5 text-xs">{emailTargets.length}</Badge>
+					{/if}
+				</Tabs.Trigger>
+			</Tabs.List>
+			<Tabs.Content value="api">
+				{@render tabTable(apiTargets)}
+			</Tabs.Content>
+			<Tabs.Content value="ssh">
+				{@render tabTable(sshTargets)}
+			</Tabs.Content>
+			<Tabs.Content value="email">
+				{@render tabTable(emailTargets)}
+			</Tabs.Content>
+		</Tabs.Root>
 	{/if}
 </div>
