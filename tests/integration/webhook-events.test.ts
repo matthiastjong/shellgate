@@ -56,6 +56,42 @@ describe("webhook-events service", () => {
 		expect(events[0].body).toEqual({ source: "linear" });
 	});
 
+	it("returns the five oldest pending events by default", async () => {
+		const { token } = await createTestToken();
+		const endpoint = await createEndpoint(token.id, { name: "Linear" });
+
+		for (let i = 0; i < 7; i++) {
+			const event = await createEvent(endpoint.id, {}, { n: i });
+			await db
+				.update(webhookEvents)
+				.set({ receivedAt: new Date(`2026-01-01T00:00:0${i}.000Z`) })
+				.where(eq(webhookEvents.id, event.id));
+		}
+
+		const events = await getPendingEvents(token.id);
+
+		expect(events).toHaveLength(5);
+		expect(events.map((event) => event.body)).toEqual([
+			{ n: 0 },
+			{ n: 1 },
+			{ n: 2 },
+			{ n: 3 },
+			{ n: 4 },
+		]);
+	});
+
+	it("allows callers to request a smaller poll batch", async () => {
+		const { token } = await createTestToken();
+		const endpoint = await createEndpoint(token.id, { name: "Linear" });
+		await createEvent(endpoint.id, {}, { n: 1 });
+		await createEvent(endpoint.id, {}, { n: 2 });
+		await createEvent(endpoint.id, {}, { n: 3 });
+
+		const events = await getPendingEvents(token.id, undefined, 2);
+
+		expect(events).toHaveLength(2);
+	});
+
 	it("does not return events belonging to another token", async () => {
 		const { token: token1 } = await createTestToken("Agent A");
 		const { token: token2 } = await createTestToken("Agent B");

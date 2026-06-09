@@ -6,6 +6,8 @@ import { getPendingEvents } from "$lib/server/services/webhook-events";
 export const GET: RequestHandler = async ({ request, url }) => {
 	const token = await requireBearer(request);
 	const endpointId = url.searchParams.get("endpointId") ?? undefined;
-	const events = await getPendingEvents(token.id, endpointId);
+	const limitParam = url.searchParams.get("limit");
+	const limit = limitParam === null ? undefined : Number(limitParam);
+	const events = await getPendingEvents(token.id, endpointId, limit);
 	return json({ events });
 };

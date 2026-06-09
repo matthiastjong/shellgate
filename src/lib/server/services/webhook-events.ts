@@ -1,8 +1,10 @@
-import { and, eq, inArray, lt } from "drizzle-orm";
+import { and, asc, eq, inArray, lt } from "drizzle-orm";
 import { db } from "../db";
 import { webhookEndpoints, webhookEvents } from "../db/schema";
 
 const EXPIRY_DAYS = 7;
+export const DEFAULT_POLL_LIMIT = 5;
+const MAX_POLL_LIMIT = 25;
 
 export async function createEvent(
 	endpointId: string,
@@ -26,7 +28,15 @@ export async function createEvent(
 	return row;
 }
 
-export async function getPendingEvents(tokenId: string, endpointId?: string) {
+function normalizePollLimit(limit?: number) {
+	if (limit === undefined || !Number.isFinite(limit)) {
+		return DEFAULT_POLL_LIMIT;
+	}
+
+	return Math.min(Math.max(Math.trunc(limit), 1), MAX_POLL_LIMIT);
+}
+
+export async function getPendingEvents(tokenId: string, endpointId?: string, limit?: number) {
 	const conditions = [
 		eq(webhookEvents.status, "pending"),
 		eq(webhookEndpoints.tokenId, tokenId),
@@ -49,7 +59,9 @@ export async function getPendingEvents(tokenId: string, endpointId?: string) {
 		})
 		.from(webhookEvents)
 		.innerJoin(webhookEndpoints, eq(webhookEvents.endpointId, webhookEndpoints.id))
-		.where(and(...conditions));
+		.where(and(...conditions))
+		.orderBy(asc(webhookEvents.receivedAt))
+		.limit(normalizePollLimit(limit));
 }
 
 export async function acknowledgeEvents(tokenId: string, eventIds: string[]) {
