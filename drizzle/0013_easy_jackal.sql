@@ -14,4 +14,5 @@ CREATE TABLE "connected_accounts" (
 --> statement-breakpoint
 ALTER TABLE "targets" ADD COLUMN "connected_account_id" uuid;--> statement-breakpoint
 ALTER TABLE "targets" ADD COLUMN "capability" varchar(32);--> statement-breakpoint
-ALTER TABLE "targets" ADD CONSTRAINT "targets_connected_account_id_connected_accounts_id_fk" FOREIGN KEY ("connected_account_id") REFERENCES "public"."connected_accounts"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "targets" ADD CONSTRAINT "targets_connected_account_id_connected_accounts_id_fk" FOREIGN KEY ("connected_account_id") REFERENCES "public"."connected_accounts"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "connected_accounts" ADD CONSTRAINT "connected_accounts_provider_type_email_unique" UNIQUE("provider_type","email");

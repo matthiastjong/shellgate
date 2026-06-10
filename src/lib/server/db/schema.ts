@@ -353,25 +353,29 @@ export const tokenVaultPermissions = pgTable(
 
 export type TokenVaultPermission = typeof tokenVaultPermissions.$inferSelect;
 
-export const connectedAccounts = pgTable("connected_accounts", {
-	id: uuid("id").primaryKey().defaultRandom(),
-	providerType: varchar("provider_type", { length: 64 }).notNull(),
-	email: varchar("email", { length: 255 }).notNull(),
-	displayName: varchar("display_name", { length: 255 }),
-	accessToken: text("access_token").notNull(),
-	refreshToken: text("refresh_token").notNull(),
-	tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }).notNull(),
-	status: varchar("status", { length: 32 })
-		.notNull()
-		.$type<"connected" | "disconnected" | "error">()
-		.default("connected"),
-	statusMessage: text("status_message"),
-	createdAt: timestamp("created_at", { withTimezone: true })
-		.notNull()
-		.defaultNow(),
-	updatedAt: timestamp("updated_at", { withTimezone: true })
-		.notNull()
-		.defaultNow(),
-});
+export const connectedAccounts = pgTable(
+	"connected_accounts",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		providerType: varchar("provider_type", { length: 64 }).notNull(),
+		email: varchar("email", { length: 255 }).notNull(),
+		displayName: varchar("display_name", { length: 255 }),
+		accessToken: text("access_token").notNull(),
+		refreshToken: text("refresh_token").notNull(),
+		tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }).notNull(),
+		status: varchar("status", { length: 32 })
+			.notNull()
+			.$type<"connected" | "disconnected" | "error">()
+			.default("connected"),
+		statusMessage: text("status_message"),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(t) => [unique().on(t.providerType, t.email)],
+);
 
 export type ConnectedAccount = typeof connectedAccounts.$inferSelect;

@@ -1,7 +1,9 @@
 import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { connectedAccounts, targets } from "../db/schema";
+import type { ConnectedAccount } from "../db/schema";
 import { getProvider } from "../providers";
+import { isUniqueViolation } from "../utils/db-error";
 
 function slugify(name: string): string {
 	return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -19,17 +21,26 @@ export async function connectAccount(input: {
 	if (!provider) throw new Error(`Unknown or unconfigured provider: ${input.providerType}`);
 
 	// Insert the connected account
-	const [account] = await db
-		.insert(connectedAccounts)
-		.values({
-			providerType: input.providerType,
-			email: input.email,
-			displayName: input.displayName,
-			accessToken: input.accessToken,
-			refreshToken: input.refreshToken,
-			tokenExpiresAt: input.tokenExpiresAt,
-		})
-		.returning();
+	let account;
+	try {
+		const [row] = await db
+			.insert(connectedAccounts)
+			.values({
+				providerType: input.providerType,
+				email: input.email,
+				displayName: input.displayName,
+				accessToken: input.accessToken,
+				refreshToken: input.refreshToken,
+				tokenExpiresAt: input.tokenExpiresAt,
+			})
+			.returning();
+		account = row;
+	} catch (err) {
+		if (isUniqueViolation(err)) {
+			throw new Error(`Account ${input.email} is already connected for this provider`);
+		}
+		throw err;
+	}
 
 	// Create 2 managed API targets — append short ID suffix to avoid slug collisions on reconnect
 	const emailSlug = slugify(input.email);
@@ -101,6 +112,9 @@ export async function getManagedTargets(accountId: string) {
 		.where(eq(targets.connectedAccountId, accountId));
 }
 
+// Deduplicate concurrent refresh calls per account
+const refreshing = new Map<string, Promise<string>>();
+
 export async function getAccessTokenForAccount(accountId: string) {
 	const account = await getAccountById(accountId);
 	if (!account) throw new Error("Account not found");
@@ -111,7 +125,20 @@ export async function getAccessTokenForAccount(accountId: string) {
 		return account.accessToken;
 	}
 
-	// Need to refresh — get provider config from static registry
+	// Deduplicate concurrent refresh attempts for the same account
+	const inflight = refreshing.get(accountId);
+	if (inflight) return inflight;
+
+	const refreshPromise = refreshAccessToken(accountId, account);
+	refreshing.set(accountId, refreshPromise);
+	try {
+		return await refreshPromise;
+	} finally {
+		refreshing.delete(accountId);
+	}
+}
+
+async function refreshAccessToken(accountId: string, account: ConnectedAccount): Promise<string> {
 	const provider = getProvider(account.providerType);
 	if (!provider) throw new Error(`Provider not configured: ${account.providerType}`);
 

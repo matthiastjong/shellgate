@@ -155,11 +155,9 @@ describe("connected accounts service", () => {
 		expect(managed.length).toBeGreaterThan(0);
 
 		const target = managed[0];
-		const result = await updateTarget(target.id, { name: "hacked" });
-
-		expect(result).toEqual({
-			error: "cannot modify a managed target — changes must be made via the connected account",
-		});
+		await expect(updateTarget(target.id, { name: "hacked" })).rejects.toThrow(
+			"cannot modify a managed target",
+		);
 	});
 
 	it("rejects deletion of managed targets", async () => {
@@ -169,11 +167,9 @@ describe("connected accounts service", () => {
 		expect(managed.length).toBeGreaterThan(0);
 
 		const target = managed[0];
-		const result = await deleteTarget(target.id);
-
-		expect(result).toEqual({
-			error: "cannot delete a managed target — disconnect the account instead",
-		});
+		await expect(deleteTarget(target.id)).rejects.toThrow(
+			"cannot delete a managed target",
+		);
 	});
 
 	it("allows permission changes on managed targets", async () => {
