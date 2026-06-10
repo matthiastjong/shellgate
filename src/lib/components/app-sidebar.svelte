@@ -25,7 +25,10 @@ const data = {
 		},
 		{
 			title: "Integrations",
-			items: [{ title: "Connect Agent", url: "/connect" }],
+			items: [
+				{ title: "Connected Accounts", url: "/integrations" },
+				{ title: "Connect Agent", url: "/connect" },
+			],
 		},
 		{
 			title: "System",
