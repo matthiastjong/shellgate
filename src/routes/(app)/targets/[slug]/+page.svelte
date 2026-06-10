@@ -603,7 +603,12 @@ async function copyToClipboard(text: string) {
 				</Breadcrumb.Item>
 			</Breadcrumb.List>
 		</Breadcrumb.Root>
-		<h1 class="mt-1 text-2xl font-bold tracking-tight">{target.name}</h1>
+		<div class="mt-1 flex items-center gap-2">
+			<h1 class="text-2xl font-bold tracking-tight">{target.name}</h1>
+			{#if data.connectedAccount}
+				<Badge variant="outline" class="ml-1">Managed by {data.connectedAccount.email}</Badge>
+			{/if}
+		</div>
 	</div>
 
 	<div class="grid gap-6 lg:grid-cols-[1fr_400px]">
@@ -617,7 +622,9 @@ async function copyToClipboard(text: string) {
 						<dt class="text-muted-foreground text-sm">Name</dt>
 						<dd class="flex items-center gap-2">
 							<span class="font-medium">{target.name}</span>
-							<Button variant="ghost" size="sm" class="h-6 text-xs" onclick={openRenameSheet}>Edit</Button>
+							{#if !data.connectedAccount}
+								<Button variant="ghost" size="sm" class="h-6 text-xs" onclick={openRenameSheet}>Edit</Button>
+							{/if}
 						</dd>
 					</div>
 					<div>
@@ -634,7 +641,9 @@ async function copyToClipboard(text: string) {
 							{:else}
 								<span class="text-muted-foreground">&mdash;</span>
 							{/if}
-							<Button variant="ghost" size="sm" class="h-6 text-xs" onclick={openConnectionSheet}>Edit</Button>
+							{#if !data.connectedAccount}
+								<Button variant="ghost" size="sm" class="h-6 text-xs" onclick={openConnectionSheet}>Edit</Button>
+							{/if}
 						</dd>
 					</div>
 				{:else if target.type === 'email'}
@@ -643,7 +652,9 @@ async function copyToClipboard(text: string) {
 						<dt class="text-muted-foreground text-sm">Email Address</dt>
 						<dd class="flex items-center gap-2">
 							<code class="text-sm font-mono">{target.email ?? '—'}</code>
-							<Button variant="ghost" size="sm" class="h-6 text-xs" onclick={openEmailConfigSheet}>Edit</Button>
+							{#if !data.connectedAccount}
+								<Button variant="ghost" size="sm" class="h-6 text-xs" onclick={openEmailConfigSheet}>Edit</Button>
+							{/if}
 						</dd>
 					</div>
 					{#if emailCfg}
@@ -665,7 +676,9 @@ async function copyToClipboard(text: string) {
 							{:else}
 								<span class="text-muted-foreground">&mdash;</span>
 							{/if}
-							<Button variant="ghost" size="sm" class="h-6 text-xs" onclick={openBaseUrlSheet}>Edit</Button>
+							{#if !data.connectedAccount}
+								<Button variant="ghost" size="sm" class="h-6 text-xs" onclick={openBaseUrlSheet}>Edit</Button>
+							{/if}
 						</dd>
 					</div>
 				{/if}
@@ -677,28 +690,30 @@ async function copyToClipboard(text: string) {
 							{:else}
 								<Badge variant="secondary">Disabled</Badge>
 							{/if}
-							<form
-								method="POST"
-								action="?/toggle"
-								use:enhance={() => {
-									return async ({ result, update }) => {
-										if (result.type === 'success' && result.data?.toggled) {
-											const { enabled } = result.data.toggled as { id: string; enabled: boolean };
-											localTarget = { ...target, enabled };
-											toast.success(enabled ? 'Target enabled' : 'Target disabled');
-										} else if (result.type === 'failure') {
-											toast.error((result.data?.error as string) ?? 'Failed to toggle');
-										}
-										await update({ reset: false, invalidateAll: false });
-									};
-								}}
-							>
-								<input type="hidden" name="id" value={target.id} />
-								<input type="hidden" name="enabled" value={target.enabled !== false ? 'false' : 'true'} />
-								<Button type="submit" variant="outline" size="sm" class="h-6 text-xs">
-									{target.enabled !== false ? 'Disable' : 'Enable'}
-								</Button>
-							</form>
+							{#if !data.connectedAccount}
+								<form
+									method="POST"
+									action="?/toggle"
+									use:enhance={() => {
+										return async ({ result, update }) => {
+											if (result.type === 'success' && result.data?.toggled) {
+												const { enabled } = result.data.toggled as { id: string; enabled: boolean };
+												localTarget = { ...target, enabled };
+												toast.success(enabled ? 'Target enabled' : 'Target disabled');
+											} else if (result.type === 'failure') {
+												toast.error((result.data?.error as string) ?? 'Failed to toggle');
+											}
+											await update({ reset: false, invalidateAll: false });
+										};
+									}}
+								>
+									<input type="hidden" name="id" value={target.id} />
+									<input type="hidden" name="enabled" value={target.enabled !== false ? 'false' : 'true'} />
+									<Button type="submit" variant="outline" size="sm" class="h-6 text-xs">
+										{target.enabled !== false ? 'Disable' : 'Enable'}
+									</Button>
+								</form>
+							{/if}
 						</dd>
 					</div>
 					<div>
@@ -716,19 +731,23 @@ async function copyToClipboard(text: string) {
 			<div>
 				<div class="mb-4 flex items-center justify-between">
 					<h2 class="text-lg font-semibold">Auth Methods</h2>
-					<Button size="sm" onclick={openAddAuthSheet}>
-						<PlusIcon class="mr-2 size-4" />
-						Add Auth Method
-					</Button>
+					{#if !data.connectedAccount}
+						<Button size="sm" onclick={openAddAuthSheet}>
+							<PlusIcon class="mr-2 size-4" />
+							Add Auth Method
+						</Button>
+					{/if}
 				</div>
 
 				{#if authMethods.length === 0}
 					<div class="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed py-12">
 						<p class="text-muted-foreground text-sm">No auth methods configured for this target.</p>
-						<Button size="sm" variant="outline" onclick={openAddAuthSheet}>
-							<PlusIcon class="mr-2 size-4" />
-							Add Auth Method
-						</Button>
+						{#if !data.connectedAccount}
+							<Button size="sm" variant="outline" onclick={openAddAuthSheet}>
+								<PlusIcon class="mr-2 size-4" />
+								Add Auth Method
+							</Button>
+						{/if}
 					</div>
 				{:else}
 					<div class="rounded-lg border">
@@ -787,45 +806,22 @@ async function copyToClipboard(text: string) {
 											</Table.Cell>
 											<Table.Cell class="text-muted-foreground text-sm">{formatDate(method.createdAt)}</Table.Cell>
 											<Table.Cell>
-												<form
-													method="POST"
-													action="?/revealCredential"
-													class="hidden"
-													id="reveal-credential-form-{method.id}"
-													use:enhance={() => {
-														return async ({ result, update }) => {
-															if (result.type === 'success' && result.data?.revealedCredential) {
-																const { credential } = result.data.revealedCredential as { id: string; credential: string };
-																viewCredentialLabel = method.label;
-																viewCredentialValue = credential;
-																viewCredentialCopied = false;
-																viewCredentialOpen = true;
-															} else if (result.type === 'failure') {
-																toast.error((result.data?.error as string) ?? 'Failed to reveal credential');
-															}
-															await update({ reset: false, invalidateAll: false });
-														};
-													}}
-												>
-													<input type="hidden" name="slug" value={target.slug} />
-													<input type="hidden" name="id" value={method.id} />
-												</form>
-												{#if !method.isDefault}
+												{#if !data.connectedAccount}
 													<form
 														method="POST"
-														action="?/setDefault"
+														action="?/revealCredential"
 														class="hidden"
-														id="set-default-form-{method.id}"
+														id="reveal-credential-form-{method.id}"
 														use:enhance={() => {
 															return async ({ result, update }) => {
-																if (result.type === 'success' && result.data?.defaultSet) {
-																	const defaultId = result.data.defaultSet as string;
-																	updateAuthMethods((methods) =>
-																		methods.map((m) => ({ ...m, isDefault: m.id === defaultId }))
-																	);
-																	toast.success('Default updated');
+																if (result.type === 'success' && result.data?.revealedCredential) {
+																	const { credential } = result.data.revealedCredential as { id: string; credential: string };
+																	viewCredentialLabel = method.label;
+																	viewCredentialValue = credential;
+																	viewCredentialCopied = false;
+																	viewCredentialOpen = true;
 																} else if (result.type === 'failure') {
-																	toast.error((result.data?.error as string) ?? 'Failed to set default');
+																	toast.error((result.data?.error as string) ?? 'Failed to reveal credential');
 																}
 																await update({ reset: false, invalidateAll: false });
 															};
@@ -834,32 +830,57 @@ async function copyToClipboard(text: string) {
 														<input type="hidden" name="slug" value={target.slug} />
 														<input type="hidden" name="id" value={method.id} />
 													</form>
-												{/if}
-												<DropdownMenu.Root>
-													<DropdownMenu.Trigger>
-														{#snippet child({ props })}
-															<Button variant="ghost" size="icon" class="size-8" {...props}>
-																<EllipsisIcon class="size-4" />
-																<span class="sr-only">Actions</span>
-															</Button>
-														{/snippet}
-													</DropdownMenu.Trigger>
-													<DropdownMenu.Content align="end">
-														<DropdownMenu.Item onclick={() => (document.getElementById(`reveal-credential-form-${method.id}`) as HTMLFormElement)?.requestSubmit()}>View Credential</DropdownMenu.Item>
-														<DropdownMenu.Item onclick={() => openRenameAuthSheet(method)}>Rename</DropdownMenu.Item>
-														<DropdownMenu.Item onclick={() => openEditAuthSheet(method)}>Edit Auth Method</DropdownMenu.Item>
-														{#if !method.isDefault}
-															<DropdownMenu.Item onclick={() => (document.getElementById(`set-default-form-${method.id}`) as HTMLFormElement)?.requestSubmit()}>Set as Default</DropdownMenu.Item>
-														{/if}
-														<DropdownMenu.Separator />
-														<DropdownMenu.Item
-															class="text-destructive"
-															onclick={() => (confirmDeleteAuthId = method.id)}
+													{#if !method.isDefault}
+														<form
+															method="POST"
+															action="?/setDefault"
+															class="hidden"
+															id="set-default-form-{method.id}"
+															use:enhance={() => {
+																return async ({ result, update }) => {
+																	if (result.type === 'success' && result.data?.defaultSet) {
+																		const defaultId = result.data.defaultSet as string;
+																		updateAuthMethods((methods) =>
+																			methods.map((m) => ({ ...m, isDefault: m.id === defaultId }))
+																		);
+																		toast.success('Default updated');
+																	} else if (result.type === 'failure') {
+																		toast.error((result.data?.error as string) ?? 'Failed to set default');
+																	}
+																	await update({ reset: false, invalidateAll: false });
+																};
+															}}
 														>
-															Delete
-														</DropdownMenu.Item>
-													</DropdownMenu.Content>
-												</DropdownMenu.Root>
+															<input type="hidden" name="slug" value={target.slug} />
+															<input type="hidden" name="id" value={method.id} />
+														</form>
+													{/if}
+													<DropdownMenu.Root>
+														<DropdownMenu.Trigger>
+															{#snippet child({ props })}
+																<Button variant="ghost" size="icon" class="size-8" {...props}>
+																	<EllipsisIcon class="size-4" />
+																	<span class="sr-only">Actions</span>
+																</Button>
+															{/snippet}
+														</DropdownMenu.Trigger>
+														<DropdownMenu.Content align="end">
+															<DropdownMenu.Item onclick={() => (document.getElementById(`reveal-credential-form-${method.id}`) as HTMLFormElement)?.requestSubmit()}>View Credential</DropdownMenu.Item>
+															<DropdownMenu.Item onclick={() => openRenameAuthSheet(method)}>Rename</DropdownMenu.Item>
+															<DropdownMenu.Item onclick={() => openEditAuthSheet(method)}>Edit Auth Method</DropdownMenu.Item>
+															{#if !method.isDefault}
+																<DropdownMenu.Item onclick={() => (document.getElementById(`set-default-form-${method.id}`) as HTMLFormElement)?.requestSubmit()}>Set as Default</DropdownMenu.Item>
+															{/if}
+															<DropdownMenu.Separator />
+															<DropdownMenu.Item
+																class="text-destructive"
+																onclick={() => (confirmDeleteAuthId = method.id)}
+															>
+																Delete
+															</DropdownMenu.Item>
+														</DropdownMenu.Content>
+													</DropdownMenu.Root>
+												{/if}
 											</Table.Cell>
 										</Table.Row>
 									{/if}
