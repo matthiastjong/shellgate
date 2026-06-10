@@ -92,6 +92,13 @@
       "when": 1780990365653,
       "tag": "0012_happy_pet_avengers",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1781074908276,
+      "tag": "0013_easy_jackal",
+      "breakpoints": true
     }
   ]
 }

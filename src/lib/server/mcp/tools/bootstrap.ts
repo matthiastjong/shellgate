@@ -6,6 +6,7 @@ import { listSkills } from "$lib/server/services/skills";
 import { listMemories } from "$lib/server/services/memories";
 import { listWikiPages } from "$lib/server/services/wiki";
 import { listVaultPermissions } from "$lib/server/services/vault-permissions";
+import { getAccountById } from "$lib/server/services/connected-accounts";
 
 export async function bootstrap(token: Token) {
 	const permissions = await listPermissions(token.id);
@@ -15,6 +16,15 @@ export async function bootstrap(token: Token) {
 			permissions.map(async (p) => {
 				const target = await getTargetById(p.targetId);
 				if (!target || !target.enabled) return null;
+
+				let integration: { email: string; capability: string } | undefined;
+				if (target.connectedAccountId && target.capability) {
+					const account = await getAccountById(target.connectedAccountId);
+					if (account) {
+						integration = { email: account.email, capability: target.capability };
+					}
+				}
+
 				return {
 					slug: target.slug,
 					name: target.name,
@@ -26,6 +36,7 @@ export async function bootstrap(token: Token) {
 					...(target.type === "email" && {
 						email: target.email,
 					}),
+					...(integration && { integration }),
 				};
 			}),
 		)

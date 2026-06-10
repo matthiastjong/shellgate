@@ -32,6 +32,7 @@ src/routes/bootstrap/       ← Agent-facing: full session-start context (REST)
 | `users` | Dashboard user management (email + password) |
 | `webhook-endpoints` | CRUD for incoming webhook endpoint registrations |
 | `webhook-events` | Event creation, polling, ACK, cleanup |
+| `connected-accounts` | OAuth account linking, managed target provisioning, token refresh |
 
 ### Data model
 
@@ -46,12 +47,15 @@ tokens ──── webhook_endpoints (one token can have multiple endpoints)
               │
               └── webhook_events (pending/delivered/expired)
 
+connected_accounts ──── targets (via connected_account_id FK, cascade delete)
+
 users (dashboard login)
 audit_logs (every gateway + SSH + mail request)
 ```
 
 - Targets have `type: "api" | "ssh" | "email"`. API targets have `baseUrl`, SSH targets have `config` (JSONB: host, port, username), email targets have `config` (JSONB: imap + smtp server settings) and `email` (mailbox address).
-- Cascade deletes: deleting a target removes its auth methods and permissions.
+- Targets may be **managed** by a connected account (`connected_account_id` set). Managed targets are read-only — only permissions can be changed. They have a `capability` field (`mail` or `calendar`).
+- Cascade deletes: deleting a target removes its auth methods and permissions. Deleting a connected account removes its managed targets.
 - Auth method types: `bearer`, `basic`, `custom_header`, `query_param`, `ssh_key`, `jwt_es256`, `oauth2_refresh_token`, `json_body`, `imap_smtp`.
 - Webhook endpoints are linked to tokens (agents), not targets. Each endpoint has a unique slug for its public URL.
 - Webhook events expire after 7 days. Agents poll and ACK events.
@@ -102,6 +106,7 @@ Behind session auth (cookie-based):
 | `/connect` | Agent connection flow |
 | `/webhooks` | Manage incoming webhook endpoints |
 | `/webhooks/[id]` | Webhook detail + events + handling instructions |
+| `/integrations` | Connected Accounts — OAuth account linking |
 | `/settings` | App settings |
 | `/setup` | First-run user creation |
 | `/onboarding` | Post-setup: create first token |
@@ -113,7 +118,9 @@ Behind session auth (cookie-based):
 2. IP whitelist check (if `allowedIps` set on token)
 3. Resolve target by slug, check enabled
 4. Check `token_permissions` for access
-5. Look up default auth method → inject into upstream headers
+5. Inject auth credentials:
+   - **Managed target** (`connectedAccountId` set): resolve OAuth access token from connected account (auto-refresh if expired, set account to "disconnected" on failure)
+   - **Standard target**: look up default auth method → inject into upstream headers
 6. Forward request to `target.baseUrl + path`
 7. Log to `audit_logs`
 
@@ -207,6 +214,8 @@ When adding new agent-facing features or data types to Shellgate, always check w
 - **DB** uses lazy proxy pattern — setting `DATABASE_URL` before first access is sufficient.
 - **Hooks** (`hooks.server.ts`) run migrations on startup and handle auth routing (skip auth for `/api/`, `/gateway/`, `/ssh/`, `/mail/`, `/discovery`).
 - **Onboarding flow**: no users → `/setup`, no tokens → `/onboarding`.
+- **Provider registry** (`src/lib/server/providers.ts`) defines OAuth providers as static code. Credentials come from env vars (`OAUTH_MICROSOFT_CLIENT_ID`, `OAUTH_MICROSOFT_CLIENT_SECRET`) — never stored in the database.
+- **Connected accounts** provision managed API targets automatically. The gateway resolves OAuth credentials from the connected account, not from target auth methods. Managed targets throw on update/delete attempts.
 
 ## Stack
 

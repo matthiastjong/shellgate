@@ -4,7 +4,7 @@ import { createTarget } from "$lib/server/services/targets";
 import { createAuthMethod } from "$lib/server/services/auth-methods";
 import { addPermission } from "$lib/server/services/permissions";
 import { db } from "$lib/server/db";
-import { tokens, targets, targetAuthMethods, tokenPermissions, users, webhookEndpoints, webhookEvents, skills, memories, wikiPages, vaults, vaultItems, vaultItemFields, tokenVaultPermissions } from "$lib/server/db/schema";
+import { tokens, targets, targetAuthMethods, tokenPermissions, users, webhookEndpoints, webhookEvents, skills, memories, wikiPages, vaults, vaultItems, vaultItemFields, tokenVaultPermissions, connectedAccounts } from "$lib/server/db/schema";
 
 function uid() {
 	return randomBytes(4).toString("hex");
@@ -111,6 +111,7 @@ export async function createTestWikiPage(
 }
 
 export async function truncateAll() {
+	await db.delete(connectedAccounts);
 	await db.delete(wikiPages);
 	await db.delete(memories);
 	await db.delete(skills);

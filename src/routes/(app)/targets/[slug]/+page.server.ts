@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "$lib/server/db";
 import { tokenPermissions, tokens } from "$lib/server/db/schema";
 import { getTargetBySlug, updateTarget } from "$lib/server/services/targets";
+import { getAccountById } from "$lib/server/services/connected-accounts";
 import { listAuthMethods, createAuthMethod, updateAuthMethod, deleteAuthMethod, getAuthMethodCredential, getDefaultAuthMethod } from "$lib/server/services/auth-methods";
 import { listTokens } from "$lib/server/services/tokens";
 import { addPermission } from "$lib/server/services/permissions";
@@ -13,6 +14,10 @@ import type { Actions, PageServerLoad } from "./$types";
 export const load: PageServerLoad = async ({ params }) => {
 	const target = await getTargetBySlug(params.slug);
 	if (!target) throw error(404, "Target not found");
+
+	const connectedAccount = target.connectedAccountId
+		? await getAccountById(target.connectedAccountId)
+		: null;
 
 	let authMethods: Awaited<ReturnType<typeof listAuthMethods>> = [];
 	try {
@@ -53,6 +58,7 @@ export const load: PageServerLoad = async ({ params }) => {
 		authMethods,
 		tokenAccess,
 		availableTokens,
+		connectedAccount,
 	};
 };
 

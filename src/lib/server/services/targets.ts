@@ -168,6 +168,10 @@ export async function updateTarget(
 
 	if (!existing) return null;
 
+	if (existing.connectedAccountId) {
+		throw new Error("cannot modify a managed target — changes must be made via the connected account");
+	}
+
 	const updates: Record<string, unknown> = { updatedAt: new Date() };
 
 	if (data.name !== undefined) {
@@ -249,6 +253,10 @@ export async function deleteTarget(id: string) {
 		.limit(1);
 
 	if (!existing) return null;
+
+	if (existing.connectedAccountId) {
+		throw new Error("cannot delete a managed target — disconnect the account instead");
+	}
 
 	await db.delete(targets).where(eq(targets.id, id));
 
