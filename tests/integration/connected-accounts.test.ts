@@ -46,13 +46,13 @@ describe("connected accounts service", () => {
 		expect(mailTarget).toBeDefined();
 		expect(mailTarget!.type).toBe("api");
 		expect(mailTarget!.baseUrl).toBe("https://graph.microsoft.com/v1.0");
-		expect(mailTarget!.slug).toBe("matthias-deal-nl-mail");
+		expect(mailTarget!.slug).toMatch(/^matthias-deal-nl-mail-[a-f0-9]{6}$/);
 		expect(mailTarget!.connectedAccountId).toBe(account.id);
 
 		expect(calTarget).toBeDefined();
 		expect(calTarget!.type).toBe("api");
 		expect(calTarget!.baseUrl).toBe("https://graph.microsoft.com/v1.0");
-		expect(calTarget!.slug).toBe("matthias-deal-nl-calendar");
+		expect(calTarget!.slug).toMatch(/^matthias-deal-nl-calendar-[a-f0-9]{6}$/);
 		expect(calTarget!.connectedAccountId).toBe(account.id);
 	});
 

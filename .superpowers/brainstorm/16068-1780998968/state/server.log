@@ -1,3 +1,0 @@
-{"type":"server-started","port":59279,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:59279","screen_dir":"/Users/mtjmedia/PhpstormProjects/shellgate/.superpowers/brainstorm/16068-1780998968/content","state_dir":"/Users/mtjmedia/PhpstormProjects/shellgate/.superpowers/brainstorm/16068-1780998968/state"}
-{"type":"screen-added","file":"/Users/mtjmedia/PhpstormProjects/shellgate/.superpowers/brainstorm/16068-1780998968/content/waiting.html"}
-{"type":"server-stopped","reason":"idle timeout"}

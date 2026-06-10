@@ -16,9 +16,9 @@ export interface ProviderConfig {
 const PROVIDERS: Record<string, ProviderConfig> = {
 	microsoft_365: {
 		name: "Microsoft 365",
-		authUrl: "https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize",
-		tokenUrl: "https://login.microsoftonline.com/organizations/oauth2/v2.0/token",
-		scopes: "Mail.ReadWrite Mail.Send Calendars.ReadWrite offline_access User.Read",
+		authUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+		tokenUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+		scopes: "Mail.ReadWrite Mail.ReadWrite.Shared Mail.Send Mail.Send.Shared Calendars.ReadWrite Calendars.ReadWrite.Shared offline_access User.Read",
 		graphBaseUrl: "https://graph.microsoft.com/v1.0",
 	},
 };

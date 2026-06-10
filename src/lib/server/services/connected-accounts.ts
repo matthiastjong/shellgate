@@ -31,13 +31,14 @@ export async function connectAccount(input: {
 		})
 		.returning();
 
-	// Create 2 managed API targets
+	// Create 2 managed API targets — append short ID suffix to avoid slug collisions on reconnect
 	const emailSlug = slugify(input.email);
+	const suffix = account.id.slice(0, 6);
 
 	await db.insert(targets).values([
 		{
 			name: `${input.email} — Mail`,
-			slug: `${emailSlug}-mail`,
+			slug: `${emailSlug}-mail-${suffix}`,
 			type: "api" as const,
 			baseUrl: provider.graphBaseUrl,
 			connectedAccountId: account.id,
@@ -45,7 +46,7 @@ export async function connectAccount(input: {
 		},
 		{
 			name: `${input.email} — Calendar`,
-			slug: `${emailSlug}-calendar`,
+			slug: `${emailSlug}-calendar-${suffix}`,
 			type: "api" as const,
 			baseUrl: provider.graphBaseUrl,
 			connectedAccountId: account.id,
