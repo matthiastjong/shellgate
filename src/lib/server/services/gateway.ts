@@ -3,6 +3,7 @@ import { db } from "../db";
 import { targets } from "../db/schema";
 import type { Target, Token } from "../db/schema";
 import { getDefaultAuthMethod } from "./auth-methods";
+import { getAccountById, getAccessTokenForAccount } from "./connected-accounts";
 import { hasPermission } from "./permissions";
 import { signES256JWT } from "../utils/jwt";
 import { getOAuth2AccessToken } from "../utils/oauth2";
@@ -104,127 +105,155 @@ export async function proxyToTarget(
 	// Normalize Accept-Encoding to exclude Brotli
 	headers.set("Accept-Encoding", "gzip, deflate");
 
-	// Inject default auth method credentials
-	const authMethod = await getDefaultAuthMethod(target.id);
-	if (authMethod) {
-		if (authMethod.type === "bearer") {
-			headers.set("Authorization", `Bearer ${authMethod.credential}`);
-		} else if (authMethod.type === "basic") {
-			const encoded = Buffer.from(authMethod.credential).toString("base64");
-			headers.set("Authorization", `Basic ${encoded}`);
-		} else if (authMethod.type === "custom_header") {
-			// Try JSON array format first: [{"name":"X-Key","value":"val"}, ...]
-			let parsed: unknown;
-			try { parsed = JSON.parse(authMethod.credential); } catch { /* legacy format */ }
-			if (Array.isArray(parsed)) {
-				for (const entry of parsed) {
-					if (entry && typeof entry.name === "string" && typeof entry.value === "string" && entry.name.trim()) {
-						headers.set(entry.name.trim(), entry.value);
+	// Inject credentials — managed targets use connected account, standard targets use auth methods
+	if (target.connectedAccountId) {
+		// Managed target — get credentials from connected account
+		const account = await getAccountById(target.connectedAccountId);
+
+		if (!account) {
+			return Response.json({ error: "connected account not found" }, { status: 500 });
+		}
+
+		if (account.status === "disconnected" || account.status === "error") {
+			return Response.json(
+				{ error: `connected account is ${account.status}: ${account.statusMessage ?? "re-authentication required"}` },
+				{ status: 503 },
+			);
+		}
+
+		try {
+			const accessToken = await getAccessTokenForAccount(target.connectedAccountId);
+			headers.set("Authorization", `Bearer ${accessToken}`);
+		} catch (err) {
+			console.error("[gateway] ✗ managed target token refresh failed:", err);
+			return Response.json(
+				{ error: "connected account token refresh failed, re-authentication required" },
+				{ status: 503 },
+			);
+		}
+	} else {
+		// Standard auth method flow
+		const authMethod = await getDefaultAuthMethod(target.id);
+		if (authMethod) {
+			if (authMethod.type === "bearer") {
+				headers.set("Authorization", `Bearer ${authMethod.credential}`);
+			} else if (authMethod.type === "basic") {
+				const encoded = Buffer.from(authMethod.credential).toString("base64");
+				headers.set("Authorization", `Basic ${encoded}`);
+			} else if (authMethod.type === "custom_header") {
+				// Try JSON array format first: [{"name":"X-Key","value":"val"}, ...]
+				let parsed: unknown;
+				try { parsed = JSON.parse(authMethod.credential); } catch { /* legacy format */ }
+				if (Array.isArray(parsed)) {
+					for (const entry of parsed) {
+						if (entry && typeof entry.name === "string" && typeof entry.value === "string" && entry.name.trim()) {
+							headers.set(entry.name.trim(), entry.value);
+						}
+					}
+				} else {
+					// Legacy single-header format: "Header: Value"
+					const separatorIndex = authMethod.credential.indexOf(":");
+					if (separatorIndex > 0) {
+						const headerName = authMethod.credential.slice(0, separatorIndex).trim();
+						const headerValue = authMethod.credential.slice(separatorIndex + 1).trim();
+						headers.set(headerName, headerValue);
 					}
 				}
-			} else {
-				// Legacy single-header format: "Header: Value"
+			} else if (authMethod.type === "query_param") {
 				const separatorIndex = authMethod.credential.indexOf(":");
 				if (separatorIndex > 0) {
-					const headerName = authMethod.credential.slice(0, separatorIndex).trim();
-					const headerValue = authMethod.credential.slice(separatorIndex + 1).trim();
-					headers.set(headerName, headerValue);
+					const paramName = authMethod.credential.slice(0, separatorIndex).trim();
+					const paramValue = authMethod.credential.slice(separatorIndex + 1).trim();
+					url.searchParams.set(paramName, paramValue);
 				}
-			}
-		} else if (authMethod.type === "query_param") {
-			const separatorIndex = authMethod.credential.indexOf(":");
-			if (separatorIndex > 0) {
-				const paramName = authMethod.credential.slice(0, separatorIndex).trim();
-				const paramValue = authMethod.credential.slice(separatorIndex + 1).trim();
-				url.searchParams.set(paramName, paramValue);
-			}
-		} else if (authMethod.type === "jwt_es256") {
-			try {
-				const config = JSON.parse(authMethod.credential);
-				const jwt = await signES256JWT({
-					privateKey: config.privateKey,
-					keyId: config.keyId,
-					issuerId: config.issuerId,
-					audience: config.audience,
-					expiresInSeconds: config.expiresInSeconds,
-				});
-				headers.set("Authorization", `Bearer ${jwt}`);
-			} catch (err) {
-				console.error("[gateway] ✗ JWT signing failed:", err);
-				return Response.json(
-					{ error: "JWT signing failed" },
-					{ status: 500 },
-				);
-			}
-		} else if (authMethod.type === "oauth2_refresh_token") {
-			try {
-				const config = JSON.parse(authMethod.credential);
-				const accessToken = await getOAuth2AccessToken({
-					clientId: config.clientId,
-					clientSecret: config.clientSecret,
-					refreshToken: config.refreshToken,
-					tokenUrl: config.tokenUrl,
-				});
-				headers.set("Authorization", `Bearer ${accessToken}`);
-			} catch (err) {
-				console.error("[gateway] ✗ OAuth2 token refresh failed:", err);
-				return Response.json(
-					{ error: "OAuth2 token refresh failed" },
-					{ status: 500 },
-				);
-			}
-		} else if (authMethod.type === "json_body") {
-			try {
-				const storedFields = JSON.parse(authMethod.credential);
-				let agentBody: Record<string, unknown> = {};
-				if (request.method !== "GET" && request.method !== "HEAD") {
-					try {
-						const cloned = request.clone();
-						const text = await cloned.text();
-						if (text) agentBody = JSON.parse(text);
-					} catch { /* non-JSON or empty body — use empty object */ }
-				}
-				const hasBody = request.method !== "GET" && request.method !== "HEAD";
-				const mergedBody = hasBody ? JSON.stringify({ ...agentBody, ...storedFields }) : undefined;
-				if (hasBody) headers.set("Content-Type", "application/json");
-
-				console.log("[gateway] →", request.method, url.toString());
-				console.log("[gateway] → headers:", redactHeaders(headers));
-
-				let upstreamResponse: Response;
+			} else if (authMethod.type === "jwt_es256") {
 				try {
-					upstreamResponse = await fetch(url.toString(), {
-						method: request.method,
-						headers,
-						body: mergedBody,
-						// @ts-expect-error duplex needed for streaming body
-						duplex: "half",
+					const config = JSON.parse(authMethod.credential);
+					const jwt = await signES256JWT({
+						privateKey: config.privateKey,
+						keyId: config.keyId,
+						issuerId: config.issuerId,
+						audience: config.audience,
+						expiresInSeconds: config.expiresInSeconds,
+					});
+					headers.set("Authorization", `Bearer ${jwt}`);
+				} catch (err) {
+					console.error("[gateway] ✗ JWT signing failed:", err);
+					return Response.json(
+						{ error: "JWT signing failed" },
+						{ status: 500 },
+					);
+				}
+			} else if (authMethod.type === "oauth2_refresh_token") {
+				try {
+					const config = JSON.parse(authMethod.credential);
+					const accessToken = await getOAuth2AccessToken({
+						clientId: config.clientId,
+						clientSecret: config.clientSecret,
+						refreshToken: config.refreshToken,
+						tokenUrl: config.tokenUrl,
+					});
+					headers.set("Authorization", `Bearer ${accessToken}`);
+				} catch (err) {
+					console.error("[gateway] ✗ OAuth2 token refresh failed:", err);
+					return Response.json(
+						{ error: "OAuth2 token refresh failed" },
+						{ status: 500 },
+					);
+				}
+			} else if (authMethod.type === "json_body") {
+				try {
+					const storedFields = JSON.parse(authMethod.credential);
+					let agentBody: Record<string, unknown> = {};
+					if (request.method !== "GET" && request.method !== "HEAD") {
+						try {
+							const cloned = request.clone();
+							const text = await cloned.text();
+							if (text) agentBody = JSON.parse(text);
+						} catch { /* non-JSON or empty body — use empty object */ }
+					}
+					const hasBody = request.method !== "GET" && request.method !== "HEAD";
+					const mergedBody = hasBody ? JSON.stringify({ ...agentBody, ...storedFields }) : undefined;
+					if (hasBody) headers.set("Content-Type", "application/json");
+
+					console.log("[gateway] →", request.method, url.toString());
+					console.log("[gateway] → headers:", redactHeaders(headers));
+
+					let upstreamResponse: Response;
+					try {
+						upstreamResponse = await fetch(url.toString(), {
+							method: request.method,
+							headers,
+							body: mergedBody,
+							// @ts-expect-error duplex needed for streaming body
+							duplex: "half",
+						});
+					} catch (err) {
+						console.error("[gateway] ✗ upstream request failed:", err);
+						return Response.json({ error: "upstream request failed" }, { status: 502 });
+					}
+
+					console.log("[gateway] ←", upstreamResponse.status, url.toString());
+					console.log("[gateway] ← headers:", Object.fromEntries(upstreamResponse.headers.entries()));
+
+					const responseHeaders = new Headers();
+					for (const [key, value] of upstreamResponse.headers.entries()) {
+						const lower = key.toLowerCase();
+						if (lower === "transfer-encoding" || lower === "content-encoding") continue;
+						responseHeaders.set(key, value);
+					}
+
+					const body = await upstreamResponse.arrayBuffer();
+					responseHeaders.set("Content-Length", String(body.byteLength));
+
+					return new Response(body, {
+						status: upstreamResponse.status,
+						headers: responseHeaders,
 					});
 				} catch (err) {
-					console.error("[gateway] ✗ upstream request failed:", err);
-					return Response.json({ error: "upstream request failed" }, { status: 502 });
+					console.error("[gateway] ✗ json_body merge failed:", err);
+					return Response.json({ error: "json_body merge failed" }, { status: 500 });
 				}
-
-				console.log("[gateway] ←", upstreamResponse.status, url.toString());
-				console.log("[gateway] ← headers:", Object.fromEntries(upstreamResponse.headers.entries()));
-
-				const responseHeaders = new Headers();
-				for (const [key, value] of upstreamResponse.headers.entries()) {
-					const lower = key.toLowerCase();
-					if (lower === "transfer-encoding" || lower === "content-encoding") continue;
-					responseHeaders.set(key, value);
-				}
-
-				const body = await upstreamResponse.arrayBuffer();
-				responseHeaders.set("Content-Length", String(body.byteLength));
-
-				return new Response(body, {
-					status: upstreamResponse.status,
-					headers: responseHeaders,
-				});
-			} catch (err) {
-				console.error("[gateway] ✗ json_body merge failed:", err);
-				return Response.json({ error: "json_body merge failed" }, { status: 500 });
 			}
 		}
 	}
