@@ -87,7 +87,7 @@
 			<Card.Header>
 				<Card.Title>No providers configured</Card.Title>
 				<Card.Description>
-					Configure an integration provider in <a href="/settings" class="underline hover:text-foreground">Settings</a> to connect external accounts.
+					Set the <code class="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">OAUTH_MICROSOFT_CLIENT_ID</code> and <code class="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">OAUTH_MICROSOFT_CLIENT_SECRET</code> environment variables to enable Microsoft 365 integration.
 				</Card.Description>
 			</Card.Header>
 		</Card.Root>
