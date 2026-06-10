@@ -7,6 +7,9 @@ import {
 	getAccessTokenForAccount,
 	getManagedTargets,
 } from "$lib/server/services/connected-accounts";
+import { updateTarget, deleteTarget } from "$lib/server/services/targets";
+import { addPermission, hasPermission } from "$lib/server/services/permissions";
+import { createTestToken } from "../helpers";
 
 describe("connected accounts service", () => {
 	beforeEach(async () => {
@@ -175,5 +178,71 @@ describe("connected accounts service", () => {
 		} finally {
 			globalThis.fetch = originalFetch;
 		}
+	});
+
+	it("rejects updates to managed target details", async () => {
+		const provider = await createTestProvider();
+
+		const account = await connectAccount({
+			providerId: provider.id,
+			email: "managed@example.com",
+			accessToken: "at",
+			refreshToken: "rt",
+			tokenExpiresAt: new Date(Date.now() + 3600_000),
+		});
+
+		const managed = await getManagedTargets(account.id);
+		expect(managed.length).toBeGreaterThan(0);
+
+		const target = managed[0];
+		const result = await updateTarget(target.id, { name: "hacked" });
+
+		expect(result).toEqual({
+			error: "cannot modify a managed target — changes must be made via the connected account",
+		});
+	});
+
+	it("rejects deletion of managed targets", async () => {
+		const provider = await createTestProvider();
+
+		const account = await connectAccount({
+			providerId: provider.id,
+			email: "nodelete@example.com",
+			accessToken: "at",
+			refreshToken: "rt",
+			tokenExpiresAt: new Date(Date.now() + 3600_000),
+		});
+
+		const managed = await getManagedTargets(account.id);
+		expect(managed.length).toBeGreaterThan(0);
+
+		const target = managed[0];
+		const result = await deleteTarget(target.id);
+
+		expect(result).toEqual({
+			error: "cannot delete a managed target — disconnect the account instead",
+		});
+	});
+
+	it("allows permission changes on managed targets", async () => {
+		const provider = await createTestProvider();
+
+		const account = await connectAccount({
+			providerId: provider.id,
+			email: "perms@example.com",
+			accessToken: "at",
+			refreshToken: "rt",
+			tokenExpiresAt: new Date(Date.now() + 3600_000),
+		});
+
+		const managed = await getManagedTargets(account.id);
+		expect(managed.length).toBeGreaterThan(0);
+
+		const target = managed[0];
+		const { token } = await createTestToken();
+
+		await addPermission(token.id, target.id);
+		const allowed = await hasPermission(token.id, target.id);
+		expect(allowed).toBe(true);
 	});
 });
