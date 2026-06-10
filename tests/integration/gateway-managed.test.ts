@@ -7,7 +7,6 @@ import { eq } from "drizzle-orm";
 import type { Token } from "$lib/server/db/schema";
 import {
 	createTestToken,
-	createTestProvider,
 	grantPermission,
 	truncateAll,
 } from "../helpers";
@@ -30,27 +29,23 @@ describe("gateway — managed targets", () => {
 	});
 
 	it("injects access token from connected account for managed targets", async () => {
-		const provider = await createTestProvider("Microsoft 365");
 		const account = await connectAccount({
-			providerId: provider.id,
+			providerType: "microsoft_365",
 			email: "user@example.com",
 			displayName: "Test User",
 			accessToken: "managed-access-token-xyz",
 			refreshToken: "managed-refresh-token-xyz",
-			tokenExpiresAt: new Date(Date.now() + 3600_000), // 1 hour from now
+			tokenExpiresAt: new Date(Date.now() + 3600_000),
 		});
 
-		// Find the managed mail target created by connectAccount
 		const managedTargets = await getManagedTargets(account.id);
 		const mailTarget = managedTargets.find((t) => t.slug?.includes("mail"));
 		expect(mailTarget).toBeDefined();
 
-		// Create a token and grant access to the managed target
 		const { token: tokenRow } = await createTestToken();
 		await grantPermission(tokenRow.id, mailTarget!.id);
 		const fullToken = await getFullToken(tokenRow.id);
 
-		// Mock fetch to capture upstream request
 		let capturedHeaders: Headers | undefined;
 		globalThis.fetch = async (input: string | URL | Request, init?: RequestInit) => {
 			capturedHeaders = new Headers(init?.headers);
@@ -69,9 +64,8 @@ describe("gateway — managed targets", () => {
 	});
 
 	it("returns 503 when connected account is disconnected", async () => {
-		const provider = await createTestProvider("Microsoft 365");
 		const account = await connectAccount({
-			providerId: provider.id,
+			providerType: "microsoft_365",
 			email: "disconnected@example.com",
 			displayName: "Disconnected User",
 			accessToken: "old-token",
@@ -79,15 +73,12 @@ describe("gateway — managed targets", () => {
 			tokenExpiresAt: new Date(Date.now() + 3600_000),
 		});
 
-		// Mark account as disconnected
 		await updateAccountStatus(account.id, "disconnected", "Token revoked");
 
-		// Find the managed mail target
 		const managedTargets = await getManagedTargets(account.id);
 		const mailTarget = managedTargets.find((t) => t.slug?.includes("mail"));
 		expect(mailTarget).toBeDefined();
 
-		// Create a token and grant access
 		const { token: tokenRow } = await createTestToken();
 		await grantPermission(tokenRow.id, mailTarget!.id);
 		const fullToken = await getFullToken(tokenRow.id);

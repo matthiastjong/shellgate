@@ -353,32 +353,9 @@ export const tokenVaultPermissions = pgTable(
 
 export type TokenVaultPermission = typeof tokenVaultPermissions.$inferSelect;
 
-export const integrationProviders = pgTable("integration_providers", {
-	id: uuid("id").primaryKey().defaultRandom(),
-	slug: varchar("slug", { length: 64 }).notNull().unique(),
-	name: varchar("name", { length: 255 }).notNull(),
-	type: varchar("type", { length: 64 }).notNull(),
-	clientId: text("client_id").notNull(),
-	clientSecret: text("client_secret").notNull(),
-	scopes: text("scopes").notNull(),
-	authUrl: text("auth_url").notNull(),
-	tokenUrl: text("token_url").notNull(),
-	enabled: boolean("enabled").notNull().default(true),
-	createdAt: timestamp("created_at", { withTimezone: true })
-		.notNull()
-		.defaultNow(),
-	updatedAt: timestamp("updated_at", { withTimezone: true })
-		.notNull()
-		.defaultNow(),
-});
-
-export type IntegrationProvider = typeof integrationProviders.$inferSelect;
-
 export const connectedAccounts = pgTable("connected_accounts", {
 	id: uuid("id").primaryKey().defaultRandom(),
-	providerId: uuid("provider_id")
-		.notNull()
-		.references(() => integrationProviders.id, { onDelete: "cascade" }),
+	providerType: varchar("provider_type", { length: 64 }).notNull(),
 	email: varchar("email", { length: 255 }).notNull(),
 	displayName: varchar("display_name", { length: 255 }),
 	accessToken: text("access_token").notNull(),

@@ -1,15 +1,28 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { truncateAll, createTestProvider } from "../helpers";
+import { truncateAll } from "../helpers";
 import {
 	connectAccount,
 	disconnectAccount,
 	listAccounts,
 	getAccessTokenForAccount,
 	getManagedTargets,
+	getAccountById,
+	updateAccountStatus,
 } from "$lib/server/services/connected-accounts";
 import { updateTarget, deleteTarget } from "$lib/server/services/targets";
 import { addPermission, hasPermission } from "$lib/server/services/permissions";
 import { createTestToken } from "../helpers";
+
+function connectTestAccount(overrides: { email?: string } = {}) {
+	return connectAccount({
+		providerType: "microsoft_365",
+		email: overrides.email ?? "test@example.com",
+		displayName: "Test User",
+		accessToken: "at-123",
+		refreshToken: "rt-456",
+		tokenExpiresAt: new Date(Date.now() + 3600_000),
+	});
+}
 
 describe("connected accounts service", () => {
 	beforeEach(async () => {
@@ -17,20 +30,12 @@ describe("connected accounts service", () => {
 	});
 
 	it("provisions 2 managed targets when connecting", async () => {
-		const provider = await createTestProvider("Microsoft 365");
-
-		const account = await connectAccount({
-			providerId: provider.id,
-			email: "matthias@deal.nl",
-			displayName: "Matthias",
-			accessToken: "at-123",
-			refreshToken: "rt-456",
-			tokenExpiresAt: new Date(Date.now() + 3600_000),
-		});
+		const account = await connectTestAccount({ email: "matthias@deal.nl" });
 
 		expect(account.id).toBeDefined();
 		expect(account.email).toBe("matthias@deal.nl");
 		expect(account.status).toBe("connected");
+		expect(account.providerType).toBe("microsoft_365");
 
 		const managed = await getManagedTargets(account.id);
 		expect(managed).toHaveLength(2);
@@ -52,15 +57,7 @@ describe("connected accounts service", () => {
 	});
 
 	it("cascade deletes managed targets when disconnecting", async () => {
-		const provider = await createTestProvider();
-
-		const account = await connectAccount({
-			providerId: provider.id,
-			email: "test@example.com",
-			accessToken: "at",
-			refreshToken: "rt",
-			tokenExpiresAt: new Date(Date.now() + 3600_000),
-		});
+		const account = await connectTestAccount();
 
 		const before = await getManagedTargets(account.id);
 		expect(before).toHaveLength(2);
@@ -72,50 +69,27 @@ describe("connected accounts service", () => {
 	});
 
 	it("lists accounts with provider info", async () => {
-		const provider = await createTestProvider("Google Workspace");
-
-		await connectAccount({
-			providerId: provider.id,
-			email: "user@example.com",
-			displayName: "User",
-			accessToken: "at",
-			refreshToken: "rt",
-			tokenExpiresAt: new Date(Date.now() + 3600_000),
-		});
+		await connectTestAccount({ email: "user@example.com" });
 
 		const accounts = await listAccounts();
 		expect(accounts).toHaveLength(1);
 
 		const acc = accounts[0];
 		expect(acc.email).toBe("user@example.com");
-		expect(acc.displayName).toBe("User");
-		expect(acc.status).toBe("connected");
-		expect(acc.provider).toBeDefined();
-		expect(acc.provider.id).toBe(provider.id);
-		expect(acc.provider.name).toBe("Google Workspace");
-		expect(acc.provider.slug).toBe("google-workspace");
+		expect(acc.provider.type).toBe("microsoft_365");
+		expect(acc.provider.name).toBe("Microsoft 365");
 	});
 
 	it("returns cached token when not expired", async () => {
-		const provider = await createTestProvider();
-
-		const account = await connectAccount({
-			providerId: provider.id,
-			email: "cached@example.com",
-			accessToken: "cached-token",
-			refreshToken: "rt",
-			tokenExpiresAt: new Date(Date.now() + 3600_000), // 1 hour from now
-		});
+		const account = await connectTestAccount();
 
 		const token = await getAccessTokenForAccount(account.id);
-		expect(token).toBe("cached-token");
+		expect(token).toBe("at-123");
 	});
 
 	it("refreshes access token when expired", async () => {
-		const provider = await createTestProvider();
-
 		const account = await connectAccount({
-			providerId: provider.id,
+			providerType: "microsoft_365",
 			email: "expired@example.com",
 			accessToken: "old-token",
 			refreshToken: "rt-refresh",
@@ -126,7 +100,7 @@ describe("connected accounts service", () => {
 		try {
 			globalThis.fetch = async (url: string | URL | Request) => {
 				const urlStr = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
-				if (urlStr.includes("googleapis.com/token")) {
+				if (urlStr.includes("oauth2/v2.0/token")) {
 					return Response.json({
 						access_token: "new-access-token",
 						refresh_token: "new-refresh-token",
@@ -144,10 +118,8 @@ describe("connected accounts service", () => {
 	});
 
 	it("sets status to disconnected on refresh failure", async () => {
-		const provider = await createTestProvider();
-
 		const account = await connectAccount({
-			providerId: provider.id,
+			providerType: "microsoft_365",
 			email: "fail@example.com",
 			accessToken: "old-token",
 			refreshToken: "bad-rt",
@@ -158,7 +130,7 @@ describe("connected accounts service", () => {
 		try {
 			globalThis.fetch = async (url: string | URL | Request) => {
 				const urlStr = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
-				if (urlStr.includes("googleapis.com/token")) {
+				if (urlStr.includes("oauth2/v2.0/token")) {
 					return new Response("invalid_grant", { status: 400 });
 				}
 				return originalFetch(url);
@@ -168,10 +140,6 @@ describe("connected accounts service", () => {
 				"Token refresh failed: 400",
 			);
 
-			// Verify status was updated
-			const { getAccountById } = await import(
-				"$lib/server/services/connected-accounts"
-			);
 			const updated = await getAccountById(account.id);
 			expect(updated!.status).toBe("disconnected");
 			expect(updated!.statusMessage).toContain("Token refresh failed");
@@ -181,15 +149,7 @@ describe("connected accounts service", () => {
 	});
 
 	it("rejects updates to managed target details", async () => {
-		const provider = await createTestProvider();
-
-		const account = await connectAccount({
-			providerId: provider.id,
-			email: "managed@example.com",
-			accessToken: "at",
-			refreshToken: "rt",
-			tokenExpiresAt: new Date(Date.now() + 3600_000),
-		});
+		const account = await connectTestAccount({ email: "managed@example.com" });
 
 		const managed = await getManagedTargets(account.id);
 		expect(managed.length).toBeGreaterThan(0);
@@ -203,15 +163,7 @@ describe("connected accounts service", () => {
 	});
 
 	it("rejects deletion of managed targets", async () => {
-		const provider = await createTestProvider();
-
-		const account = await connectAccount({
-			providerId: provider.id,
-			email: "nodelete@example.com",
-			accessToken: "at",
-			refreshToken: "rt",
-			tokenExpiresAt: new Date(Date.now() + 3600_000),
-		});
+		const account = await connectTestAccount({ email: "nodelete@example.com" });
 
 		const managed = await getManagedTargets(account.id);
 		expect(managed.length).toBeGreaterThan(0);
@@ -225,15 +177,7 @@ describe("connected accounts service", () => {
 	});
 
 	it("allows permission changes on managed targets", async () => {
-		const provider = await createTestProvider();
-
-		const account = await connectAccount({
-			providerId: provider.id,
-			email: "perms@example.com",
-			accessToken: "at",
-			refreshToken: "rt",
-			tokenExpiresAt: new Date(Date.now() + 3600_000),
-		});
+		const account = await connectTestAccount({ email: "perms@example.com" });
 
 		const managed = await getManagedTargets(account.id);
 		expect(managed.length).toBeGreaterThan(0);

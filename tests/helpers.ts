@@ -4,7 +4,7 @@ import { createTarget } from "$lib/server/services/targets";
 import { createAuthMethod } from "$lib/server/services/auth-methods";
 import { addPermission } from "$lib/server/services/permissions";
 import { db } from "$lib/server/db";
-import { tokens, targets, targetAuthMethods, tokenPermissions, users, webhookEndpoints, webhookEvents, skills, memories, wikiPages, vaults, vaultItems, vaultItemFields, tokenVaultPermissions, integrationProviders, connectedAccounts } from "$lib/server/db/schema";
+import { tokens, targets, targetAuthMethods, tokenPermissions, users, webhookEndpoints, webhookEvents, skills, memories, wikiPages, vaults, vaultItems, vaultItemFields, tokenVaultPermissions, connectedAccounts } from "$lib/server/db/schema";
 
 function uid() {
 	return randomBytes(4).toString("hex");
@@ -88,19 +88,6 @@ export async function createTestMemory(
 	});
 }
 
-export async function createTestProvider(name?: string) {
-	const { createProvider } = await import("$lib/server/services/integration-providers");
-	return createProvider({
-		name: name ?? `Provider ${uid()}`,
-		type: "google",
-		clientId: `client-id-${uid()}`,
-		clientSecret: `client-secret-${uid()}`,
-		scopes: "https://mail.google.com/",
-		authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
-		tokenUrl: "https://oauth2.googleapis.com/token",
-	});
-}
-
 export async function createTestWikiPage(
 	overrides: {
 		namespace?: string;
@@ -125,7 +112,6 @@ export async function createTestWikiPage(
 
 export async function truncateAll() {
 	await db.delete(connectedAccounts);
-	await db.delete(integrationProviders);
 	await db.delete(wikiPages);
 	await db.delete(memories);
 	await db.delete(skills);

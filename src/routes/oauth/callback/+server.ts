@@ -1,5 +1,5 @@
 import { redirect } from "@sveltejs/kit";
-import { getProviderById } from "$lib/server/services/integration-providers";
+import { getProvider } from "$lib/server/providers";
 import { connectAccount } from "$lib/server/services/connected-accounts";
 import type { RequestHandler } from "./$types";
 
@@ -16,13 +16,12 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 		redirect(303, "/integrations?error=missing_params");
 	}
 
-	// Validate state
 	const stateCookie = cookies.get("oauth_state");
 	if (!stateCookie) {
 		redirect(303, "/integrations?error=invalid_state");
 	}
 
-	let storedState: { state: string; providerId: string };
+	let storedState: { state: string; providerType: string };
 	try {
 		storedState = JSON.parse(stateCookie);
 	} catch {
@@ -35,12 +34,11 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 
 	cookies.delete("oauth_state", { path: "/" });
 
-	const provider = await getProviderById(storedState.providerId);
+	const provider = getProvider(storedState.providerType);
 	if (!provider) {
 		redirect(303, "/integrations?error=provider_not_found");
 	}
 
-	// Exchange code for tokens
 	const redirectUri = `${url.origin}/oauth/callback`;
 
 	const tokenResponse = await fetch(provider.tokenUrl, {
@@ -81,7 +79,7 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 	}
 
 	await connectAccount({
-		providerId: provider.id,
+		providerType: storedState.providerType,
 		email,
 		displayName,
 		accessToken,

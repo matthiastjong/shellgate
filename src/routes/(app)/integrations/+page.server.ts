@@ -1,11 +1,11 @@
 import { fail } from "@sveltejs/kit";
 import { listAccounts, disconnectAccount, getManagedTargets } from "$lib/server/services/connected-accounts";
-import { getEnabledProviders } from "$lib/server/services/integration-providers";
+import { getEnabledProviders } from "$lib/server/providers";
 import type { Actions, PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async () => {
 	const accounts = await listAccounts();
-	const providers = await getEnabledProviders();
+	const providers = getEnabledProviders();
 
 	const accountsWithTargets = await Promise.all(
 		accounts.map(async (account) => {

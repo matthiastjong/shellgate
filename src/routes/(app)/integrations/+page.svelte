@@ -73,8 +73,8 @@
 			</Card.Header>
 			<Card.Content>
 				<div class="flex flex-wrap gap-3">
-					{#each data.providers as provider (provider.id)}
-						<Button href="/oauth/authorize?provider={provider.id}">
+					{#each data.providers as provider (provider.type)}
+						<Button href="/oauth/authorize?provider={provider.type}">
 							<LinkIcon class="mr-2 size-4" />
 							Connect {provider.name}
 						</Button>

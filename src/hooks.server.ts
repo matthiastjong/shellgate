@@ -4,10 +4,9 @@ import { countUsers, getUserByEmail } from "$lib/server/services/users";
 import { validateSession } from "$lib/server/auth";
 import { checkHasTokens } from "$lib/server/cache";
 import { runMigrations } from "$lib/server/migrate";
-import { seedProviders } from "$lib/server/seed-providers";
 import { env } from "$env/dynamic/private";
 
-const migrationPromise = runMigrations().then(() => seedProviders());
+const migrationPromise = runMigrations();
 
 async function checkHasUsers(): Promise<boolean> {
 	const count = await countUsers();

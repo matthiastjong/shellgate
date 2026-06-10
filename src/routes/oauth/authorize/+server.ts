@@ -1,25 +1,25 @@
 import { redirect } from "@sveltejs/kit";
 import { randomBytes } from "node:crypto";
-import { getProviderById } from "$lib/server/services/integration-providers";
+import { getProvider } from "$lib/server/providers";
 import type { RequestHandler } from "./$types";
 
 export const GET: RequestHandler = async ({ url, cookies }) => {
-	const providerId = url.searchParams.get("provider");
-	if (!providerId) {
+	const providerType = url.searchParams.get("provider");
+	if (!providerType) {
 		return Response.json({ error: "provider parameter required" }, { status: 400 });
 	}
 
-	const provider = await getProviderById(providerId);
-	if (!provider || !provider.enabled) {
-		return Response.json({ error: "provider not found or disabled" }, { status: 404 });
+	const provider = getProvider(providerType);
+	if (!provider) {
+		return Response.json({ error: "provider not found or not configured" }, { status: 404 });
 	}
 
 	const state = randomBytes(32).toString("hex");
-	cookies.set("oauth_state", JSON.stringify({ state, providerId }), {
+	cookies.set("oauth_state", JSON.stringify({ state, providerType }), {
 		path: "/",
 		httpOnly: true,
 		sameSite: "lax",
-		maxAge: 600, // 10 minutes
+		maxAge: 600,
 	});
 
 	const redirectUri = `${url.origin}/oauth/callback`;

@@ -1,33 +1,28 @@
 import { eq } from "drizzle-orm";
 import { db } from "../db";
-import { connectedAccounts, integrationProviders, targets } from "../db/schema";
+import { connectedAccounts, targets } from "../db/schema";
+import { getProvider } from "../providers";
 
 function slugify(name: string): string {
 	return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
 export async function connectAccount(input: {
-	providerId: string;
+	providerType: string;
 	email: string;
 	displayName?: string;
 	accessToken: string;
 	refreshToken: string;
 	tokenExpiresAt: Date;
 }) {
-	// Look up the provider
-	const [provider] = await db
-		.select()
-		.from(integrationProviders)
-		.where(eq(integrationProviders.id, input.providerId))
-		.limit(1);
-
-	if (!provider) throw new Error("Provider not found");
+	const provider = getProvider(input.providerType);
+	if (!provider) throw new Error(`Unknown or unconfigured provider: ${input.providerType}`);
 
 	// Insert the connected account
 	const [account] = await db
 		.insert(connectedAccounts)
 		.values({
-			providerId: input.providerId,
+			providerType: input.providerType,
 			email: input.email,
 			displayName: input.displayName,
 			accessToken: input.accessToken,
@@ -37,23 +32,22 @@ export async function connectAccount(input: {
 		.returning();
 
 	// Create 2 managed API targets
-	const emailSlug = `${slugify(input.email)}-mail`;
-	const calendarSlug = `${slugify(input.email)}-calendar`;
+	const emailSlug = slugify(input.email);
 
 	await db.insert(targets).values([
 		{
 			name: `${input.email} — Mail`,
-			slug: emailSlug,
+			slug: `${emailSlug}-mail`,
 			type: "api" as const,
-			baseUrl: "https://graph.microsoft.com/v1.0",
+			baseUrl: provider.graphBaseUrl,
 			connectedAccountId: account.id,
 			capability: "mail" as const,
 		},
 		{
 			name: `${input.email} — Calendar`,
-			slug: calendarSlug,
+			slug: `${emailSlug}-calendar`,
 			type: "api" as const,
-			baseUrl: "https://graph.microsoft.com/v1.0",
+			baseUrl: provider.graphBaseUrl,
 			connectedAccountId: account.id,
 			capability: "calendar" as const,
 		},
@@ -83,27 +77,20 @@ export async function getAccountById(accountId: string) {
 
 export async function listAccounts() {
 	const rows = await db
-		.select({
-			id: connectedAccounts.id,
-			email: connectedAccounts.email,
-			displayName: connectedAccounts.displayName,
-			status: connectedAccounts.status,
-			statusMessage: connectedAccounts.statusMessage,
-			createdAt: connectedAccounts.createdAt,
-			provider: {
-				id: integrationProviders.id,
-				name: integrationProviders.name,
-				type: integrationProviders.type,
-				slug: integrationProviders.slug,
-			},
-		})
+		.select()
 		.from(connectedAccounts)
-		.innerJoin(
-			integrationProviders,
-			eq(connectedAccounts.providerId, integrationProviders.id),
-		);
+		.orderBy(connectedAccounts.createdAt);
 
-	return rows;
+	return rows.map((row) => {
+		const provider = getProvider(row.providerType);
+		return {
+			...row,
+			provider: {
+				type: row.providerType,
+				name: provider?.name ?? row.providerType,
+			},
+		};
+	});
 }
 
 export async function getManagedTargets(accountId: string) {
@@ -118,20 +105,14 @@ export async function getAccessTokenForAccount(accountId: string) {
 	if (!account) throw new Error("Account not found");
 
 	// Check if token is still valid (with 60s buffer)
-	const now = Date.now();
 	const expiresAt = new Date(account.tokenExpiresAt).getTime();
-	if (expiresAt > now + 60_000) {
+	if (expiresAt > Date.now() + 60_000) {
 		return account.accessToken;
 	}
 
-	// Need to refresh — look up provider for tokenUrl and clientId/secret
-	const [provider] = await db
-		.select()
-		.from(integrationProviders)
-		.where(eq(integrationProviders.id, account.providerId))
-		.limit(1);
-
-	if (!provider) throw new Error("Provider not found");
+	// Need to refresh — get provider config from static registry
+	const provider = getProvider(account.providerType);
+	if (!provider) throw new Error(`Provider not configured: ${account.providerType}`);
 
 	try {
 		const response = await fetch(provider.tokenUrl, {
@@ -153,11 +134,9 @@ export async function getAccessTokenForAccount(accountId: string) {
 
 		const data = await response.json();
 
-		const newExpiresAt = new Date(Date.now() + data.expires_in * 1000);
-
 		const updates: Record<string, unknown> = {
 			accessToken: data.access_token,
-			tokenExpiresAt: newExpiresAt,
+			tokenExpiresAt: new Date(Date.now() + data.expires_in * 1000),
 			status: "connected",
 			statusMessage: null,
 			updatedAt: new Date(),
@@ -174,11 +153,9 @@ export async function getAccessTokenForAccount(accountId: string) {
 
 		return data.access_token as string;
 	} catch (error) {
-		// If it's already our thrown error from the !response.ok branch, re-throw
 		if (error instanceof Error && error.message.startsWith("Token refresh failed")) {
 			throw error;
 		}
-		// Network or unexpected error
 		await updateAccountStatus(accountId, "disconnected", `Token refresh error: ${error instanceof Error ? error.message : String(error)}`);
 		throw error;
 	}
